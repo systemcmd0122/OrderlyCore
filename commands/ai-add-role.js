@@ -1,4 +1,3 @@
-// commands/ai-add-role.js
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getFirestore, doc, setDoc } = require('firebase/firestore');
 const { v4: uuidv4 } = require('uuid');
@@ -24,7 +23,7 @@ module.exports = {
             // index.jsでclientオブジェクトに格納されたgeminiModelを正しく参照
             const geminiModel = interaction.client.geminiModel; 
             if (!geminiModel) {
-                 throw new Error('AIモデルが初期化されていません。');
+                 throw new Error('AIモデルが初期化されていません。Botの管理者に連絡してください。');
             }
 
             const result = await geminiModel.generateContent(prompt);

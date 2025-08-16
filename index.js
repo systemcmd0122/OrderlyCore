@@ -7,14 +7,13 @@ const express = require('express');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-const { getFirestore } = require('firebase/firestore');
-const { getDatabase } = require('firebase/database'); // Realtime Databaseを追加
+const { getFirestore, collection, query, where, getDocs, deleteDoc, doc } = require('firebase/firestore');
+const { getDatabase } = require('firebase/database');
 
 // --- Express アプリケーション設定 ---
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// セキュリティヘッダーの設定
 app.use(express.json());
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -26,21 +25,19 @@ app.use((req, res, next) => {
 // --- ウェブサイトホスティング機能 ---
 app.get('/', (req, res) => {
     const indexPath = path.join(__dirname, 'index.html');
-    fs.access(indexPath, fs.constants.F_OK, (err) => {
-        if (err) {
-            console.error('index.html が見つかりません。');
+    // fs.access は非推奨のため、fs.promises.stat を使用
+    fs.promises.stat(indexPath)
+        .then(() => res.sendFile(indexPath))
+        .catch(() => {
             res.status(404).json({ 
                 status: 'error', 
                 message: 'Website not found. Bot is running.',
-                botStatus: client && client.isReady() ? 'ok' : 'initializing'
+                botStatus: client && client.isReady() ? 'ok' : 'initializing' 
             });
-        } else {
-            res.sendFile(indexPath);
-        }
-    });
+        });
 });
 
-// ヘルスチェック用エンドポイント
+// --- ヘルスチェック用エンドポイント ---
 app.get('/ping', (req, res) => {
     res.status(200).json({
         status: 'ok',
@@ -52,17 +49,16 @@ app.get('/ping', (req, res) => {
 app.get('/health', (req, res) => {
     const isReady = client && client.isReady();
     const status = isReady && client.ws.status === 0 ? 'ok' : 'degraded';
-    const health = {
-        status: status,
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        botStatus: isReady ? client.ws.status : 'initializing'
-    };
-    res.status(status === 'ok' ? 200 : 503).json(health);
+    res.status(status === 'ok' ? 200 : 503).json({ 
+        status, 
+        timestamp: new Date().toISOString(), 
+        uptime: process.uptime(), 
+        memory: process.memoryUsage(), 
+        botStatus: isReady ? client.ws.status : 'initializing' 
+    });
 });
 
-// Keep-Alive (常時起動) 機能
+// --- Keep-Alive (常時起動) 機能 ---
 function keepAlive() {
     const PING_INTERVAL = 2 * 60 * 1000; // 2分
     const selfUrl = process.env.APP_URL;
@@ -72,21 +68,20 @@ function keepAlive() {
     }
     setInterval(async () => {
         try {
-            const url = selfUrl.endsWith('/ping') ? selfUrl : `${selfUrl}/ping`;
+            const url = new URL('/ping', selfUrl).href;
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
-            const response = await fetch(url, {
-                signal: controller.signal,
-                headers: { 'User-Agent': `Discord-Bot-KeepAlive/${require('./package.json').version || '1.0.0'}` }
+            
+            const response = await fetch(url, { 
+                signal: controller.signal, 
+                headers: { 'User-Agent': `Discord-Bot-KeepAlive/${require('./package.json').version || '1.0.0'}` } 
             });
             clearTimeout(timeout);
-            if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
-            console.log(chalk.cyan(`Keep-Alive ping successful to ${url}. Status: ${response.status}`));
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            console.log(chalk.cyan(`Keep-Alive ping successful. Status: ${response.status}`));
         } catch (error) {
-            console.error(chalk.yellow(`Keep-Alive ping failed for ${selfUrl}:`, error.message));
+            console.error(chalk.yellow(`Keep-Alive ping failed:`, error.message));
         }
-        const used = process.memoryUsage();
-        console.log(chalk.cyan(`Memory: ${Math.round(used.heapUsed / 1024 / 1024)}MB / ${Math.round(used.heapTotal / 1024 / 1024)}MB`));
     }, PING_INTERVAL);
     app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
 }
@@ -95,7 +90,7 @@ function keepAlive() {
 const firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-    databaseURL: process.env.FIREBASE_DATABASE_URL, // ★ Realtime DatabaseのURLを追加
+    databaseURL: process.env.FIREBASE_DATABASE_URL,
     projectId: process.env.FIREBASE_PROJECT_ID,
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
@@ -104,7 +99,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-const rtdb = getDatabase(firebaseApp); // ★ Realtime Databaseを初期化
+const rtdb = getDatabase(firebaseApp);
 
 // --- Google Gemini API設定 ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -123,84 +118,53 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-// グローバル変数
+// --- グローバル変数 (他ファイルから参照できるようにclientオブジェクトに格納) ---
 client.db = db;
-client.rtdb = rtdb; // ★ Realtime Databaseをclientオブジェクトに格納
+client.rtdb = rtdb;
+client.geminiModel = geminiModel; // ★ AIモデルを格納
 client.commands = new Collection();
 
-// --- ボットステータス管理 ---
-const BotStatus = {
-    INITIALIZING: '🔄 初期化中...',
-    LOADING_COMMANDS: '📂 コマンド読み込み中...',
-    LOADING_EVENTS: '🎯 イベント読み込み中...',
-    CONNECTING: '🌐 Discord に接続中...',
-    REGISTERING_COMMANDS: '⚙️ コマンド登録中...',
-    GENERATING_STATUS: '🤖 AIステータス生成中...',
-    READY: '✅ 正常稼働中',
-    ERROR: '❌ エラー発生'
-};
-let currentStatus = BotStatus.INITIALIZING;
-
-function updateBotStatus(status, details = '') {
-    currentStatus = status;
-    console.log(`[${new Date().toLocaleString('ja-JP')}] ${status} ${details}`);
-    if (client.user && !client.isReady()) {
-         client.user.setPresence({
-            activities: [{ name: 'status', type: ActivityType.Custom, state: status }],
-            status: 'dnd'
-        });
-    }
-}
-
-// --- コマンド・イベントの読み込み ---
-updateBotStatus(BotStatus.LOADING_COMMANDS);
+// --- コマンド・イベントの動的読み込み ---
+// commandsフォルダ
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 const commands = [];
 for (const file of commandFiles) {
     try {
-        const filePath = path.join(commandsPath, file);
-        delete require.cache[require.resolve(filePath)];
-        const command = require(filePath);
+        const command = require(path.join(commandsPath, file));
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
             commands.push(command.data.toJSON());
-            console.log(chalk.blue(`✅ コマンド読み込み完了: ${command.data.name}`));
-        } else {
-            console.log(chalk.yellow(`⚠️ 警告: ${filePath} のコマンドに必要なプロパティがありません。`));
         }
     } catch (error) {
         console.error(chalk.red(`❌ コマンド読み込みエラー (${file}):`), error);
     }
 }
-console.log(chalk.blueBright(`📦 ${commands.length} 個のコマンドが読み込まれました。`));
+console.log(chalk.blueBright(`📦 ${commands.length} 個のコマンドを読み込みました。`));
 
-updateBotStatus(BotStatus.LOADING_EVENTS);
+// eventsフォルダ
 const eventsPath = path.join(__dirname, 'events');
-if (fs.existsSync(eventsPath)) {
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
-    for (const file of eventFiles) {
-        try {
-            const filePath = path.join(eventsPath, file);
-            delete require.cache[require.resolve(filePath)];
-            const event = require(filePath);
-            if (event.once) {
-                client.once(event.name, (...args) => event.execute(...args, client));
-            } else {
-                client.on(event.name, (...args) => event.execute(...args, client));
-            }
-            console.log(chalk.magenta(`✅ イベント読み込み完了: ${event.name}`));
-        } catch (error) {
-            console.error(chalk.red(`❌ イベント読み込みエラー (${file}):`), error);
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+for (const file of eventFiles) {
+    try {
+        const event = require(path.join(eventsPath, file));
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
         }
+    } catch (error) {
+        console.error(chalk.red(`❌ イベント読み込みエラー (${file}):`), error);
     }
 }
+console.log(chalk.magenta(`✨ ${eventFiles.length} 個のイベントを読み込みました。`));
 
-// --- スラッシュコマンド登録 ---
+
+// --- スラッシュコマンドの登録 ---
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 async function deployCommands() {
     try {
-        updateBotStatus(BotStatus.REGISTERING_COMMANDS, `${commands.length} 個のコマンド`);
+        console.log(chalk.yellow(`⚙️ ${commands.length} 個のアプリケーションコマンドの登録を開始...`));
         const data = await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands }
@@ -209,53 +173,50 @@ async function deployCommands() {
         return true;
     } catch (error) {
         console.error(chalk.red('❌ コマンド登録エラー:'), error);
-        updateBotStatus(BotStatus.ERROR, 'コマンド登録失敗');
         return false;
     }
 }
 
-// --- Gemini APIによるカスタムステータス生成 ---
-async function generateStatuses(client) {
-    updateBotStatus(BotStatus.GENERATING_STATUS);
-    try {
-        const serverCount = client.guilds.cache.size;
-        const userCount = client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0);
-        const prompt = `あなたは多機能Discordボットのための、ユニークでキャッチーな「カスタムステータス」を考えるプロです。
-以下の情報を参考に、ボットの機能や規模をアピールするような、短くて魅力的なステータスを10個生成してください。
-# ボットの情報
-- サーバー参加数: ${serverCount}
-- 合計ユーザー数: ${userCount}
-- 主な機能: ウェルカムメッセージ, 高機能ロールボード, Firestoreデータベース連携, AI連携
-# 出力形式のルール
-- 必ずJSON形式の配列で出力してください。
-- 各要素は、'emoji'(string)と'state'(string)のキーを持つオブジェクトとします。
-- 'emoji'にはステータスに付ける絵文字を1つ記述します。
-- 'state'にはステータスのテキストを記述します。
-- サーバー数やユーザー数のような動的な情報は、必ず"\${serverCount}"や"\${userCount}"というプレースホルダーの形でテキストに含めてください。
-# 出力例
-[
-  { "emoji": "🚀", "state": "\${serverCount}個のサーバーをサポート中！" },
-  { "emoji": "🎧", "state": "\${userCount}人の声に耳を傾けています" }
-]`;
+// --- 予約投稿スケジューラ ---
+function startScheduler(client) {
+    console.log(chalk.blue('⏰ 予約投稿スケジューラを起動しました。'));
+    setInterval(async () => {
+        const now = Date.now();
+        const firestore = client.db;
+        try {
+            // Firestoreから期限切れの予約タスクを取得
+            const schedulesRef = collection(firestore, 'schedules');
+            const q = query(schedulesRef, where('postAt', '<=', now));
+            const snapshot = await getDocs(q);
 
-        const result = await geminiModel.generateContent(prompt);
-        const text = result.response.text();
-        const cleanedJson = text.replace(/```json|```/g, '').trim();
-        const generatedStatuses = JSON.parse(cleanedJson);
-        return generatedStatuses.filter(s => s.emoji && s.state);
-    } catch (error) {
-        console.error(chalk.red('❌ Gemini APIでのステータス生成に失敗:'), error.message);
-        console.log(chalk.yellow('⚠️ フォールバック用の静的ステータスを使用します。'));
-        return [
-            { emoji: '✅', state: '正常稼働中' },
-            { emoji: '📊', state: `${client.guilds.cache.size} サーバーで稼働中` },
-            { emoji: '💡', state: '/help でコマンド一覧' },
-            { emoji: '👥', state: `${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)} ユーザーをサポート` },
-        ];
-    }
+            if (snapshot.empty) return;
+
+            // 各タスクを実行
+            for (const document of snapshot.docs) {
+                const schedule = document.data();
+                try {
+                    const channel = await client.channels.fetch(schedule.channelId).catch(() => null);
+                    if (channel) {
+                        await channel.send(schedule.message);
+                        console.log(chalk.green(`✅ 予約投稿を実行しました (ID: ${schedule.id})`));
+                    } else {
+                        console.warn(chalk.yellow(`⚠️ 予約投稿のチャンネルが見つかりません (ID: ${schedule.id})`));
+                    }
+                } catch (sendError) {
+                    console.error(chalk.red(`❌ 予約投稿の送信に失敗 (ID: ${schedule.id}):`), sendError);
+                } finally {
+                    // 成功・失敗に関わらずDBから削除
+                    await deleteDoc(doc(firestore, 'schedules', document.id));
+                }
+            }
+        } catch (error) {
+            console.error(chalk.red('❌ スケジューラの実行中にエラーが発生:'), error);
+        }
+    }, 60 * 1000); // 1分ごとにチェック
 }
 
-// --- ボット準備完了イベント ---
+
+// --- ボット準備完了イベント (起動シーケンス) ---
 client.once('ready', async () => {
     console.log(chalk.bold.greenBright('\n==========================================='));
     console.log(`🚀 ${client.user.tag} が正常に起動しました！`);
@@ -263,61 +224,28 @@ client.once('ready', async () => {
     console.log(`👥 ユーザー数: ${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)}`);
     console.log(chalk.bold.greenBright('===========================================\n'));
 
+    // スラッシュコマンドをDiscordに登録
     const deploySuccess = await deployCommands();
     if (deploySuccess) {
+        // 全ての準備が整ったらWebサーバーとスケジューラを起動
         keepAlive();
-        
-        const statuses = await generateStatuses(client);
-        console.log(`✅ ${statuses.length}個のカスタムステータスを準備しました。`);
-
-        if (statuses.length > 0) {
-            let i = 0;
-            const updateStatus = () => {
-                const statusTemplate = statuses[i];
-                const statusState = statusTemplate.state
-                    .replace(/\$\{serverCount\}/g, client.guilds.cache.size)
-                    .replace(/\$\{userCount\}/g, client.guilds.cache.reduce((a, g) => a + g.memberCount, 0));
-                
-                client.user.setPresence({
-                    activities: [{
-                        name: 'customstatus',
-                        type: ActivityType.Custom,
-                        state: statusState,
-                        emoji: statusTemplate.emoji
-                    }],
-                    status: 'online'
-                });
-                console.log(chalk.cyan(`🎯 ステータス更新: ${statusTemplate.emoji} ${statusState}`));
-                i = (i + 1) % statuses.length;
-            };
-            updateStatus();
-            setInterval(updateStatus, 60000);
-        }
-        console.log(chalk.greenBright('🎉 ボットの初期化が完全に完了しました！'));
+        startScheduler(client);
+        console.log(chalk.greenBright('🎉 ボットの初期化が完全に完了し、全ての機能がオンラインです！'));
+    } else {
+        console.error(chalk.red('❌ 起動シーケンスに失敗しました。コマンド登録ができなかったため、一部機能が利用できません。'));
     }
 });
 
-// --- エラーハンドリング ---
-client.on('error', error => console.error(chalk.red('❌ Discord.js クライアントエラー:'), error));
-client.on('warn', warning => console.warn(chalk.yellow('⚠️ Discord.js 警告:'), warning));
+// --- プロセス全体のエラーハンドリング ---
 process.on('unhandledRejection', error => console.error(chalk.red('❌ 未処理の Promise リジェクション:'), error));
 process.on('uncaughtException', error => {
     console.error(chalk.red('❌ 未処理の例外:'), error);
     process.exit(1);
 });
-const shutdown = () => {
-    console.log(chalk.yellow('\n🔄 ボットを安全にシャットダウンしています...'));
-    client.destroy();
-    process.exit(0);
-};
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
 
-// --- ボット起動 ---
-updateBotStatus(BotStatus.CONNECTING);
+// --- ボットのログイン ---
 client.login(process.env.DISCORD_TOKEN).catch(error => {
-    console.error(chalk.red('❌ ボットの起動に失敗しました:'), error);
-    updateBotStatus(BotStatus.ERROR, 'ログイン失敗');
+    console.error(chalk.red('❌ ボットの起動に致命的なエラーが発生しました:'), error);
     if (error.message.includes('An invalid token')) {
         console.error(chalk.red('🔑 無効なトークンです。.envファイルの DISCORD_TOKEN を確認してください。'));
     } else if (error.message.includes('Privileged intent')) {
