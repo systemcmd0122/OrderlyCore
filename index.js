@@ -103,7 +103,7 @@ const rtdb = getDatabase(firebaseApp);
 
 // --- Google Gemini API設定 ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 // --- Discordクライアント設定 ---
 const client = new Client({
