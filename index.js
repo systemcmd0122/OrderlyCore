@@ -27,8 +27,8 @@ app.get('/', (req, res) => {
     fs.access(indexPath, fs.constants.F_OK, (err) => {
         if (err) {
             console.error('index.html が見つかりません。');
-            res.status(404).json({ 
-                status: 'error', 
+            res.status(404).json({
+                status: 'error',
                 message: 'Website not found. Bot is running.',
                 botStatus: client && client.isReady() ? 'ok' : 'initializing'
             });
