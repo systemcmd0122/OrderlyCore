@@ -8,10 +8,11 @@ const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getFirestore } = require('firebase/firestore');
+const { getDatabase } = require('firebase/database'); // Realtime Databaseを追加
 
-// --- Koyeb 常時起動設定 ---
-const PORT = process.env.PORT || 8000;
+// --- Express アプリケーション設定 ---
 const app = express();
+const PORT = process.env.PORT || 8000;
 
 // セキュリティヘッダーの設定
 app.use(express.json());
@@ -20,6 +21,23 @@ app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     next();
+});
+
+// --- ウェブサイトホスティング機能 ---
+app.get('/', (req, res) => {
+    const indexPath = path.join(__dirname, 'index.html');
+    fs.access(indexPath, fs.constants.F_OK, (err) => {
+        if (err) {
+            console.error('index.html が見つかりません。');
+            res.status(404).json({ 
+                status: 'error', 
+                message: 'Website not found. Bot is running.',
+                botStatus: client && client.isReady() ? 'ok' : 'initializing'
+            });
+        } else {
+            res.sendFile(indexPath);
+        }
+    });
 });
 
 // ヘルスチェック用エンドポイント
@@ -32,10 +50,8 @@ app.get('/ping', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-    // clientオブジェクトが初期化されているか確認
     const isReady = client && client.isReady();
     const status = isReady && client.ws.status === 0 ? 'ok' : 'degraded';
-
     const health = {
         status: status,
         timestamp: new Date().toISOString(),
@@ -49,51 +65,37 @@ app.get('/health', (req, res) => {
 // Keep-Alive (常時起動) 機能
 function keepAlive() {
     const PING_INTERVAL = 2 * 60 * 1000; // 2分
-    const selfUrl = process.env.APP_URL; // KoyebのアプリURLを環境変数に設定
-
+    const selfUrl = process.env.APP_URL;
     if (!selfUrl) {
         console.warn(chalk.yellow('環境変数 APP_URL が設定されていません。Keep-Alive機能は無効になります。'));
         return;
     }
-
     setInterval(async () => {
         try {
             const url = selfUrl.endsWith('/ping') ? selfUrl : `${selfUrl}/ping`;
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
-
             const response = await fetch(url, {
                 signal: controller.signal,
                 headers: { 'User-Agent': `Discord-Bot-KeepAlive/${require('./package.json').version || '1.0.0'}` }
             });
-            
             clearTimeout(timeout);
-            
-            if (!response.ok) {
-                 throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
             console.log(chalk.cyan(`Keep-Alive ping successful to ${url}. Status: ${response.status}`));
-            
         } catch (error) {
             console.error(chalk.yellow(`Keep-Alive ping failed for ${selfUrl}:`, error.message));
         }
-
-        // メモリ使用状況のログ
         const used = process.memoryUsage();
-        console.log(chalk.cyan(
-            `Memory: ${Math.round(used.heapUsed / 1024 / 1024)}MB / ${Math.round(used.heapTotal / 1024 / 1024)}MB`
-        ));
+        console.log(chalk.cyan(`Memory: ${Math.round(used.heapUsed / 1024 / 1024)}MB / ${Math.round(used.heapTotal / 1024 / 1024)}MB`));
     }, PING_INTERVAL);
-
-    app.listen(PORT, () => console.log(chalk.green(`✅ Keep-Alive server running on port ${PORT}`)));
+    app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
 }
-
 
 // --- Firebase設定 ---
 const firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    databaseURL: process.env.FIREBASE_DATABASE_URL, // ★ Realtime DatabaseのURLを追加
     projectId: process.env.FIREBASE_PROJECT_ID,
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
@@ -102,6 +104,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const rtdb = getDatabase(firebaseApp); // ★ Realtime Databaseを初期化
 
 // --- Google Gemini API設定 ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -122,6 +125,7 @@ const client = new Client({
 
 // グローバル変数
 client.db = db;
+client.rtdb = rtdb; // ★ Realtime Databaseをclientオブジェクトに格納
 client.commands = new Collection();
 
 // --- ボットステータス管理 ---
@@ -140,11 +144,10 @@ let currentStatus = BotStatus.INITIALIZING;
 function updateBotStatus(status, details = '') {
     currentStatus = status;
     console.log(`[${new Date().toLocaleString('ja-JP')}] ${status} ${details}`);
-    // 起動時のカスタムステータスは一時的なもの
     if (client.user && !client.isReady()) {
          client.user.setPresence({
             activities: [{ name: 'status', type: ActivityType.Custom, state: status }],
-            status: 'dnd' // 準備中は「取り込み中」
+            status: 'dnd'
         });
     }
 }
@@ -211,37 +214,6 @@ async function deployCommands() {
     }
 }
 
-// --- インタラクション処理 ---
-client.on('interactionCreate', async interaction => {
-    if (interaction.isAutocomplete()) {
-        const command = client.commands.get(interaction.commandName);
-        if (!command || !command.autocomplete) return;
-        try {
-            await command.autocomplete(interaction);
-        } catch (error) {
-            console.error(chalk.red(`❌ オートコンプリートエラー (${interaction.commandName}):`), error);
-        }
-        return;
-    }
-
-    if (interaction.isChatInputCommand()) {
-        const command = client.commands.get(interaction.commandName);
-        if (!command) return;
-        try {
-            await command.execute(interaction);
-            console.log(`🎯 コマンド実行: ${interaction.commandName} by ${interaction.user.tag}`);
-        } catch (error) {
-            console.error(chalk.red(`❌ コマンド実行エラー (${interaction.commandName}):`), error);
-            const errorMessage = { content: 'コマンドの実行中にエラーが発生しました。', ephemeral: true };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMessage).catch(e => console.error('Error sending follow-up:', e));
-            } else {
-                await interaction.reply(errorMessage).catch(e => console.error('Error sending reply:', e));
-            }
-        }
-    }
-});
-
 // --- Gemini APIによるカスタムステータス生成 ---
 async function generateStatuses(client) {
     updateBotStatus(BotStatus.GENERATING_STATUS);
@@ -293,7 +265,6 @@ client.once('ready', async () => {
 
     const deploySuccess = await deployCommands();
     if (deploySuccess) {
-        // Keep-Aliveサーバーを起動
         keepAlive();
         
         const statuses = await generateStatuses(client);
@@ -309,7 +280,7 @@ client.once('ready', async () => {
                 
                 client.user.setPresence({
                     activities: [{
-                        name: 'customstatus', // この名前は表示されませんが必須項目です
+                        name: 'customstatus',
                         type: ActivityType.Custom,
                         state: statusState,
                         emoji: statusTemplate.emoji
@@ -320,7 +291,7 @@ client.once('ready', async () => {
                 i = (i + 1) % statuses.length;
             };
             updateStatus();
-            setInterval(updateStatus, 60000); // 60秒ごとに更新
+            setInterval(updateStatus, 60000);
         }
         console.log(chalk.greenBright('🎉 ボットの初期化が完全に完了しました！'));
     }

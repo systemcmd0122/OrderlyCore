@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overseer - 次世代Discord Bot</title>
+    <meta name="description" content="Overseerは、Gemini AIとの連携、高度なロール管理、カスタマイズ可能なウェルカム機能などを搭載した多機能Discord Botです。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Reset & Base Styles --- */
+        :root {
+            --primary-color: #00e5ff; /* A bright cyan */
+            --background-color: #0d1117; /* GitHub dark theme background */
+            --surface-color: #161b22;   /* GitHub dark theme surface */
+            --text-color: #c9d1d9;      /* GitHub dark theme text */
+            --text-muted-color: #8b949e; /* GitHub dark theme muted text */
+            --border-color: #30363d;
+            --header-height: 70px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(var(--border-color) 1px, transparent 1px),
+                radial-gradient(var(--border-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+            animation: background-pan 30s linear infinite;
+        }
+
+        @keyframes background-pan {
+            from { background-position: 0 0, 20px 20px; }
+            to { background-position: 40px 40px, 60px 60px; }
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--primary-color);
+            text-shadow: 0 0 5px var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        section {
+            padding: 80px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* --- Header --- */
+        .header {
+            background-color: rgba(13, 17, 23, 0.8);
+            border-bottom: 1px solid var(--border-color);
+            position: fixed;
+            width: 100%;
+            height: var(--header-height);
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+        }
+
+        .logo {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.8em;
+            color: var(--primary-color);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo:before {
+            content: '[O]';
+            margin-right: 10px;
+            color: var(--text-color);
+        }
+
+        .nav-links a {
+            color: var(--text-color);
+            text-decoration: none;
+            margin-left: 25px;
+            font-size: 1em;
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-color);
+            text-shadow: 0 0 3px var(--primary-color);
+        }
+
+        /* --- Hero Section --- */
+        .hero {
+            padding-top: calc(var(--header-height) + 100px);
+            text-align: center;
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            animation: flicker 3s infinite alternate;
+        }
+        
+        @keyframes flicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% {
+                text-shadow:
+                0 0 4px var(--primary-color),
+                0 0 11px var(--primary-color),
+                0 0 19px var(--primary-color),
+                0 0 40px #0fa,
+                0 0 80px #0fa,
+                0 0 90px #0fa,
+                0 0 100px #0fa,
+                0 0 150px #0fa;
+            }
+            20%, 24%, 55% { text-shadow: none; }
+        }
+
+
+        .hero-subtitle {
+            font-size: 1.4rem;
+            max-width: 700px;
+            margin: 0 auto 30px;
+            color: var(--text-muted-color);
+            line-height: 1.5;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: var(--primary-color);
+            color: var(--background-color);
+            padding: 15px 35px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-decoration: none;
+            border: 2px solid var(--primary-color);
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        .cta-button:hover {
+            background: transparent;
+            color: var(--primary-color);
+            box-shadow: 0 0 25px var(--primary-color);
+        }
+
+        /* --- Features Section --- */
+        #features {
+            text-align: center;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .feature-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            text-align: left;
+            border-radius: 8px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 20px rgba(0, 229, 255, 0.1);
+        }
+
+        .feature-card:before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(transparent, rgba(0, 229, 255, 0.1), transparent 30%);
+            animation: rotate 4s linear infinite;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .feature-card:hover:before {
+            opacity: 1;
+        }
+
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+        
+        .feature-card h3:before {
+            content: '>';
+            margin-right: 8px;
+            color: var(--primary-color);
+        }
+
+        .feature-card p {
+            color: var(--text-muted-color);
+        }
+
+        /* --- Commands Section --- */
+        #commands {
+            text-align: center;
+        }
+
+        .terminal {
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 50px;
+            text-align: left;
+            font-family: 'Share Tech Mono', monospace;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+        
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+        
+        .terminal-title {
+            flex-grow: 1;
+            text-align: center;
+            color: var(--text-muted-color);
+        }
+
+        .terminal-body {
+            height: 350px;
+            overflow-y: auto;
+        }
+
+        .terminal-line {
+            line-height: 1.4;
+        }
+
+        .prompt {
+            color: var(--primary-color);
+        }
+
+        .command-output {
+            color: var(--text-muted-color);
+            padding-left: 15px;
+        }
+
+        .typed-cursor {
+            display: inline-block;
+            background: var(--primary-color);
+            width: 10px;
+            height: 1.2em;
+            animation: blink 1s step-end infinite;
+            vertical-align: bottom;
+        }
+
+        @keyframes blink {
+            from, to { background: transparent; }
+            50% { background: var(--primary-color); }
+        }
+
+        /* --- Footer --- */
+        .footer {
+            text-align: center;
+            padding: 40px 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .footer p {
+            color: var(--text-muted-color);
+        }
+        
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .hero-subtitle {
+                font-size: 1.1rem;
+            }
+            .nav-links {
+                display: none; /* Simplification for mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="container">
+            <a href="#" class="logo">Overseer</a>
+            <nav class="nav-links">
+                <a href="#hero">Home</a>
+                <a href="#features">Features</a>
+                <a href="#commands">Commands</a>
+                <a href="YOUR_INVITE_LINK" target="_blank">Invite</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section id="hero" class="hero">
+            <div class="container">
+                <h1>OVERSEER</h1>
+                <p class="hero-subtitle">
+                    Gemini AIによる動的ステータス生成、高度なロールボード、詳細な統計機能。
+                    あなたのDiscordサーバー管理を次のレベルへ引き上げる、インテリジェントな監視者。
+                </p>
+                <a href="https://discord.com/oauth2/authorize?client_id=1406092882531848254" class="cta-button" target="_blank">サーバーに招待する</a>
+            </div>
+        </section>
+
+        <section id="features">
+            <div class="container">
+                <h2>// Core Systems</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">⚙️</div>
+                        <h3>高度なウェルカム設定</h3>
+                        <p>参加・退出メッセージの完全カスタマイズ、自動ロール付与、ルールチャンネルへの誘導など、サーバーの第一印象を完璧に演出します。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎭</div>
+                        <h3>インタラクティブ・ロールボード</h3>
+                        <p>ジャンル分け可能なボタン式ロールパネルを簡単に作成。メンバーはクリック一つで直感的にロールを取得・削除できます。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>詳細なサーバー統計</h3>
+                        <p>メンバーの参加・退出履歴から、ボイスチャンネルの活動ログまで。サーバーのアクティビティを分析し、コミュニティの成長を可視化します。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🧠</div>
+                        <h3>Gemini AI 連携</h3>
+                        <p>GoogleのGemini AIを活用し、サーバーの状況に応じた動的なカスタムステータスを自動生成。Botが生きているかのように振る舞います。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📡</div>
+                        <h3>リアルタイムPing</h3>
+                        <p>WebSocket、API、往復遅延など、Botの接続状態をミリ秒単位で詳細に表示。システムの健全性を常に監視できます。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💾</div>
+                        <h3>Firebaseデータベース連携</h3>
+                        <p>すべての設定とログデータをFirebase Firestoreに永続化。信頼性と拡張性の高いデータ管理を実現します。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="commands">
+            <div class="container">
+                <h2>// Command Interface</h2>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dot dot-red"></div>
+                        <div class="terminal-dot dot-yellow"></div>
+                        <div class="terminal-dot dot-green"></div>
+                        <div class="terminal-title">bash -- overseer-cli</div>
+                    </div>
+                    <div class="terminal-body" id="terminal-body">
+                        </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Overseer Project. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const commands = [
+                {
+                    cmd: "/ping",
+                    desc: "Botの応答速度、システム情報、接続状態を詳細に確認します。"
+                },
+                {
+                    cmd: "/welcome-config setup",
+                    desc: "ウェルカム・お別れメッセージや自動ロール付与の基本設定を行います。"
+                },
+                {
+                    cmd: "/welcome-config stats",
+                    desc: "サーバーの参加・退出に関する統計データを表示します。"
+                },
+                {
+                    cmd: "/roleboard create",
+                    desc: "新しいインタラクティブなロールボードを作成します。"
+                },
+                {
+                    cmd: "/roleboard send",
+                    desc: "作成したロールボードを指定したチャンネルに送信します。"
+                },
+                {
+                    cmd: "/set-vc-log",
+                    desc: "ボイスチャンネルの入退室ログを特定のテキストチャンネルに記録する設定をします。"
+                },
+                 {
+                    cmd: "help",
+                    desc: "利用可能な全コマンドのリストを表示します..."
+                }
+            ];
+
+            const terminalBody = document.getElementById('terminal-body');
+            let commandIndex = 0;
+            let charIndex = 0;
+
+            function typeCommand() {
+                if (commandIndex >= commands.length) {
+                    // Start over
+                    setTimeout(() => {
+                        terminalBody.innerHTML = '';
+                        commandIndex = 0;
+                        charIndex = 0;
+                        typeCommand();
+                    }, 5000);
+                    return;
+                }
+
+                const current = commands[commandIndex];
+                const line = document.createElement('div');
+                line.className = 'terminal-line';
+                
+                const promptSpan = document.createElement('span');
+                promptSpan.className = 'prompt';
+                promptSpan.textContent = 'user@overseer:~$ ';
+                line.appendChild(promptSpan);
+                
+                const cmdSpan = document.createElement('span');
+                line.appendChild(cmdSpan);
+
+                const cursorSpan = document.createElement('span');
+                cursorSpan.className = 'typed-cursor';
+                line.appendChild(cursorSpan);
+
+                terminalBody.appendChild(line);
+
+                const typeChar = () => {
+                    if (charIndex < current.cmd.length) {
+                        cmdSpan.textContent += current.cmd[charIndex];
+                        charIndex++;
+                        terminalBody.scrollTop = terminalBody.scrollHeight;
+                        setTimeout(typeChar, Math.random() * 100 + 50);
+                    } else {
+                        line.removeChild(cursorSpan);
+                        executeCommand();
+                    }
+                };
+
+                typeChar();
+            }
+
+            function executeCommand() {
+                const output = document.createElement('div');
+                output.className = 'command-output';
+                output.textContent = `> ${commands[commandIndex].desc}`;
+                terminalBody.appendChild(output);
+                terminalBody.scrollTop = terminalBody.scrollHeight;
+
+                commandIndex++;
+                charIndex = 0;
+
+                setTimeout(typeCommand, 2000);
+            }
+            
+            const inviteLink = "https://discord.com/oauth2/authorize?client_id=1406092882531848254";
+            document.querySelectorAll('a[href="YOUR_INVITE_LINK"]').forEach(a => {
+            });
+
+
+            typeCommand();
+        });
+    </script>
+</body>
+</html>
