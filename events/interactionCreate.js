@@ -1,6 +1,4 @@
-// events/interactionCreate.js
 const { EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
-const { doc, getDoc, runTransaction } = require('firebase/firestore');
 
 module.exports = {
     name: 'interactionCreate',
@@ -8,147 +6,146 @@ module.exports = {
         // メインのtry...catchですべてのインタラクションエラーを捕捉
         try {
             // 1. スラッシュコマンドの処理
-            if (interaction.isChatInputCommand() || interaction.isAutocomplete()) {
+            if (interaction.isChatInputCommand()) {
                 const command = client.commands.get(interaction.commandName);
 
                 if (!command) {
                     console.error(`❌ 未知のコマンド: ${interaction.commandName}`);
-                    if (interaction.isChatInputCommand()) {
-                        await interaction.reply({ 
-                            content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
-                            flags: MessageFlags.Ephemeral 
-                        });
-                    }
+                    // deferされていないので、通常のreplyで応答
+                    await interaction.reply({ 
+                        content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
+                        flags: [MessageFlags.Ephemeral] 
+                    });
                     return;
                 }
 
-                // 各コマンドファイル内の処理に委譲
+                // コマンドファイル内のエラーはここで一元管理
                 try {
-                    if (interaction.isAutocomplete()) {
-                        if (command.autocomplete) {
-                            await command.autocomplete(interaction);
-                        }
-                    } else if (interaction.isChatInputCommand()) {
-                        console.log(`🎯 コマンド実行: /${interaction.commandName} | ユーザー: ${interaction.user.tag}`);
-                        await command.execute(interaction);
-                    }
+                    console.log(`🎯 コマンド実行: /${interaction.commandName} | ユーザー: ${interaction.user.tag} | サーバー: ${interaction.guild?.name || 'DM'}`);
+                    await command.execute(interaction);
                 } catch (error) {
                     console.error(`❌ コマンド実行エラー (${interaction.commandName}):`, error);
+                    
                     const errorMessage = {
                         content: '⚠️ コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。',
-                        flags: MessageFlags.Ephemeral
+                        flags: [MessageFlags.Ephemeral]
                     };
+
+                    // 応答が保留中(deferred)か、既に応答済み(replied)かチェック
                     if (interaction.deferred || interaction.replied) {
-                        await interaction.followUp(errorMessage).catch(e => console.error('Error sending follow-up:', e));
+                        // 追加メッセージとしてエラーを送信
+                        await interaction.followUp(errorMessage);
                     } else {
-                        await interaction.reply(errorMessage).catch(e => console.error('Error sending reply:', e));
+                        // まだ応答していない場合は、通常通りエラーを送信
+                        await interaction.reply(errorMessage);
                     }
                 }
                 return;
             }
             
-            // 2. ボタンインタラクションの処理
+            // 2. オートコンプリートの処理
+            if (interaction.isAutocomplete()) {
+                const command = client.commands.get(interaction.commandName);
+                if (!command || !command.autocomplete) return;
+                
+                try {
+                    await command.autocomplete(interaction);
+                } catch (error) {
+                    console.error(`❌ オートコンプリートエラー (${interaction.commandName}):`, error);
+                }
+                return;
+            }
+            
+            // 3. ボタンインタラクションの処理
             if (interaction.isButton()) {
-                // --- ロールパネル用ボタン ---
+                // ロールパネル用のボタンか判定 (customIdが 'role_' で始まる)
                 if (interaction.customId.startsWith('role_')) {
                     const roleId = interaction.customId.replace('role_', '');
                     const role = interaction.guild.roles.cache.get(roleId);
+                    const member = interaction.member;
                     
-                    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                    // 応答は本人にしか見えないように設定
+                    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
-                    if (!role || !interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageRoles) || role.position >= interaction.guild.members.me.roles.highest.position) {
-                        await interaction.editReply({ content: '❌ このロールは操作できません。' });
+                    // --- 安全性チェック ---
+                    if (!role) {
+                        await interaction.editReply({ content: '❌ このロールはサーバーに存在しないため、操作できません。' });
                         return;
                     }
                     
-                    const hasRole = interaction.member.roles.cache.has(roleId);
-                    if (hasRole) {
-                        await interaction.member.roles.remove(role);
-                        await interaction.editReply({ content: `🗑️ ロール **${role.name}** を削除しました。` });
-                    } else {
-                        await interaction.member.roles.add(role);
-                        await interaction.editReply({ content: `✅ ロール **${role.name}** を付与しました。` });
+                    const botMember = interaction.guild.members.cache.get(client.user.id);
+                    if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                        await interaction.editReply({ content: '❌ ボットにロールを管理する権限がありません。サーバー管理者にご連絡ください。' });
+                        return;
                     }
-                    return;
-                }
-
-                // --- 投票ボタン用 ---
-                if (interaction.customId.startsWith('poll_')) {
-                    const pollCommand = client.commands.get('poll');
-                    if (pollCommand && pollCommand.handleButton) await pollCommand.handleButton(interaction);
-                    return;
-                }
-
-                // --- Giveawayボタン用 ---
-                if (interaction.customId.startsWith('giveaway_')) {
-                    const giveawayCommand = client.commands.get('giveaway');
-                    if (giveawayCommand && giveawayCommand.handleButton) await giveawayCommand.handleButton(interaction);
-                    return;
-                }
-                
-                // --- チケット作成ボタン用 ---
-                if (interaction.customId === 'create_ticket') {
-                    const ticketCommand = client.commands.get('ticket');
-                    if (ticketCommand && ticketCommand.handleCreateTicket) await ticketCommand.handleCreateTicket(interaction);
-                    return;
-                }
-                
-                // --- チケット閉じるボタン用 ---
-                if (interaction.customId.startsWith('close_ticket_')) {
-                    const ticketCommand = client.commands.get('ticket');
-                    if (ticketCommand && ticketCommand.handleCloseTicket) await ticketCommand.handleCloseTicket(interaction);
-                    return;
-                }
-
-                // --- Shop購入ボタン用 ---
-                if (interaction.customId.startsWith('buy_item_')) {
-                    await interaction.deferReply({ ephemeral: true });
-                    const itemId = interaction.customId.split('_')[2];
-                    const guildId = interaction.guild.id;
-                    const userId = interaction.user.id;
-                    const db = client.db;
                     
-                    try {
-                        await runTransaction(db, async (transaction) => {
-                            const itemRef = doc(db, `shop_items/${guildId}/items`, itemId);
-                            const userRef = doc(db, 'levels', `${guildId}_${userId}`);
-
-                            const itemDoc = await transaction.get(itemRef);
-                            const userDoc = await transaction.get(userRef);
-
-                            if (!itemDoc.exists()) { throw new Error('商品が見つかりません。'); }
-                            
-                            const item = itemDoc.data();
-                            const userCoins = userDoc.exists() ? (userDoc.data().coins || 0) : 0;
-
-                            if (userCoins < item.price) { throw new Error('コインが不足しています。'); }
-                            
-                            const member = await interaction.guild.members.fetch(userId);
-                            if (member.roles.cache.has(item.roleId)) { throw new Error('既にこのロールを所持しています。'); }
-
-                            transaction.set(userRef, { coins: userCoins - item.price }, { merge: true });
-                            await member.roles.add(item.roleId);
-                            await interaction.editReply(`✅ **${item.name}** を購入しました！`);
-                        });
-                    } catch (error) {
-                        console.error('購入処理エラー:', error);
-                        await interaction.editReply(`❌ 購入に失敗しました: ${error.message}`);
+                    if (role.position >= botMember.roles.highest.position) {
+                        await interaction.editReply({ content: '❌ このロールはボットより上位のため、操作できません。' });
+                        return;
                     }
-                    return;
+                    
+                    // --- ロール付与・削除処理 ---
+                    try {
+                        let embed;
+                        // メンバーが既にロールを持っているか確認
+                        if (member.roles.cache.has(roleId)) {
+                            // 持っている場合は削除
+                            await member.roles.remove(role);
+                            embed = new EmbedBuilder()
+                                .setColor(0xff6b6b)
+                                .setTitle('🗑️ ロールを削除しました')
+                                .setDescription(`**${role.name}** ロールをあなたから削除しました。`);
+                            
+                            console.log(`🔄 ロール削除: ${member.user.tag} から ${role.name} を削除`);
+                        } else {
+                            // 持っていない場合は付与
+                            await member.roles.add(role);
+                            embed = new EmbedBuilder()
+                                .setColor(0x4caf50)
+                                .setTitle('✅ ロールを付与しました')
+                                .setDescription(`**${role.name}** ロールをあなたに付与しました。`);
+                            
+                            console.log(`🔄 ロール付与: ${member.user.tag} に ${role.name} を付与`);
+                        }
+                        await interaction.editReply({ embeds: [embed] });
+
+                    } catch (roleError) {
+                        console.error(`❌ ロール操作エラー (${member.user.tag} -> ${role.name}):`, roleError);
+                        await interaction.editReply({ content: '❌ ロールの操作中にエラーが発生しました。ボットの権限が正しいか確認してください。' });
+                    }
                 }
+                // (他のボタン処理が必要な場合は、ここに 'else if' を追加)
                 return;
             }
             
-            // 3. その他のインタラクション (セレクトメニュー、モーダルなど)
-            // 必要に応じてここに処理を追加
+            // 4. セレクトメニューの処理 (将来の拡張用)
+            if (interaction.isStringSelectMenu()) {
+                console.log(`📋 セレクトメニュー操作: ${interaction.customId} by ${interaction.user.tag}`);
+                // ここにセレクトメニューの処理を追加
+                return;
+            }
+            
+            // 5. モーダル送信の処理 (将来の拡張用)
+            if (interaction.isModalSubmit()) {
+                console.log(`📝 モーダル送信: ${interaction.customId} by ${interaction.user.tag}`);
+                // ここにモーダル送信の処理を追加
+                return;
+            }
             
         } catch (error) {
             console.error('❌ インタラクション処理の包括的なエラー:', error);
+            // 最終的なフォールバックとしてエラーメッセージを送信
              try {
                 if (!interaction.replied && !interaction.deferred) {
-                    await interaction.reply({ content: '⚠️ 予期せぬエラーが発生しました。', flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ 
+                        content: '⚠️ 予期せぬエラーが発生しました。', 
+                        flags: [MessageFlags.Ephemeral] 
+                    });
                 } else {
-                    await interaction.followUp({ content: '⚠️ 予期せぬエラーが発生しました。', flags: MessageFlags.Ephemeral });
+                    await interaction.followUp({ 
+                        content: '⚠️ 予期せぬエラーが発生しました。', 
+                        flags: [MessageFlags.Ephemeral] 
+                    });
                 }
             } catch (finalError) {
                 console.error('❌ 最終エラーメッセージの送信にも失敗しました:', finalError);

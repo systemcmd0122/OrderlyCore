@@ -56,35 +56,20 @@ async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
 
 // Firestoreに滞在時間を加算更新する関数
 async function updateUserStayTime(db, guildId, userId, stayDuration) {
-    if (!stayDuration || stayDuration <= 10000) return; // 10秒未満は記録しない
-
-    // 10分ごとに5〜15コイン獲得する計算
-    const minutesInVc = stayDuration / (1000 * 60);
-    const coinsGained = Math.floor((minutesInVc / 10) * (Math.floor(Math.random() * 11) + 5));
-
+    // 滞在時間が0以下の場合は記録しない
+    if (!stayDuration || stayDuration <= 0) return;
     try {
         const statsRef = doc(db, 'voice_stats', `${guildId}_${userId}`);
+        // incrementを使ってアトミックに加算する
         await setDoc(statsRef, {
-            totalStayTime: increment(stayDuration),
+            totalStayTime: increment(stayDuration), // ミリ秒単位で加算
             guildId: guildId,
             userId: userId,
             updatedAt: new Date(),
         }, { merge: true });
-        
-        // ★ レベリングDBにもコインを加算
-        if (coinsGained > 0) {
-            const levelRef = doc(db, 'levels', `${guildId}_${userId}`);
-            await setDoc(levelRef, {
-                coins: increment(coinsGained),
-                userId: userId,
-                guildId: guildId,
-            }, { merge: true });
-        }
-        
-        console.log(chalk.blue(`📊 Voice stats updated for ${userId}. Added ${Math.round(stayDuration / 1000)}s and ${coinsGained} coins`));
-
+        console.log(chalk.blue(`📊 Voice stats updated for ${userId}. Added ${Math.round(stayDuration / 1000)}s`));
     } catch (error) {
-        console.error(chalk.red(`❌ Error updating user stay time/coins for ${userId}:`), error);
+        console.error(chalk.red(`❌ Error updating user stay time for ${userId}:`), error);
     }
 }
 
