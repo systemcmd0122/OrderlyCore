@@ -3,6 +3,7 @@ const { EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js'
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
+        // 対応するインタラクションタイプでなければ早期リターン
         if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isButton()) return;
 
         try {
@@ -12,6 +13,7 @@ module.exports = {
 
                 if (!command) {
                     console.error(`❌ 未知のコマンド: ${interaction.commandName}`);
+                    // 応答済みでないことを確認してから返信
                     if (!interaction.replied) {
                         await interaction.reply({
                             content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
@@ -23,6 +25,7 @@ module.exports = {
 
                 try {
                     console.log(`🎯 コマンド実行: /${interaction.commandName} | ユーザー: ${interaction.user.tag} | サーバー: ${interaction.guild?.name || 'DM'}`);
+                    // コマンドファイルに実行を移譲
                     await command.execute(interaction);
                 } catch (error) {
                     console.error(`❌ コマンド実行エラー (${interaction.commandName}):`, error);
@@ -32,13 +35,11 @@ module.exports = {
                         ephemeral: true
                     };
 
-                    // 応答が保留中か、既に応答済みかチェック
+                    // 応答が保留中か、既に応答済みかによって対応を分ける
                     if (interaction.replied || interaction.deferred) {
-                        // followUpでエラーを送信
-                        await interaction.followUp(errorMessage);
+                        await interaction.followUp(errorMessage).catch(console.error);
                     } else {
-                        // まだ応答していない場合は、replyでエラーを送信
-                        await interaction.reply(errorMessage);
+                        await interaction.reply(errorMessage).catch(console.error);
                     }
                 }
                 return;
@@ -59,9 +60,9 @@ module.exports = {
 
             // 3. ボタンインタラクションの処理
             if (interaction.isButton()) {
-                // ロールパネル用のボタンか判定 (customIdが 'role_' で始まる)
+                 // ロールパネル用のボタンか判定
                 if (interaction.customId.startsWith('role_')) {
-                    // 応答は本人にしか見えないように設定
+                    // 先に遅延応答をしてタイムアウトを防ぐ
                     await interaction.deferReply({ ephemeral: true });
 
                     const roleId = interaction.customId.replace('role_', '');
@@ -70,42 +71,34 @@ module.exports = {
 
                     // --- 安全性チェック ---
                     if (!role) {
-                        await interaction.editReply({ content: '❌ このロールはサーバーに存在しないため、操作できません。' });
-                        return;
+                        return await interaction.editReply({ content: '❌ このロールはサーバーに存在しないため、操作できません。' });
                     }
 
                     const botMember = interaction.guild.members.cache.get(client.user.id);
                     if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
-                        await interaction.editReply({ content: '❌ ボットにロールを管理する権限がありません。サーバー管理者にご連絡ください。' });
-                        return;
+                        return await interaction.editReply({ content: '❌ ボットにロールを管理する権限がありません。サーバー管理者にご連絡ください。' });
                     }
 
                     if (role.position >= botMember.roles.highest.position) {
-                        await interaction.editReply({ content: '❌ このロールはボットより上位のため、操作できません。' });
-                        return;
+                        return await interaction.editReply({ content: '❌ このロールはボットより上位のため、操作できません。' });
                     }
 
                     // --- ロール付与・削除処理 ---
                     try {
                         let embed;
-                        // メンバーが既にロールを持っているか確認
                         if (member.roles.cache.has(roleId)) {
-                            // 持っている場合は削除
                             await member.roles.remove(role);
                             embed = new EmbedBuilder()
                                 .setColor(0xff6b6b)
                                 .setTitle('🗑️ ロールを削除しました')
                                 .setDescription(`**${role.name}** ロールをあなたから削除しました。`);
-
                             console.log(`🔄 ロール削除: ${member.user.tag} から ${role.name} を削除`);
                         } else {
-                            // 持っていない場合は付与
                             await member.roles.add(role);
                             embed = new EmbedBuilder()
                                 .setColor(0x4caf50)
                                 .setTitle('✅ ロールを付与しました')
                                 .setDescription(`**${role.name}** ロールをあなたに付与しました。`);
-
                             console.log(`🔄 ロール付与: ${member.user.tag} に ${role.name} を付与`);
                         }
                         await interaction.editReply({ embeds: [embed] });
@@ -115,23 +108,19 @@ module.exports = {
                         await interaction.editReply({ content: '❌ ロールの操作中にエラーが発生しました。ボットの権限が正しいか確認してください。' });
                     }
                 }
-                // (他のボタン処理が必要な場合は、ここに 'else if' を追加)
+                // (他のボタン処理はここに 'else if' を追加)
                 return;
             }
 
         } catch (error) {
             console.error('❌ インタラクション処理の包括的なエラー:', error);
-            // 最終的なフォールバックとしてエラーメッセージを送信
+            // 最終的なフォールバック
              try {
+                const finalErrorMessage = { content: '⚠️ 予期せぬエラーが発生しました。', ephemeral: true };
                 if (!interaction.replied && !interaction.deferred) {
-                    await interaction.reply({
-                        content: '⚠️ 予期せぬエラーが発生しました。',
-                        ephemeral: true
-                    });
+                    await interaction.reply(finalErrorMessage);
                 } else if (interaction.deferred) {
-                    await interaction.editReply({
-                        content: '⚠️ 予期せぬエラーが発生しました。'
-                    });
+                    await interaction.editReply(finalErrorMessage);
                 }
             } catch (finalError) {
                 console.error('❌ 最終エラーメッセージの送信にも失敗しました:', finalError);

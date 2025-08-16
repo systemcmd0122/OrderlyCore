@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, time, userMention } = require('discord.js');
-const { getFirestore, doc, getDoc, collection, query, where, orderBy, limit, getDocs } = require('firebase/firestore');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, getDoc } = require('firebase/firestore');
 const { getDatabase, ref, get } = require('firebase/database');
 
 // 時間を分かりやすい形式に変換するヘルパー関数
@@ -32,7 +32,7 @@ module.exports = {
                 .setDescription('特定のユーザーの統計を表示します（省略時はサーバーランキング）')),
     
     async execute(interaction) {
-        // ★★★ 修正点: 最初に必ず応答を保留する ★★★
+        // 最初に必ず応答を保留し、タイムアウトを防ぐ
         await interaction.deferReply();
 
         try {
@@ -46,8 +46,10 @@ module.exports = {
                 await this.displayServerRanking(interaction);
             }
         } catch (error) {
+            // エラーログをより詳細に出力
             console.error('vc-stats コマンドの実行エラー:', error);
-            await interaction.editReply({ content: '❌ 統計情報の取得中にエラーが発生しました。' });
+            // ユーザーには汎用的なエラーメッセージを返す
+            await interaction.editReply({ content: '❌ 統計情報の取得中にデータベースエラーが発生しました。権限設定を確認してください。' });
         }
     },
 
