@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/commands/rank.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, getDoc } = require('firebase/firestore');
 
@@ -28,7 +29,18 @@ module.exports = {
                 return interaction.editReply({ content: `${targetUser.displayName} にはまだランクデータがありません。` });
             }
 
-            const userData = userSnap.data();
+            // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
+            // Firestoreから取得したデータにデフォルト値を設定
+            const rawData = userSnap.data();
+            const userData = {
+                level: rawData.level || 0,
+                xp: rawData.xp || 0,
+                messageCount: rawData.messageCount || 0,
+                userId: rawData.userId,
+                guildId: rawData.guildId
+            };
+            // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
+
             const requiredXp = calculateRequiredXp(userData.level);
 
             // サーバー内での順位を取得
@@ -44,7 +56,7 @@ module.exports = {
             });
 
             // プログレスバーを作成
-            const progress = Math.floor((userData.xp / requiredXp) * 10);
+            const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 10) : 0;
             const progressBar = '🟩'.repeat(progress) + '⬛'.repeat(10 - progress);
 
             const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
@@ -64,7 +76,7 @@ module.exports = {
                     },
                     {
                         name: '次のレベルへの進捗',
-                        value: `${progressBar} **${((userData.xp / requiredXp) * 100).toFixed(1)}%**`,
+                        value: `${progressBar} **${requiredXp > 0 ? ((userData.xp / requiredXp) * 100).toFixed(1) : '0.0'}%**`,
                         inline: false
                     }
                 )
@@ -74,7 +86,13 @@ module.exports = {
 
         } catch (error) {
             console.error('ランクコマンドの実行エラー:', error);
-            await interaction.editReply({ content: '❌ ランク情報の取得中にエラーが発生しました。' });
+             if (error.code === 'failed-precondition') {
+                await interaction.editReply({ 
+                    content: '❌ **データベース設定エラー:**\nランキング機能に必要なデータベースインデックスがありません。Botの管理者に連絡し、コンソールログに表示されているURLからインデックスを作成するよう依頼してください。' 
+                });
+            } else {
+                await interaction.editReply({ content: '❌ ランク情報の取得中に不明なエラーが発生しました。' });
+            }
         }
     }
 };

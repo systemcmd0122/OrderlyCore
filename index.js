@@ -1,5 +1,3 @@
-// systemcmd0122/overseer/overseer-56eb1777939dec018269fcbfbef7995841b85cf1/index.js
-// 必要なモジュールのインポート
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials } = require('discord.js');
 const fs = require('node:fs');
@@ -110,13 +108,17 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember] // GuildMember を追加
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember]
 });
 
 // グローバル変数
 client.db = db;
 client.rtdb = rtdb;
 client.commands = new Collection();
+// ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
+client.geminiModel = geminiModel; // Geminiモデルをclientオブジェクトに格納
+// ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
+
 
 // --- ボットステータス管理 ---
 const BotStatus = {
@@ -237,7 +239,7 @@ async function generateStatuses(client) {
   { "emoji": "🎧", "state": "\${userCount}人の声に耳を傾けています" }
 ]`;
 
-        const result = await geminiModel.generateContent(prompt);
+        const result = await client.geminiModel.generateContent(prompt);
         const text = result.response.text();
         const cleanedJson = text.replace(/```json|```/g, '').trim();
         const generatedStatuses = JSON.parse(cleanedJson);
