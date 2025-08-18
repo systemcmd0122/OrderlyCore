@@ -29,28 +29,39 @@ async function sendLog(client, guild, embed) {
 module.exports = (client) => {
     // メッセージ削除
     client.on(Events.MessageDelete, async (message) => {
-        if (!message.guild || message.author?.bot) return;
+        // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
+        // message.author が null の可能性があるため、早期リターン条件を修正
+        if (!message.guild || (message.author && message.author.bot)) return;
 
+        // 送信者情報を安全に取得
+        const authorTag = message.author ? `${message.author.tag} (${message.author.id})` : '不明なユーザー (キャッシュ外)';
+        const messageContent = message.content ? message.content.substring(0, 1024) : '（内容を取得できませんでした）';
+        
         const embed = new EmbedBuilder()
             .setColor(0xff6b6b)
             .setTitle('メッセージ削除')
-            .setDescription(`**チャンネル:** ${message.channel}\n**送信者:** ${message.author.tag} (${message.author.id})`)
-            .addFields({ name: '内容', value: message.content.substring(0, 1024) || '（内容なし）' })
+            .setDescription(`**チャンネル:** ${message.channel}\n**送信者:** ${authorTag}`)
+            .addFields({ name: '内容', value: messageContent })
             .setTimestamp();
+        // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
         await sendLog(client, message.guild, embed);
     });
 
     // メッセージ編集
     client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-        if (!newMessage.guild || newMessage.author?.bot || oldMessage.content === newMessage.content) return;
+        if (!newMessage.guild || (newMessage.author && newMessage.author.bot) || oldMessage.content === newMessage.content) return;
+
+        const authorTag = newMessage.author ? newMessage.author.tag : '不明なユーザー';
+        const oldContent = oldMessage.content ? oldMessage.content.substring(0, 1024) : '（内容を取得できませんでした）';
+        const newContent = newMessage.content ? newMessage.content.substring(0, 1024) : '（内容を取得できませんでした）';
 
         const embed = new EmbedBuilder()
             .setColor(0x3498db)
             .setTitle('メッセージ編集')
-            .setDescription(`**チャンネル:** ${newMessage.channel}\n**送信者:** ${newMessage.author.tag}`)
+            .setDescription(`**チャンネル:** ${newMessage.channel}\n**送信者:** ${authorTag}`)
             .addFields(
-                { name: '変更前', value: oldMessage.content.substring(0, 1024) || '（内容なし）' },
-                { name: '変更後', value: newMessage.content.substring(0, 1024) || '（内容なし）' }
+                { name: '変更前', value: oldContent },
+                { name: '変更後', value: newContent }
             )
             .setURL(newMessage.url)
             .setTimestamp();
@@ -87,11 +98,16 @@ module.exports = (client) => {
 
         if (oldRoles.size > newRoles.size) { // ロール剥奪
             const removedRole = oldRoles.find(role => !newRoles.has(role.id));
-            embed.setTitle('ロール剥奪').addFields({ name: '剥奪されたロール', value: `${removedRole.name}` });
+            if (removedRole) {
+                embed.setTitle('ロール剥奪').addFields({ name: '剥奪されたロール', value: `${removedRole.name}` });
+                await sendLog(client, newMember.guild, embed);
+            }
         } else { // ロール付与
             const addedRole = newRoles.find(role => !oldRoles.has(role.id));
-            embed.setTitle('ロール付与').addFields({ name: '付与されたロール', value: `${addedRole.name}` });
+            if (addedRole) {
+                embed.setTitle('ロール付与').addFields({ name: '付与されたロール', value: `${addedRole.name}` });
+                await sendLog(client, newMember.guild, embed);
+            }
         }
-        await sendLog(client, newMember.guild, embed);
     });
 };
