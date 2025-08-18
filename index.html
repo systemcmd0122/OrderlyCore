@@ -378,9 +378,9 @@
                 <h2>// Core Systems</h2>
                 <div class="features-grid">
                     <div class="feature-card">
-                        <div class="feature-icon">⚙️</div>
-                        <h3>高度なウェルカム設定</h3>
-                        <p>参加・退出メッセージの完全カスタマイズ、自動ロール付与、ルールチャンネルへの誘導など、サーバーの第一印象を完璧に演出します。</p>
+                        <div class="feature-icon">🛡️</div>
+                        <h3>高機能モデレーション</h3>
+                        <p>NGワード、招待URLの自動削除から、警告システムの運用、サーバーの全操作を記録する監査ログまで。サーバーの健全な運営を強力にサポートします。</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🎭</div>
@@ -398,9 +398,9 @@
                         <p>GoogleのGemini AIを活用し、サーバーの状況に応じた動的なカスタムステータスを自動生成。Botが生きているかのように振る舞います。</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">📡</div>
-                        <h3>リアルタイムPing</h3>
-                        <p>WebSocket、API、往復遅延など、Botの接続状態をミリ秒単位で詳細に表示。システムの健全性を常に監視できます。</p>
+                        <div class="feature-icon">⚙️</div>
+                        <h3>高度なウェルカム設定</h3>
+                        <p>参加・退出メッセージの完全カスタマイズ、自動ロール付与、ルールチャンネルへの誘導など、サーバーの第一印象を完璧に演出します。</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">💾</div>
@@ -438,31 +438,31 @@
         document.addEventListener('DOMContentLoaded', function() {
             const commands = [
                 {
-                    cmd: "/ping",
-                    desc: "Botの応答速度、システム情報、接続状態を詳細に確認します。"
+                    cmd: "/automod ng-word add",
+                    desc: "NGワードリストに新しい単語を登録します。"
                 },
                 {
-                    cmd: "/welcome-config setup",
-                    desc: "ウェルカム・お別れメッセージや自動ロール付与の基本設定を行います。"
+                    cmd: "/warn add @User スパム行為",
+                    desc: "メンバーに警告を与え、履歴を記録します。"
                 },
                 {
-                    cmd: "/welcome-config stats",
-                    desc: "サーバーの参加・退出に関する統計データを表示します。"
+                    cmd: "/log-config setup #logs",
+                    desc: "サーバーの全操作を記録する監査ログチャンネルを設定します。"
                 },
                 {
                     cmd: "/roleboard create",
                     desc: "新しいインタラクティブなロールボードを作成します。"
                 },
                 {
-                    cmd: "/roleboard send",
-                    desc: "作成したロールボードを指定したチャンネルに送信します。"
+                    cmd: "/welcome-config setup",
+                    desc: "ウェルカム・お別れメッセージや自動ロール付与の基本設定を行います。"
                 },
                 {
-                    cmd: "/set-vc-log",
-                    desc: "ボイスチャンネルの入退室ログを特定のテキストチャンネルに記録する設定をします。"
+                    cmd: "/vc-stats",
+                    desc: "ボイスチャンネルの滞在時間ランキングを表示します。"
                 },
                  {
-                    cmd: "help",
+                    cmd: "/help",
                     desc: "利用可能な全コマンドのリストを表示します..."
                 }
             ];
@@ -531,6 +531,7 @@
             
             const inviteLink = "https://discord.com/oauth2/authorize?client_id=1406092882531848254";
             document.querySelectorAll('a[href="YOUR_INVITE_LINK"]').forEach(a => {
+                a.href = inviteLink;
             });
 
 
