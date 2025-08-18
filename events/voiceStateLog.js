@@ -1,14 +1,13 @@
 // systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/events/voiceStateLog.js
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events } = require('discord.js');
 const chalk = require('chalk');
-const { getFirestore, doc, getDoc, setDoc, updateDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
+const { getFirestore, doc, getDoc, setDoc, updateDoc, increment } = require('firebase/firestore');
 const { getDatabase, ref, set, remove, get } = require('firebase/database');
 
-// メッセージ削除管理クラス
 class MessageDeleteManager {
     constructor() {
         this.scheduledDeletions = new Map();
-        this.DELETE_DELAY = 60000; // 1分
+        this.DELETE_DELAY = 60000;
     }
     scheduleDelete(messageId, message, delay = this.DELETE_DELAY) {
         if (this.scheduledDeletions.has(messageId)) {
@@ -16,13 +15,9 @@ class MessageDeleteManager {
         }
         const timeoutId = setTimeout(async () => {
             try {
-                if (message && !message.deleted) {
-                    await message.delete();
-                }
+                if (message && !message.deleted) await message.delete();
             } catch (error) {
-                if (error.code !== 10008) {
-                    console.error(chalk.red('❌ Error deleting voice message:'), error);
-                }
+                if (error.code !== 10008) console.error(chalk.red('❌ Error deleting voice message:'), error);
             } finally {
                 this.scheduledDeletions.delete(messageId);
             }
@@ -37,7 +32,6 @@ class MessageDeleteManager {
 }
 const deleteManager = new MessageDeleteManager();
 
-// ===== ▼▼▼▼▼ 修正箇所（ファイル全体で共有する関数を追加） ▼▼▼▼▼ =====
 const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
 
 async function getLevelData(db, guildId, userId) {
@@ -45,24 +39,12 @@ async function getLevelData(db, guildId, userId) {
     const docSnap = await getDoc(userRef);
     if (docSnap.exists()) {
         const data = docSnap.data();
-        if (typeof data.level === 'undefined') {
-            data.level = 0;
-        }
+        if (typeof data.level === 'undefined') data.level = 0;
         return data;
     }
-    return {
-        guildId,
-        userId,
-        xp: 0,
-        level: 0,
-        messageCount: 0,
-        lastMessageTimestamp: 0
-    };
+    return { guildId, userId, xp: 0, level: 0, messageCount: 0, lastMessageTimestamp: 0 };
 }
-// ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
 
-
-// 特定のVCに対応するログチャンネルIDをFirestoreから取得
 async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
     if (!guildId || !voiceChannelId) return null;
     try {
@@ -79,7 +61,6 @@ async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
     }
 }
 
-// VC滞在時間に応じてXPを付与し、レベルアップ処理を行う関数
 async function addVcExpAndLevelUp(client, guildId, userId, stayDuration) {
     if (!stayDuration || stayDuration <= 0) return;
 
@@ -88,54 +69,41 @@ async function addVcExpAndLevelUp(client, guildId, userId, stayDuration) {
 
     const xpGained = minutesStayed * 5;
     const db = client.db;
-    const userRef = doc(db, 'levels', `${guildId}_${userId}`);
 
-    // まずXPを加算
-    try {
-        await updateDoc(userRef, { xp: increment(xpGained) });
-    } catch (error) {
-        if (error.code === 'not-found') {
-            await setDoc(userRef, {
-                guildId, userId, xp: xpGained, level: 0, messageCount: 0, lastMessageTimestamp: 0
-            });
-        } else {
-            console.error(chalk.red(`❌ Error adding VC XP for ${userId}:`), error);
-            return; // エラーならここで中断
-        }
-    }
-     console.log(chalk.blue(`[XP] Added ${xpGained} XP to ${userId} for ${minutesStayed} minutes in VC.`));
+    // 1. ユーザーデータを取得
+    const userData = await getLevelData(db, guildId, userId);
 
-    // XP加算後にレベルアップ判定
-    const updatedUserData = await getLevelData(db, guildId, userId);
-    let { level, xp } = updatedUserData;
-    let requiredXp = calculateRequiredXp(level);
+    // 2. ローカル変数でXPを更新
+    userData.xp += xpGained;
+    console.log(chalk.blue(`[XP] Added ${xpGained} XP to ${userId} for ${minutesStayed} minutes in VC. New Total (pre-calc): ${userData.xp}`));
+
     let leveledUp = false;
+    let requiredXp = calculateRequiredXp(userData.level);
 
-    while (xp >= requiredXp) {
-        xp -= requiredXp;
-        level += 1;
+    // 3. レベルアップ判定と計算
+    while (userData.xp >= requiredXp) {
+        userData.xp -= requiredXp;
+        userData.level += 1;
         leveledUp = true;
-        requiredXp = calculateRequiredXp(level);
+        requiredXp = calculateRequiredXp(userData.level);
     }
+
+    // 4. 計算後の最終データをFirestoreに保存
+    const userRef = doc(db, 'levels', `${guildId}_${userId}`);
+    await setDoc(userRef, userData, { merge: true });
 
     if (leveledUp) {
-        await updateDoc(userRef, { level, xp });
-        console.log(chalk.green(`[LEVEL UP] ${userId} reached level ${level} from VC activity!`));
-        // ここではレベルアップ通知は送信しない（メッセージ起因のみとする）
+        console.log(chalk.green(`[LEVEL UP] ${userId} reached level ${userData.level} from VC activity!`));
     }
 }
 
-
-// Firestoreに滞在時間を加算更新する関数
 async function updateUserStayTime(db, guildId, userId, stayDuration) {
     if (!stayDuration || stayDuration <= 0) return;
     try {
         const statsRef = doc(db, 'voice_stats', `${guildId}_${userId}`);
         await setDoc(statsRef, {
             totalStayTime: increment(stayDuration),
-            guildId: guildId,
-            userId: userId,
-            updatedAt: new Date(),
+            guildId, userId, updatedAt: new Date(),
         }, { merge: true });
         console.log(chalk.blue(`📊 Voice stats updated for ${userId}. Added ${Math.round(stayDuration / 1000)}s`));
     } catch (error) {
@@ -143,25 +111,19 @@ async function updateUserStayTime(db, guildId, userId, stayDuration) {
     }
 }
 
-// VC参加時の処理
 async function handleVoiceJoin(newState, client) {
     const { guild, channel, member } = newState;
     const { db, rtdb } = client;
 
     const sessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
-    const sessionData = {
-        channelId: channel.id,
-        channelName: channel.name,
-        joinedAt: Date.now()
-    };
-    await set(sessionRef, sessionData);
+    await set(sessionRef, { channelId: channel.id, channelName: channel.name, joinedAt: Date.now() });
     console.log(chalk.green(`🔴 RTDB Session started for ${member.user.tag} in ${channel.name}`));
     
     const logChannelId = await getLogChannelIdForVc(db, guild.id, channel.id);
     if (logChannelId) {
         try {
             const logChannel = guild.channels.cache.get(logChannelId);
-            if (logChannel && logChannel.isTextBased()) {
+            if (logChannel?.isTextBased()) {
                 const message = await logChannel.send(`🎤 **${member.displayName}** が **${channel.name}** に参加しました`);
                 deleteManager.scheduleDelete(message.id, message);
             }
@@ -171,7 +133,6 @@ async function handleVoiceJoin(newState, client) {
     }
 }
 
-// VC退出時の処理
 async function handleVoiceLeave(oldState, client) {
     const { guild, channel, member } = oldState;
     const { db, rtdb } = client;
@@ -184,11 +145,7 @@ async function handleVoiceLeave(oldState, client) {
         const stayDuration = Date.now() - sessionData.joinedAt;
         
         await updateUserStayTime(db, guild.id, member.id, stayDuration);
-        
-        // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
-        // XP付与とレベルアップ判定をまとめた関数を呼び出す
         await addVcExpAndLevelUp(client, guild.id, member.id, stayDuration);
-        // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
         
         await remove(sessionRef);
         console.log(chalk.yellow(`🔴 RTDB Session ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
@@ -198,7 +155,7 @@ async function handleVoiceLeave(oldState, client) {
     if (logChannelId) {
         try {
             const logChannel = guild.channels.cache.get(logChannelId);
-            if (logChannel && logChannel.isTextBased()) {
+            if (logChannel?.isTextBased()) {
                 const message = await logChannel.send(`👋 **${member.displayName}** が **${channel.name}** から退出しました`);
                 deleteManager.scheduleDelete(message.id, message);
             }
@@ -212,34 +169,24 @@ module.exports = {
     name: Events.VoiceStateUpdate,
     async execute(oldState, newState, client) {
         if (newState.member?.user.bot) return;
-
         const { db, rtdb } = client;
-        if (!db || !rtdb) {
-            console.error(chalk.red('❌ Firestore or Realtime DB instance not found'));
-            return;
-        }
+        if (!db || !rtdb) return;
 
         const oldChannelId = oldState.channelId;
         const newChannelId = newState.channelId;
 
         try {
-            if (!oldChannelId && newChannelId) {
-                await handleVoiceJoin(newState, client);
-            } 
-            else if (oldChannelId && !newChannelId) {
-                await handleVoiceLeave(oldState, client);
-            } 
+            if (!oldChannelId && newChannelId) await handleVoiceJoin(newState, client);
+            else if (oldChannelId && !newChannelId) await handleVoiceLeave(oldState, client);
             else if (oldChannelId && newChannelId && oldChannelId !== newChannelId) {
                 await handleVoiceLeave(oldState, client);
                 await handleVoiceJoin(newState, client);
 
-                const oldLogChannelId = await getLogChannelIdForVc(db, oldState.guild.id, oldState.channelId);
-                const newLogChannelId = await getLogChannelIdForVc(db, newState.guild.id, newState.channelId);
-                const logDestId = newLogChannelId || oldLogChannelId;
+                const logDestId = await getLogChannelIdForVc(db, newState.guild.id, newState.channelId) || await getLogChannelIdForVc(db, oldState.guild.id, oldState.channelId);
                 if (logDestId) {
                     try {
                         const logChannel = newState.guild.channels.cache.get(logDestId);
-                        if (logChannel && logChannel.isTextBased()) {
+                        if (logChannel?.isTextBased()) {
                            const message = await logChannel.send(`↪️ **${newState.member.displayName}** が ${oldState.channel.name} から **${newState.channel.name}** に移動しました`);
                            deleteManager.scheduleDelete(message.id, message);
                         }
