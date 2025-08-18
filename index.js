@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-56eb1777939dec018269fcbfbef7995841b85cf1/index.js
 // 必要なモジュールのインポート
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials } = require('discord.js');
@@ -8,7 +9,7 @@ const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
 const { getFirestore } = require('firebase/firestore');
-const { getDatabase } = require('firebase/database'); // ★ 追加
+const { getDatabase } = require('firebase/database');
 
 // --- Express アプリケーション設定 ---
 const app = express();
@@ -84,7 +85,7 @@ function keepAlive() {
 const firebaseConfig = {
     apiKey: process.env.FIREBASE_API_KEY,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-    databaseURL: process.env.FIREBASE_DATABASE_URL, // ★ 追加
+    databaseURL: process.env.FIREBASE_DATABASE_URL,
     projectId: process.env.FIREBASE_PROJECT_ID,
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
@@ -93,7 +94,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-const rtdb = getDatabase(firebaseApp); // ★ 追加
+const rtdb = getDatabase(firebaseApp);
 
 // --- Google Gemini API設定 ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -109,15 +110,14 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessageReactions
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember] // GuildMember を追加
 });
 
 // グローバル変数
 client.db = db;
-client.rtdb = rtdb; // ★ 追加
+client.rtdb = rtdb;
 client.commands = new Collection();
 
-// (以下、変更なし)
 // --- ボットステータス管理 ---
 const BotStatus = {
     INITIALIZING: '🔄 初期化中...',
@@ -186,6 +186,15 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
+// ===== ▼▼▼▼▼ 変更箇所 ▼▼▼▼▼ =====
+// 新しいカスタムイベントハンドラをここで読み込みます
+require('./events/auditLog')(client);
+console.log(chalk.magenta(`✅ イベント読み込み完了: auditLog (カスタム)`));
+require('./events/automodListener')(client);
+console.log(chalk.magenta(`✅ イベント読み込み完了: automodListener (カスタム)`));
+// ===== ▲▲▲▲▲ 変更箇所 ▲▲▲▲▲ =====
+
+
 // --- スラッシュコマンド登録 ---
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 async function deployCommands() {
@@ -215,7 +224,7 @@ async function generateStatuses(client) {
 # ボットの情報
 - サーバー参加数: ${serverCount}
 - 合計ユーザー数: ${userCount}
-- 主な機能: ウェルカムメッセージ, 高機能ロールボード, Firestoreデータベース連携, AI連携
+- 主な機能: ウェルカムメッセージ, 高機能ロールボード, Firestoreデータベース連携, AI連携, 高度なモデレーション
 # 出力形式のルール
 - 必ずJSON形式の配列で出力してください。
 - 各要素は、'emoji'(string)と'state'(string)のキーを持つオブジェクトとします。
@@ -238,7 +247,7 @@ async function generateStatuses(client) {
         console.log(chalk.yellow('⚠️ フォールバック用の静的ステータスを使用します。'));
         return [
             { emoji: '✅', state: '正常稼働中' },
-            { emoji: '📊', state: `${client.guilds.cache.size} サーバーで稼働中` },
+            { emoji: '🛡️', state: `${client.guilds.cache.size} サーバーを保護中` },
             { emoji: '💡', state: '/help でコマンド一覧' },
             { emoji: '👥', state: `${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)} ユーザーをサポート` },
         ];
