@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/events/levelingSystem.js
 const { Events, EmbedBuilder } = require('discord.js');
 const { doc, getDoc, setDoc, updateDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');
@@ -109,10 +110,7 @@ async function handleMessage(message, client) {
 
         console.log(chalk.green(`[LEVEL UP] ${author.tag} reached level ${currentLevel}!`));
 
-        // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
-        // Gemini AIから動的にコメントを生成
         const awesomeComment = await generateLevelUpComment(client, author, currentLevel, guild.name);
-        // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
 
         const usersRef = collection(db, 'levels');
         const q = query(usersRef, where('guildId', '==', guildId), orderBy('level', 'desc'), orderBy('xp', 'desc'));
@@ -131,11 +129,11 @@ async function handleMessage(message, client) {
             .setColor(0x00FFFF)
             .setAuthor({ name: `LEVEL UP! - ${author.displayName}`, iconURL: author.displayAvatarURL() })
             .setTitle(`《 RANK UP: ${oldLevel}  ➔  ${currentLevel} 》`)
-            // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
-            .setDescription(awesomeComment) // 生成されたコメントをここに設定
-            // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
+            .setDescription(awesomeComment)
             .setThumbnail(author.displayAvatarURL({ dynamic: true, size: 256 }))
-            .setImage('https://i.imgur.com/2d9UPgJ.gif')
+            // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
+            // .setImage('https://i.imgur.com/2d9UPgJ.gif') // この行を削除またはコメントアウト
+            // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
             .addFields(
                 {
                     name: '📊 現在のステータス',
