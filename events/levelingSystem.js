@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/events/levelingSystem.js
 const { Events, EmbedBuilder } = require('discord.js');
 const { doc, getDoc, setDoc, updateDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');
@@ -31,7 +30,6 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
         return text;
     } catch (error) {
         console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
-        // APIエラー時のフォールバックメッセージ
         return `**<@${user.id}> が新たな境地へ到達しました！**\n絶え間ない努力が実を結び、サーバー内での存在感がさらに増しました。`;
     }
 }
@@ -43,11 +41,13 @@ async function getLevelData(db, guildId, userId) {
     const docSnap = await getDoc(userRef);
     if (docSnap.exists()) {
         const data = docSnap.data();
+        // データにlevelプロパティが存在しない場合、0で初期化
         if (typeof data.level === 'undefined') {
             data.level = 0;
         }
         return data;
     }
+    // 新規ユーザーのデフォルトデータ
     return {
         guildId,
         userId,
@@ -67,25 +67,43 @@ async function handleMessage(message, client) {
     const guildId = guild.id;
     const userId = author.id;
     
+    // 1. ユーザーデータを取得 (クールダウンチェックのため)
     const userData = await getLevelData(db, guildId, userId);
 
+    // 2. 60秒間のクールダウンをチェック
     const now = Date.now();
     if (now - (userData.lastMessageTimestamp || 0) < 60000) {
         return;
     }
 
+    // 3. XPを加算し、タイムスタンプを更新
     const xpGained = Math.floor(Math.random() * 11) + 15;
-    
     const userRef = doc(db, 'levels', `${guildId}_${userId}`);
-    await setDoc(userRef, {
-        xp: increment(xpGained),
-        messageCount: increment(1),
-        lastMessageTimestamp: now,
-        guildId: guildId,
-        userId: userId,
-        level: userData.level
-    }, { merge: true });
-
+    try {
+        // 既存ユーザーならupdateDocで更新
+        await updateDoc(userRef, {
+            xp: increment(xpGained),
+            messageCount: increment(1),
+            lastMessageTimestamp: now
+        });
+    } catch (error) {
+        // 新規ユーザーでupdateDocが失敗した場合、setDocで新規作成
+        if (error.code === 'not-found') {
+            await setDoc(userRef, {
+                guildId: guildId,
+                userId: userId,
+                xp: xpGained,
+                level: 0,
+                messageCount: 1,
+                lastMessageTimestamp: now,
+            });
+        } else {
+            console.error(chalk.red("XPの更新に失敗:"), error);
+            return;
+        }
+    }
+    
+    // 4. 更新後の最新データを再取得
     const updatedUserData = await getLevelData(db, guildId, userId);
     
     console.log(chalk.cyan(`[XP] ${author.tag} gained ${xpGained} XP. Total: ${updatedUserData.xp}/${calculateRequiredXp(updatedUserData.level)}`));
@@ -93,19 +111,23 @@ async function handleMessage(message, client) {
     let leveledUp = false;
     let oldLevel = updatedUserData.level;
     let currentLevel = updatedUserData.level;
+    let currentXp = updatedUserData.xp;
     let requiredXp = calculateRequiredXp(currentLevel);
 
-    while (updatedUserData.xp >= requiredXp) {
-        updatedUserData.xp -= requiredXp;
+    // 5. レベルアップ判定 (複数レベルアップにも対応)
+    while (currentXp >= requiredXp) {
+        currentXp -= requiredXp;
         currentLevel += 1;
         leveledUp = true;
         requiredXp = calculateRequiredXp(currentLevel);
     }
 
+    // 6. レベルアップした場合の処理
     if (leveledUp) {
+        // レベルと残りのXPをDBに保存
         await updateDoc(userRef, {
             level: currentLevel,
-            xp: updatedUserData.xp
+            xp: currentXp
         });
 
         console.log(chalk.green(`[LEVEL UP] ${author.tag} reached level ${currentLevel}!`));
@@ -122,7 +144,7 @@ async function handleMessage(message, client) {
             }
         });
         
-        const progress = requiredXp > 0 ? Math.floor((updatedUserData.xp / requiredXp) * 20) : 0;
+        const progress = requiredXp > 0 ? Math.floor((currentXp / requiredXp) * 20) : 0;
         const progressBar = `**[** ${'🟦'.repeat(progress)}${'⬛'.repeat(20 - progress)} **]**`;
 
         const levelUpEmbed = new EmbedBuilder()
@@ -131,9 +153,6 @@ async function handleMessage(message, client) {
             .setTitle(`《 RANK UP: ${oldLevel}  ➔  ${currentLevel} 》`)
             .setDescription(awesomeComment)
             .setThumbnail(author.displayAvatarURL({ dynamic: true, size: 256 }))
-            // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
-            // .setImage('https://i.imgur.com/2d9UPgJ.gif') // この行を削除またはコメントアウト
-            // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
             .addFields(
                 {
                     name: '📊 現在のステータス',
@@ -142,7 +161,7 @@ async function handleMessage(message, client) {
                 },
                 {
                     name: `🚀 次のレベルまで (Lv. ${currentLevel + 1})`,
-                    value: `あと **${(requiredXp - updatedUserData.xp).toLocaleString()}** XP\n${progressBar} **${updatedUserData.xp.toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
+                    value: `あと **${(requiredXp - currentXp).toLocaleString()}** XP\n${progressBar} **${currentXp.toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
                     inline: false
                 }
             )
@@ -170,7 +189,6 @@ async function handleMessage(message, client) {
         }
     }
 }
-
 
 module.exports = (client) => {
     client.on(Events.MessageCreate, (message) => handleMessage(message, client));
