@@ -21,7 +21,6 @@ module.exports = {
         const guildId = interaction.guild.id;
 
         try {
-            // ユーザーのランクデータを取得
             const userRef = doc(db, 'levels', `${guildId}_${targetUser.id}`);
             const userSnap = await getDoc(userRef);
 
@@ -29,8 +28,6 @@ module.exports = {
                 return interaction.editReply({ content: `${targetUser.displayName} にはまだランクデータがありません。` });
             }
 
-            // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
-            // Firestoreから取得したデータにデフォルト値を設定
             const rawData = userSnap.data();
             const userData = {
                 level: rawData.level || 0,
@@ -39,11 +36,9 @@ module.exports = {
                 userId: rawData.userId,
                 guildId: rawData.guildId
             };
-            // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
 
             const requiredXp = calculateRequiredXp(userData.level);
 
-            // サーバー内での順位を取得
             const usersRef = collection(db, 'levels');
             const q = query(usersRef, where('guildId', '==', guildId), orderBy('level', 'desc'), orderBy('xp', 'desc'));
             const snapshot = await getDocs(q);
@@ -55,9 +50,15 @@ module.exports = {
                 }
             });
 
-            // プログレスバーを作成
-            const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 10) : 0;
+            // ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
+            // XPが必要値を超えても計算が破綻しないように修正
+            let progress = 0;
+            if (requiredXp > 0) {
+                // 現在のXPが必要XPを超えることは基本的にないが、念のため最大値を10に制限
+                progress = Math.min(Math.floor((userData.xp / requiredXp) * 10), 10);
+            }
             const progressBar = '🟩'.repeat(progress) + '⬛'.repeat(10 - progress);
+            // ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
 
             const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
