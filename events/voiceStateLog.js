@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
 const chalk = require('chalk');
-const { getFirestore, doc, getDoc, setDoc, increment } = require('firebase/firestore');
+const { getFirestore, doc, getDoc, setDoc, increment, updateDoc } = require('firebase/firestore');
 const { getDatabase, ref, set, remove, get } = require('firebase/database');
 
 // メッセージ削除管理クラス
@@ -53,6 +53,42 @@ async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
         return null;
     }
 }
+
+// VC滞在時間に応じてXPを付与する関数
+async function addVcExp(db, guildId, userId, stayDuration) {
+    if (!stayDuration || stayDuration <= 0) return;
+
+    // 1分あたり5XPを計算 (ミリ秒を分に変換)
+    const minutesStayed = Math.floor(stayDuration / 60000);
+    if (minutesStayed <= 0) return;
+
+    const xpGained = minutesStayed * 5;
+
+    try {
+        const userRef = doc(db, 'levels', `${guildId}_${userId}`);
+        const userSnap = await getDoc(userRef);
+
+        // ユーザーデータが存在すればXPを加算、なければ新規作成
+        if (userSnap.exists()) {
+            await updateDoc(userRef, {
+                xp: increment(xpGained)
+            });
+        } else {
+            await setDoc(userRef, {
+                guildId,
+                userId,
+                xp: xpGained,
+                level: 0,
+                messageCount: 0,
+                lastMessageTimestamp: 0
+            });
+        }
+        console.log(chalk.blue(`[XP] Added ${xpGained} XP to ${userId} for ${minutesStayed} minutes in VC.`));
+    } catch (error) {
+        console.error(chalk.red(`❌ Error adding VC XP for ${userId}:`), error);
+    }
+}
+
 
 // Firestoreに滞在時間を加算更新する関数
 async function updateUserStayTime(db, guildId, userId, stayDuration) {
@@ -120,12 +156,15 @@ async function handleVoiceLeave(oldState, client) {
         // 3. Firestoreの累計滞在時間を更新
         await updateUserStayTime(db, guild.id, member.id, stayDuration);
         
-        // 4. Realtime DBのセッション情報を削除
+        // 4. VC滞在時間からXPを付与
+        await addVcExp(db, guild.id, member.id, stayDuration);
+        
+        // 5. Realtime DBのセッション情報を削除
         await remove(sessionRef);
         console.log(chalk.yellow(`🔴 RTDB Session ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
     }
 
-    // 5. [既存機能] ログチャンネルにメッセージを送信
+    // 6. [既存機能] ログチャンネルにメッセージを送信
     const logChannelId = await getLogChannelIdForVc(db, guild.id, channel.id);
     if (logChannelId) {
         try {

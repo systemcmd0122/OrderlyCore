@@ -186,13 +186,13 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-// ===== ▼▼▼▼▼ 変更箇所 ▼▼▼▼▼ =====
 // 新しいカスタムイベントハンドラをここで読み込みます
 require('./events/auditLog')(client);
 console.log(chalk.magenta(`✅ イベント読み込み完了: auditLog (カスタム)`));
 require('./events/automodListener')(client);
 console.log(chalk.magenta(`✅ イベント読み込み完了: automodListener (カスタム)`));
-// ===== ▲▲▲▲▲ 変更箇所 ▲▲▲▲▲ =====
+require('./events/levelingSystem')(client);
+console.log(chalk.magenta(`✅ イベント読み込み完了: levelingSystem (カスタム)`));
 
 
 // --- スラッシュコマンド登録 ---

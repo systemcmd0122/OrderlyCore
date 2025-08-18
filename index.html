@@ -378,9 +378,9 @@
                 <h2>// Core Systems</h2>
                 <div class="features-grid">
                     <div class="feature-card">
-                        <div class="feature-icon">🛡️</div>
-                        <h3>高機能モデレーション</h3>
-                        <p>NGワード、招待URLの自動削除から、警告システムの運用、サーバーの全操作を記録する監査ログまで。サーバーの健全な運営を強力にサポートします。</p>
+                        <div class="feature-icon">🏆</div>
+                        <h3>インタラクティブ・レベリング</h3>
+                        <p>メッセージ投稿やVC滞在時間に応じてXPを獲得。レベルアップやランキングでサーバー内の活動を促進し、コミュニティを活性化させます。</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🎭</div>
@@ -402,10 +402,10 @@
                         <h3>高度なウェルカム設定</h3>
                         <p>参加・退出メッセージの完全カスタマイズ、自動ロール付与、ルールチャンネルへの誘導など、サーバーの第一印象を完璧に演出します。</p>
                     </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">💾</div>
-                        <h3>Firebaseデータベース連携</h3>
-                        <p>すべての設定とログデータをFirebase Firestoreに永続化。信頼性と拡張性の高いデータ管理を実現します。</p>
+                     <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>高機能モデレーション</h3>
+                        <p>NGワード、招待URLの自動削除から、警告システムの運用、サーバーの全操作を記録する監査ログまで。健全な運営を強力にサポートします。</p>
                     </div>
                 </div>
             </div>
@@ -438,16 +438,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             const commands = [
                 {
-                    cmd: "/automod ng-word add",
-                    desc: "NGワードリストに新しい単語を登録します。"
+                    cmd: "/rank",
+                    desc: "あなたの現在のレベル、XP、サーバー内ランキングを表示します。"
                 },
                 {
-                    cmd: "/warn add @User スパム行為",
-                    desc: "メンバーに警告を与え、履歴を記録します。"
-                },
-                {
-                    cmd: "/log-config setup #logs",
-                    desc: "サーバーの全操作を記録する監査ログチャンネルを設定します。"
+                    cmd: "/profile @User",
+                    desc: "指定したユーザーの活動統計（レベル、VC滞在時間など）を表示します。"
                 },
                 {
                     cmd: "/roleboard create",
@@ -461,7 +457,11 @@
                     cmd: "/vc-stats",
                     desc: "ボイスチャンネルの滞在時間ランキングを表示します。"
                 },
-                 {
+                {
+                    cmd: "/warn add @User スパム行為",
+                    desc: "メンバーに警告を与え、履歴を記録します。"
+                },
+                {
                     cmd: "/help",
                     desc: "利用可能な全コマンドのリストを表示します..."
                 }
