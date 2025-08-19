@@ -1,83 +1,37 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-const { getFirestore } = require('firebase/firestore');
-const { getDatabase } = require('firebase/database');
+const { getFirestore, doc, getDoc, setDoc } = require('firebase/firestore');
+const { getDatabase, ref, set, get, remove } = require('firebase/database');
 
 // --- Express アプリケーション設定 ---
 const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your_very_secret_key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 86400000 } // 1 day
+}));
+
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     next();
 });
-
-app.get('/', (req, res) => {
-    const indexPath = path.join(__dirname, 'index.html');
-    fs.access(indexPath, fs.constants.F_OK, (err) => {
-        if (err) {
-            console.error('index.html が見つかりません。');
-            res.status(404).json({
-                status: 'error',
-                message: 'Website not found. Bot is running.',
-                botStatus: client && client.isReady() ? 'ok' : 'initializing'
-            });
-        } else {
-            res.sendFile(indexPath);
-        }
-    });
-});
-
-app.get('/ping', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
-});
-
-app.get('/health', (req, res) => {
-    const isReady = client && client.isReady();
-    const status = isReady && client.ws.status === 0 ? 'ok' : 'degraded';
-    const health = {
-        status: status,
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        botStatus: isReady ? client.ws.status : 'initializing'
-    };
-    res.status(status === 'ok' ? 200 : 503).json(health);
-});
-
-function keepAlive() {
-    const PING_INTERVAL = 2 * 60 * 1000;
-    const selfUrl = process.env.APP_URL;
-    if (!selfUrl) {
-        console.warn(chalk.yellow('環境変数 APP_URL が設定されていません。Keep-Alive機能は無効になります。'));
-        return;
-    }
-    setInterval(async () => {
-        try {
-            const url = selfUrl.endsWith('/ping') ? selfUrl : `${selfUrl}/ping`;
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-            const response = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': `Discord-Bot-KeepAlive/${require('./package.json').version || '1.0.0'}` } });
-            clearTimeout(timeout);
-            if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
-            console.log(chalk.cyan(`Keep-Alive ping successful to ${url}. Status: ${response.status}`));
-        } catch (error) {
-            console.error(chalk.yellow(`Keep-Alive ping failed for ${selfUrl}:`, error.message));
-        }
-        const used = process.memoryUsage();
-        console.log(chalk.cyan(`Memory: ${Math.round(used.heapUsed / 1024 / 1024)}MB / ${Math.round(used.heapTotal / 1024 / 1024)}MB`));
-    }, PING_INTERVAL);
-    app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
-}
 
 // --- Firebase設定 ---
 const firebaseConfig = {
@@ -111,16 +65,139 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember]
 });
 
-// グローバル変数
 client.db = db;
 client.rtdb = rtdb;
 client.commands = new Collection();
-// ===== ▼▼▼▼▼ 修正箇所 ▼▼▼▼▼ =====
-client.geminiModel = geminiModel; // Geminiモデルをclientオブジェクトに格納
-// ===== ▲▲▲▲▲ 修正ここまで ▲▲▲▲▲ =====
+client.geminiModel = geminiModel;
+
+// --- Webダッシュボード用ミドルウェアとAPI ---
+
+// 認証チェックミドルウェア
+const isAuthenticated = (req, res, next) => {
+    if (req.session.userId && req.session.guildId) {
+        next();
+    } else {
+        res.status(401).json({ error: 'Unauthorized' });
+    }
+};
+
+// サーバー管理者チェックミドルウェア (修正)
+const isGuildAdmin = async (req, res, next) => {
+    try {
+        // req.params からではなく、req.session から guildId を取得
+        const guild = await client.guilds.fetch(req.session.guildId);
+        const member = await guild.members.fetch(req.session.userId);
+        if (member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+            next();
+        } else {
+            res.status(403).json({ error: 'Forbidden: You are not an administrator of this server.' });
+        }
+    } catch (error) {
+        console.error('Error checking guild admin status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+// API: 認証トークンの検証
+app.post('/api/verify', async (req, res) => {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token is required.' });
+
+    const tokenRef = ref(rtdb, `authTokens/${token}`);
+    const snapshot = await get(tokenRef);
+
+    if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.expiresAt > Date.now()) {
+            req.session.userId = data.userId;
+            req.session.guildId = data.guildId;
+            await remove(tokenRef);
+            return res.status(200).json({ message: 'Login successful!', guildId: data.guildId });
+        } else {
+            await remove(tokenRef);
+            return res.status(401).json({ error: 'Token has expired.' });
+        }
+    } else {
+        return res.status(401).json({ error: 'Invalid token.' });
+    }
+});
+
+// API: ログアウト
+app.post('/api/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            return res.status(500).json({ error: 'Could not log out.' });
+        }
+        res.clearCookie('connect.sid');
+        res.status(200).json({ message: 'Logged out successfully.' });
+    });
+});
+
+// (新規追加) API: セッション情報の取得
+app.get('/api/session', isAuthenticated, async (req, res) => {
+    try {
+        const guild = await client.guilds.fetch(req.session.guildId);
+        res.json({
+            userId: req.session.userId,
+            guildId: req.session.guildId,
+            guildName: guild.name,
+            guildIcon: guild.iconURL()
+        });
+    } catch(e) {
+        res.status(404).json({ error: 'Guild not found.'});
+    }
+});
+
+// API: サーバー設定の取得 (修正)
+app.get('/api/settings', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists()) {
+            res.json(docSnap.data());
+        } else {
+            res.json({}); // 設定がない場合は空のオブジェクトを返す
+        }
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+        res.status(500).json({ error: 'Failed to fetch settings.' });
+    }
+});
+
+// API: サーバー設定の更新 (修正)
+app.post('/api/settings', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        await setDoc(settingsRef, req.body, { merge: true });
+        res.status(200).json({ message: 'Settings updated successfully.' });
+    } catch (error) {
+        console.error('Error updating settings:', error);
+        res.status(500).json({ error: 'Failed to update settings.' });
+    }
+});
 
 
-// --- ボットステータス管理 ---
+// ページルーティング
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+    if (req.session.userId && req.session.guildId) {
+        res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+    } else {
+        res.redirect('/login');
+    }
+});
+
+
+// --- コマンド・イベントの読み込みとボット起動 (既存のコード) ---
+
+// ボットステータス管理
 const BotStatus = {
     INITIALIZING: '🔄 初期化中...',
     LOADING_COMMANDS: '📂 コマンド読み込み中...',
@@ -144,7 +221,7 @@ function updateBotStatus(status, details = '') {
     }
 }
 
-// --- コマンド・イベントの読み込み ---
+// コマンド読み込み
 updateBotStatus(BotStatus.LOADING_COMMANDS);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -157,16 +234,15 @@ for (const file of commandFiles) {
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
             commands.push(command.data.toJSON());
-            console.log(chalk.blue(`✅ コマンド読み込み完了: ${command.data.name}`));
         } else {
-            console.log(chalk.yellow(`⚠️ 警告: ${filePath} のコマンドに必要なプロパティがありません。`));
+             console.log(chalk.yellow(`⚠️ 警告: ${filePath} のコマンドに必要なプロパティがありません。`));
         }
     } catch (error) {
         console.error(chalk.red(`❌ コマンド読み込みエラー (${file}):`), error);
     }
 }
-console.log(chalk.blueBright(`📦 ${commands.length} 個のコマンドが読み込まれました。`));
 
+// イベント読み込み
 updateBotStatus(BotStatus.LOADING_EVENTS);
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
@@ -181,41 +257,32 @@ if (fs.existsSync(eventsPath)) {
             } else {
                 client.on(event.name, (...args) => event.execute(...args, client));
             }
-            console.log(chalk.magenta(`✅ イベント読み込み完了: ${event.name}`));
         } catch (error) {
             console.error(chalk.red(`❌ イベント読み込みエラー (${file}):`), error);
         }
     }
 }
-
-// 新しいカスタムイベントハンドラをここで読み込みます
 require('./events/auditLog')(client);
-console.log(chalk.magenta(`✅ イベント読み込み完了: auditLog (カスタム)`));
 require('./events/automodListener')(client);
-console.log(chalk.magenta(`✅ イベント読み込み完了: automodListener (カスタム)`));
 require('./events/levelingSystem')(client);
-console.log(chalk.magenta(`✅ イベント読み込み完了: levelingSystem (カスタム)`));
 
 
-// --- スラッシュコマンド登録 ---
+// スラッシュコマンド登録
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 async function deployCommands() {
     try {
-        updateBotStatus(BotStatus.REGISTERING_COMMANDS, `${commands.length} 個のコマンド`);
+        updateBotStatus(BotStatus.REGISTERING_COMMANDS, `${commands.length} 個`);
         const data = await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands }
         );
-        console.log(chalk.green(`✅ ${data.length} 個のアプリケーションコマンドの登録が完了しました。`));
-        return true;
+        console.log(chalk.green(`✅ ${data.length} 個のコマンド登録完了。`));
     } catch (error) {
         console.error(chalk.red('❌ コマンド登録エラー:'), error);
-        updateBotStatus(BotStatus.ERROR, 'コマンド登録失敗');
-        return false;
     }
 }
 
-// --- Gemini APIによるカスタムステータス生成 ---
+// ステータス生成
 async function generateStatuses(client) {
     updateBotStatus(BotStatus.GENERATING_STATUS);
     try {
@@ -232,12 +299,7 @@ async function generateStatuses(client) {
 - 各要素は、'emoji'(string)と'state'(string)のキーを持つオブジェクトとします。
 - 'emoji'にはステータスに付ける絵文字を1つ記述します。
 - 'state'にはステータスのテキストを記述します。
-- サーバー数やユーザー数のような動的な情報は、必ず"\${serverCount}"や"\${userCount}"というプレースホルダーの形でテキストに含めてください。
-# 出力例
-[
-  { "emoji": "🚀", "state": "\${serverCount}個のサーバーをサポート中！" },
-  { "emoji": "🎧", "state": "\${userCount}人の声に耳を傾けています" }
-]`;
+- サーバー数やユーザー数のような動的な情報は、必ず"\${serverCount}"や"\${userCount}"というプレースホルダーの形でテキストに含めてください。`;
 
         const result = await client.geminiModel.generateContent(prompt);
         const text = result.response.text();
@@ -256,24 +318,17 @@ async function generateStatuses(client) {
     }
 }
 
-// --- ボット準備完了イベント ---
+// ボット準備完了イベント
 client.once('ready', async () => {
-    console.log(chalk.bold.greenBright('\n==========================================='));
-    console.log(`🚀 ${client.user.tag} が正常に起動しました！`);
-    console.log(`📊 サーバー数: ${client.guilds.cache.size}`);
-    console.log(`👥 ユーザー数: ${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)}`);
-    console.log(chalk.bold.greenBright('===========================================\n'));
+    console.log(chalk.bold.greenBright(`🚀 ${client.user.tag} が起動しました！`));
+    await deployCommands();
+    
+    app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
 
-    const deploySuccess = await deployCommands();
-    if (deploySuccess) {
-        keepAlive();
-        
-        const statuses = await generateStatuses(client);
-        console.log(`✅ ${statuses.length}個のカスタムステータスを準備しました。`);
-
-        if (statuses.length > 0) {
-            let i = 0;
-            const updateStatus = () => {
+    const statuses = await generateStatuses(client);
+    if (statuses.length > 0) {
+        let i = 0;
+        const updateStatus = () => {
                 const statusTemplate = statuses[i];
                 const statusState = statusTemplate.state
                     .replace(/\$\{serverCount\}/g, client.guilds.cache.size)
@@ -291,38 +346,14 @@ client.once('ready', async () => {
                 console.log(chalk.cyan(`🎯 ステータス更新: ${statusTemplate.emoji} ${statusState}`));
                 i = (i + 1) % statuses.length;
             };
-            updateStatus();
-            setInterval(updateStatus, 60000);
-        }
-        console.log(chalk.greenBright('🎉 ボットの初期化が完全に完了しました！'));
+        updateStatus();
+        setInterval(updateStatus, 60000);
     }
 });
 
-// --- エラーハンドリング ---
-client.on('error', error => console.error(chalk.red('❌ Discord.js クライアントエラー:'), error));
-client.on('warn', warning => console.warn(chalk.yellow('⚠️ Discord.js 警告:'), warning));
-process.on('unhandledRejection', error => console.error(chalk.red('❌ 未処理の Promise リジェクション:'), error));
-process.on('uncaughtException', error => {
-    console.error(chalk.red('❌ 未処理の例外:'), error);
-    process.exit(1);
-});
-const shutdown = () => {
-    console.log(chalk.yellow('\n🔄 ボットを安全にシャットダウンしています...'));
-    client.destroy();
-    process.exit(0);
-};
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+// エラーハンドリング
+client.on('error', console.error);
+process.on('unhandledRejection', console.error);
 
-// --- ボット起動 ---
-updateBotStatus(BotStatus.CONNECTING);
-client.login(process.env.DISCORD_TOKEN).catch(error => {
-    console.error(chalk.red('❌ ボットの起動に失敗しました:'), error);
-    updateBotStatus(BotStatus.ERROR, 'ログイン失敗');
-    if (error.message.includes('An invalid token')) {
-        console.error(chalk.red('🔑 無効なトークンです。.envファイルの DISCORD_TOKEN を確認してください。'));
-    } else if (error.message.includes('Privileged intent')) {
-        console.error(chalk.red('🔒 必要な特権インテントが有効化されていません。Discord Developer Portalで設定を確認してください。'));
-    }
-    process.exit(1);
-});
+// ボット起動
+client.login(process.env.DISCORD_TOKEN);

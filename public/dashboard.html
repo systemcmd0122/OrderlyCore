@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overseer - ダッシュボード</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+            <h1>サーバー設定ダッシュボード</h1>
+            <button id="logout-btn" class="btn btn-secondary">ログアウト</button>
+        </div>
+            <p>このページでサーバーの各種設定を変更できます。</p>
+            
+            <form id="settings-form">
+                <h2>監査ログ設定</h2>
+                <div class="form-group">
+                    <label for="auditLogChannel">監査ログチャンネルID</label>
+                    <input type="text" id="auditLogChannel" name="auditLogChannel" placeholder="監査ログを送信するチャンネルのID">
+                </div>
+
+                <h2>オートモデレーター設定</h2>
+                <div class="form-group">
+                    <label for="blockInvites">招待リンクをブロック</label>
+                    <input type="checkbox" id="blockInvites" name="blockInvites">
+                </div>
+                <div class="form-group">
+                    <label for="ngWords">NGワード (カンマ区切り)</label>
+                    <textarea id="ngWords" name="ngWords" rows="3" placeholder="word1,word2,word3"></textarea>
+                </div>
+
+                <h2>レベリング設定</h2>
+                <div class="form-group">
+                    <label for="levelUpChannel">レベルアップ通知チャンネルID</label>
+                    <input type="text" id="levelUpChannel" name="levelUpChannel" placeholder="レベルアップ通知を送信するチャンネルのID">
+                </div>
+
+                <button type="submit" class="btn">設定を保存</button>
+            </form>
+            <p id="message" class="message"></p>
+        </div>
+    </div>
+    <script src="/client.js"></script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overseer - ログイン</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Overseer Dashboard</h1>
+            <p>Discordサーバーで `/login` コマンドを実行して取得したトークンを入力してください。</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="token">認証トークン</label>
+                    <input type="text" id="token" name="token" required placeholder="ここにトークンを貼り付け">
+                </div>
+                <button type="submit" class="btn">ログイン</button>
+            </form>
+            <p id="message" class="message"></p>
+        </div>
+    </div>
+    <script>
+        const form = document.getElementById('login-form');
+        const messageEl = document.getElementById('message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = document.getElementById('token').value;
+            messageEl.textContent = '認証中...';
+            messageEl.className = 'message';
+
+            try {
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.textContent = 'ログイン成功！ダッシュボードに移動します...';
+                    messageEl.classList.add('success');
+                    window.location.href = '/dashboard';
+                } else {
+                    messageEl.textContent = `エラー: ${data.error || '不明なエラーが発生しました。'}`;
+                    messageEl.classList.add('error');
+                }
+            } catch (error) {
+                messageEl.textContent = 'サーバーとの通信に失敗しました。';
+                messageEl.classList.add('error');
+            }
+        });
+    </script>
+</body>
+</html>
