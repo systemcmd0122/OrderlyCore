@@ -480,3 +480,18 @@ input:checked + .slider:before {
 .stat-info .stat-label {
     color: var(--text-muted-color);
 }
+
+/* --- 修正箇所 --- */
+.feature-card:before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(transparent, rgba(0, 229, 255, 0.1), transparent 30%);
+    animation: rotate 4s linear infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none; /* この行を追加 */
+}
