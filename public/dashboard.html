@@ -5,44 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overseer - ダッシュボード</title>
     <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <div class="header">
-            <h1>サーバー設定ダッシュボード</h1>
-            <button id="logout-btn" class="btn btn-secondary">ログアウト</button>
-        </div>
-            <p>このページでサーバーの各種設定を変更できます。</p>
-            
-            <form id="settings-form">
-                <h2>監査ログ設定</h2>
-                <div class="form-group">
-                    <label for="auditLogChannel">監査ログチャンネルID</label>
-                    <input type="text" id="auditLogChannel" name="auditLogChannel" placeholder="監査ログを送信するチャンネルのID">
-                </div>
-
-                <h2>オートモデレーター設定</h2>
-                <div class="form-group">
-                    <label for="blockInvites">招待リンクをブロック</label>
-                    <input type="checkbox" id="blockInvites" name="blockInvites">
-                </div>
-                <div class="form-group">
-                    <label for="ngWords">NGワード (カンマ区切り)</label>
-                    <textarea id="ngWords" name="ngWords" rows="3" placeholder="word1,word2,word3"></textarea>
-                </div>
-
-                <h2>レベリング設定</h2>
-                <div class="form-group">
-                    <label for="levelUpChannel">レベルアップ通知チャンネルID</label>
-                    <input type="text" id="levelUpChannel" name="levelUpChannel" placeholder="レベルアップ通知を送信するチャンネルのID">
-                </div>
-
-                <button type="submit" class="btn">設定を保存</button>
-            </form>
-            <p id="message" class="message"></p>
-        </div>
+    <div id="loader" class="loader-container">
+        <div class="loader-ring"></div>
+        <p>サーバー情報を読み込み中...</p>
     </div>
+
+    <div class="dashboard-wrapper" style="display: none;">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="/" class="logo">[O] Overseer</a>
+            </div>
+            <div class="server-info">
+                <img id="server-icon" src="" alt="Server Icon" class="server-icon">
+                <h2 id="server-name">サーバー名</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> ダッシュボード</a>
+                <a href="#welcome" class="nav-item" data-page="welcome"><span class="nav-icon">👋</span> ウェルカム設定</a>
+                <a href="#roleboard" class="nav-item" data-page="roleboard"><span class="nav-icon">🎭</span> ロールボード</a>
+                <a href="#automod" class="nav-item" data-page="automod"><span class="nav-icon">🛡️</span> オートモッド</a>
+                <a href="#logging" class="nav-item" data-page="logging"><span class="nav-icon">✍️</span> ログ設定</a>
+                <a href="#leveling" class="nav-item" data-page="leveling"><span class="nav-icon">📈</span> レベリング</a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn btn-secondary">ログアウト</button>
+            </div>
+        </aside>
+        
+        <main class="main-content">
+            <header class="main-header">
+                <h1 id="page-title">ダッシュボード</h1>
+            </header>
+            <div id="page-content" class="page-content">
+                </div>
+        </main>
+    </div>
+
+    <div id="modal-container"></div>
+
     <script src="/client.js"></script>
 </body>
 </html>
