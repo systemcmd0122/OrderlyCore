@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-c77a6dcfa2cc76f806b03dad35fc4cfbde460231/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loader');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
@@ -11,37 +12,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Utility Functions ---
     const api = {
-        get: async (endpoint) => {
-            const res = await fetch(endpoint);
-            if (!res.ok) {
-                if (res.status === 401) window.location.href = '/login';
-                throw new Error(`API Error: ${res.statusText}`);
+        _request: async (endpoint, options = {}) => {
+            try {
+                const res = await fetch(endpoint, options);
+                if (res.status === 401) {
+                    // 認証エラー時はログインページへリダイレクト
+                    window.location.href = '/login';
+                    return; // これ以上処理を続けない
+                }
+                const data = await res.json();
+                if (!res.ok) {
+                    // APIからのエラーメッセージを投げる
+                    throw new Error(data.error || `Request failed with status ${res.status}`);
+                }
+                return data;
+            } catch (err) {
+                console.error(`API request to ${endpoint} failed:`, err);
+                throw err; // エラーを再スローして呼び出し元でキャッチできるようにする
             }
-            return res.json();
         },
-        post: async (endpoint, body) => {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) throw new Error((await res.json()).error);
-            return res.json();
-        },
-        put: async (endpoint, body) => {
-             const res = await fetch(endpoint, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) throw new Error((await res.json()).error);
-            return res.json();
-        },
-        delete: async (endpoint) => {
-            const res = await fetch(endpoint, { method: 'DELETE' });
-            if (!res.ok) throw new Error((await res.json()).error);
-            return res.json();
-        }
+        get: async (endpoint) => api._request(endpoint),
+        post: async (endpoint, body) => api._request(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        }),
+        put: async (endpoint, body) => api._request(endpoint, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        }),
+        delete: async (endpoint) => api._request(endpoint, { method: 'DELETE' })
     };
 
     const showMessage = (text, type = 'success') => {
@@ -57,6 +58,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const createModal = (title, content, footerButtons) => {
+        // 既存のモーダルを削除
+        const existingModal = document.querySelector('.modal-backdrop');
+        if (existingModal) existingModal.remove();
+
         const modalId = `modal-${Date.now()}`;
         const modalHTML = `
             <div class="modal-backdrop" id="${modalId}-backdrop">
@@ -84,8 +89,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return document.getElementById(modalId);
     };
 
-    const closeModal = (backdrop) => {
-        if (!backdrop) backdrop = document.querySelector('.modal-backdrop');
+    const closeModal = () => {
+        const backdrop = document.querySelector('.modal-backdrop');
         if (backdrop) {
             backdrop.classList.remove('show');
             setTimeout(() => backdrop.remove(), 300);
@@ -103,14 +108,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="card stat-card">
                         <div class="stat-icon">👥</div>
                         <div class="stat-info">
-                            <div class="stat-value">${guildInfo.memberCount.toLocaleString()}</div>
+                            <div class="stat-value">${(guildInfo.memberCount || 0).toLocaleString()}</div>
                             <div class="stat-label">メンバー数</div>
                         </div>
                     </div>
                     <div class="card stat-card">
                         <div class="stat-icon">🤖</div>
                         <div class="stat-info">
-                            <div class="stat-value">${guildInfo.botCount.toLocaleString()}</div>
+                            <div class="stat-value">${(guildInfo.botCount || 0).toLocaleString()}</div>
                             <div class="stat-label">ボット数</div>
                         </div>
                     </div>
@@ -136,9 +141,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const settings = await api.get('/api/settings/guilds');
             settingsCache['guilds'] = settings;
             
-            const createSelect = (id, options, selected) => `
+            const createSelect = (id, options, selected, placeholder = "未設定") => `
                 <select id="${id}">
-                    <option value="">未設定</option>
+                    <option value="">${placeholder}</option>
                     ${options.map(o => `<option value="${o.id}" ${o.id === selected ? 'selected' : ''}>${o.name}</option>`).join('')}
                 </select>`;
             
@@ -200,14 +205,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             
             await renderRoleboardList();
-
             document.getElementById('add-roleboard-btn').addEventListener('click', showAddRoleboardModal);
         },
         automod: async() => {
              pageTitle.textContent = 'オートモッド設定';
              const settings = await api.get('/api/settings/guild_settings');
              settingsCache['guild_settings'] = settings;
-             const automod = settings.automod || {};
+             const automod = settings.automod || { ngWords: [], blockInvites: true };
 
              pageContent.innerHTML = `
                 <form id="automod-form">
@@ -215,7 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="card-header"><h3>NGワードフィルター</h3></div>
                         <div class="form-group">
                             <label for="ngWords">NGワード (カンマ区切り)</label>
-                            <textarea id="ngWords" name="ngWords" rows="4">${(automod.ngWords || []).join(',')}</textarea>
+                            <textarea id="ngWords" name="ngWords" rows="4" placeholder="word1,word2,word3">${(automod.ngWords || []).join(',')}</textarea>
                         </div>
                     </div>
                     <div class="card">
@@ -288,29 +292,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const renderRoleboardList = async () => {
         const listEl = document.getElementById('roleboard-list');
-        const boards = await api.get('/api/roleboards');
-        if (boards.length === 0) {
-            listEl.innerHTML = '<p>まだロールボードが作成されていません。</p>';
-            return;
-        }
-        listEl.innerHTML = boards.map(board => `
-            <div class="card">
-                <div class="card-header">
-                    <h3>${board.title}</h3>
-                    <div>
-                        <button class="btn btn-secondary btn-small edit-roleboard-btn" data-id="${board.id}">編集</button>
-                        <button class="btn btn-danger btn-small delete-roleboard-btn" data-id="${board.id}">削除</button>
+        listEl.innerHTML = '<div class="loader-ring"></div>';
+        try {
+            const boards = await api.get('/api/roleboards');
+            if (boards.length === 0) {
+                listEl.innerHTML = '<p>まだロールボードが作成されていません。</p>';
+                return;
+            }
+            listEl.innerHTML = boards.map(board => `
+                <div class="card">
+                    <div class="card-header">
+                        <h3>${board.title}</h3>
+                        <div>
+                            <button class="btn btn-secondary btn-small edit-roleboard-btn" data-id="${board.id}">編集</button>
+                            <button class="btn btn-danger btn-small delete-roleboard-btn" data-id="${board.id}">削除</button>
+                        </div>
                     </div>
+                    <p>${board.description}</p>
+                    <p><strong>ロール数:</strong> ${Object.keys(board.roles || {}).length}</p>
                 </div>
-                <p>${board.description}</p>
-                <p><strong>ロール数:</strong> ${Object.keys(board.roles || {}).length}</p>
-            </div>
-        `).join('');
+            `).join('');
 
-        listEl.querySelectorAll('.edit-roleboard-btn').forEach(btn => btn.onclick = (e) => showEditRoleboardModal(e.target.dataset.id));
-        listEl.querySelectorAll('.delete-roleboard-btn').forEach(btn => btn.onclick = (e) => confirmDeleteRoleboard(e.target.dataset.id));
+            listEl.querySelectorAll('.edit-roleboard-btn').forEach(btn => btn.onclick = (e) => showEditRoleboardModal(e.target.dataset.id));
+            listEl.querySelectorAll('.delete-roleboard-btn').forEach(btn => btn.onclick = (e) => confirmDeleteRoleboard(e.target.dataset.id));
+        } catch (error) {
+            listEl.innerHTML = `<p class="message error">ロールボードの読み込みに失敗しました: ${error.message}</p>`;
+        }
     };
-
 
     // --- Modal Handlers ---
     const showAddRoleboardModal = () => {
@@ -358,7 +366,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const showEditRoleboardModal = async (boardId) => {
-        const board = (await api.get('/api/roleboards')).find(b => b.id === boardId);
+        const boards = await api.get('/api/roleboards');
+        const board = boards.find(b => b.id === boardId);
         if (!board) return showMessage('ボードが見つかりません', 'error');
 
         const roleOptions = guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
@@ -366,18 +375,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const content = `
             <div class="grid-container" style="align-items: flex-end;">
                  <div class="form-group" style="flex-grow: 1;">
-                    <label>タイトル</label> <input type="text" id="edit-title" value="${board.title}">
+                    <label>タイトル</label> <input type="text" id="edit-title" value="${board.title || ''}">
                 </div>
                 <div class="form-group">
                     <label>色</label> 
                     <div class="color-input-wrapper">
-                        <input type="color" id="edit-color-picker" value="#${(board.color || 0).toString(16).padStart(6, '0')}">
-                        <input type="text" id="edit-color-text" value="#${(board.color || 0).toString(16).padStart(6, '0')}">
+                        <input type="color" id="edit-color-picker" value="#${(board.color || 0x5865F2).toString(16).padStart(6, '0')}">
+                        <input type="text" id="edit-color-text" value="#${(board.color || 0x5865F2).toString(16).padStart(6, '0')}">
                     </div>
                 </div>
             </div>
              <div class="form-group">
-                <label>説明</label> <textarea id="edit-desc">${board.description}</textarea>
+                <label>説明</label> <textarea id="edit-desc">${board.description || ''}</textarea>
             </div>
             <hr style="border-color: var(--border-color); margin: 20px 0;">
             <h4>ロール管理</h4>
@@ -399,25 +408,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         colorPicker.oninput = () => colorText.value = colorPicker.value;
         colorText.oninput = () => colorPicker.value = colorText.value;
 
-        await renderRoleListInModal(board.roles || {});
+        const localBoard = JSON.parse(JSON.stringify(board)); // Deep copy for local editing
+
+        await renderRoleListInModal(localBoard.roles || {});
         
-        modal.querySelector('#add-role-btn').onclick = async () => {
+        modal.querySelector('#add-role-btn').onclick = () => {
             const roleId = modal.querySelector('#add-role-select').value;
             const genre = modal.querySelector('#add-role-genre').value;
             const role = guildInfo.roles.find(r => r.id === roleId);
 
             if (!roleId || !genre || !role) return showMessage('ロールとジャンルを選択・入力してください', 'error');
 
-            board.roles = board.roles || {};
-            if (board.roles[roleId]) return showMessage('このロールは既に追加されています。', 'warning');
+            localBoard.roles = localBoard.roles || {};
+            if (localBoard.roles[roleId]) return showMessage('このロールは既に追加されています。', 'warning');
 
-            board.roles[roleId] = { name: role.name, genre, emoji: null };
+            localBoard.roles[roleId] = { name: role.name, genre, emoji: null };
             
-            board.genres = board.genres || {};
-            if (!board.genres[genre]) board.genres[genre] = [];
-            if (!board.genres[genre].includes(roleId)) board.genres[genre].push(roleId);
+            localBoard.genres = localBoard.genres || {};
+            if (!localBoard.genres[genre]) localBoard.genres[genre] = [];
+            if (!localBoard.genres[genre].includes(roleId)) localBoard.genres[genre].push(roleId);
 
-            await renderRoleListInModal(board.roles);
+            renderRoleListInModal(localBoard.roles);
             modal.querySelector('#add-role-genre').value = '';
         };
 
@@ -425,12 +436,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (e.target.classList.contains('remove-role-btn')) {
                 const roleItem = e.target.closest('.role-item');
                 const roleId = roleItem.dataset.id;
-                const roleGenre = board.roles[roleId].genre;
+                if (!localBoard.roles[roleId]) return;
 
-                delete board.roles[roleId];
-                if (board.genres && board.genres[roleGenre]) {
-                    board.genres[roleGenre] = board.genres[roleGenre].filter(id => id !== roleId);
-                    if (board.genres[roleGenre].length === 0) delete board.genres[roleGenre];
+                const roleGenre = localBoard.roles[roleId].genre;
+
+                delete localBoard.roles[roleId];
+                if (localBoard.genres && localBoard.genres[roleGenre]) {
+                    localBoard.genres[roleGenre] = localBoard.genres[roleGenre].filter(id => id !== roleId);
+                    if (localBoard.genres[roleGenre].length === 0) delete localBoard.genres[roleGenre];
                 }
                 roleItem.remove();
             }
@@ -442,8 +455,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     title: modal.querySelector('#edit-title').value,
                     description: modal.querySelector('#edit-desc').value,
                     color: parseInt(colorText.value.replace('#', ''), 16),
-                    roles: board.roles,
-                    genres: board.genres
+                    roles: localBoard.roles,
+                    genres: localBoard.genres
                 });
                 showMessage('ロールボードを更新しました。');
                 closeModal();
@@ -456,7 +469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const renderRoleListInModal = (roles) => {
         const listEl = document.getElementById('modal-role-list');
-        if (Object.keys(roles).length === 0) {
+        if (!roles || Object.keys(roles).length === 0) {
             listEl.innerHTML = '<p style="text-align: center; color: var(--text-muted-color);">まだロールが追加されていません。</p>';
             return;
         }
@@ -504,7 +517,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'welcome':
                 collection = 'guilds';
                 settings = {
-                    ...settingsCache[collection],
                     welcomeChannelId: form.querySelector('#welcomeChannelId').value || null,
                     goodbyeChannelId: form.querySelector('#goodbyeChannelId').value || null,
                     rulesChannelId: form.querySelector('#rulesChannelId').value || null,
@@ -516,7 +528,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'automod':
                  collection = 'guild_settings';
                  settings = {
-                     ...settingsCache[collection],
                      automod: {
                         ngWords: form.querySelector('#ngWords').value.split(',').map(w => w.trim()).filter(Boolean),
                         blockInvites: form.querySelector('#blockInvites').checked
@@ -526,14 +537,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'logging':
                 collection = 'guild_settings';
                 settings = {
-                    ...settingsCache[collection],
                     auditLogChannel: form.querySelector('#auditLogChannel').value || null
                 };
                 break;
             case 'leveling':
                  collection = 'guild_settings';
                  settings = {
-                     ...settingsCache[collection],
                      levelUpChannel: form.querySelector('#levelUpChannel').value || null
                  };
                  break;
@@ -544,7 +553,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             await api.post(`/api/settings/${collection}`, settings);
             showMessage('設定を保存しました。');
-            settingsCache[collection] = settings; // キャッシュ更新
+            settingsCache[collection] = { ...settingsCache[collection], ...settings }; // キャッシュ更新
         } catch (error) {
             showMessage(`保存エラー: ${error.message}`, 'error');
         }
@@ -556,16 +565,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             item.classList.toggle('active', item.dataset.page === page);
         });
         
-        pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>'; // Show loading spinner
+        pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
         
-        if (renderers[page]) {
+        const renderer = renderers[page];
+        if (renderer) {
             try {
-                await renderers[page]();
+                await renderer();
             } catch(error) {
-                pageContent.innerHTML = `<p class="message error">ページの読み込みに失敗しました: ${error.message}</p>`;
+                pageContent.innerHTML = `<p class="message error show">ページの読み込みに失敗しました: ${error.message}</p>`;
             }
         } else {
-            pageContent.innerHTML = `<p class="message error">ページが見つかりません。</p>`;
+            pageContent.innerHTML = `<p class="message error show">ページが見つかりません。</p>`;
         }
     };
     
@@ -574,7 +584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             guildInfo = await api.get('/api/guild-info');
 
-            document.getElementById('server-icon').src = guildInfo.icon || '';
+            document.getElementById('server-icon').src = guildInfo.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
             document.getElementById('server-name').textContent = guildInfo.name;
             
             loader.style.display = 'none';
@@ -584,13 +594,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             await navigate();
 
             logoutBtn.addEventListener('click', async () => {
-                await api.post('/api/logout', {});
-                window.location.href = '/login';
+                try {
+                    await api.post('/api/logout', {});
+                    window.location.href = '/login';
+                } catch(err) {
+                    showMessage('ログアウトに失敗しました', 'error');
+                }
             });
 
         } catch (error) {
+            // api.getが401エラーでリダイレクトするので、ここはそれ以外の初期化失敗ケース
             console.error('Initialization failed:', error);
-            // 401エラーの場合はapi.get内でリダイレクトされる
             loader.innerHTML = `<p class="message error">ダッシュボードの読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn">ログインページへ</a>`;
         }
     };
