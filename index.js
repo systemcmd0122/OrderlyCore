@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, getDoc, setDoc } = require('firebase/firestore');
+const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, Timestamp, orderBy } = require('firebase/firestore');
 const { getDatabase, ref, set, get, remove } = require('firebase/database');
 
 // --- Express アプリケーション設定 ---
@@ -81,10 +81,9 @@ const isAuthenticated = (req, res, next) => {
     }
 };
 
-// サーバー管理者チェックミドルウェア (修正)
+// サーバー管理者チェックミドルウェア
 const isGuildAdmin = async (req, res, next) => {
     try {
-        // req.params からではなく、req.session から guildId を取得
         const guild = await client.guilds.fetch(req.session.guildId);
         const member = await guild.members.fetch(req.session.userId);
         if (member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
@@ -133,25 +132,42 @@ app.post('/api/logout', (req, res) => {
     });
 });
 
-// (新規追加) API: セッション情報の取得
-app.get('/api/session', isAuthenticated, async (req, res) => {
+// API: サーバーの基本情報を取得 (チャンネルリスト、ロールリストなど)
+app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guild = await client.guilds.fetch(req.session.guildId);
+        const channels = guild.channels.cache
+            .filter(c => c.type === 0 || c.type === 2) // Text and Voice channels
+            .map(c => ({ id: c.id, name: c.name, type: c.type }));
+        const roles = guild.roles.cache
+            .filter(r => r.id !== guild.id) // @everyoneを除外
+            .map(r => ({ id: r.id, name: r.name, color: r.hexColor }));
+        
+        const members = await guild.members.fetch();
+        const memberCount = members.filter(member => !member.user.bot).size;
+        const botCount = members.size - memberCount;
+
         res.json({
-            userId: req.session.userId,
-            guildId: req.session.guildId,
-            guildName: guild.name,
-            guildIcon: guild.iconURL()
+            id: guild.id,
+            name: guild.name,
+            icon: guild.iconURL(),
+            channels,
+            roles,
+            memberCount,
+            botCount
         });
-    } catch(e) {
-        res.status(404).json({ error: 'Guild not found.'});
+    } catch (e) {
+        console.error('Error fetching guild info:', e);
+        res.status(404).json({ error: 'Guild not found or failed to fetch details.' });
     }
 });
 
-// API: サーバー設定の取得 (修正)
-app.get('/api/settings', isAuthenticated, isGuildAdmin, async (req, res) => {
+
+// API: サーバー設定の取得 (汎用)
+app.get('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
-        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const { collection } = req.params;
+        const settingsRef = doc(db, collection, req.session.guildId);
         const docSnap = await getDoc(settingsRef);
         if (docSnap.exists()) {
             res.json(docSnap.data());
@@ -159,20 +175,126 @@ app.get('/api/settings', isAuthenticated, isGuildAdmin, async (req, res) => {
             res.json({}); // 設定がない場合は空のオブジェクトを返す
         }
     } catch (error) {
-        console.error('Error fetching settings:', error);
-        res.status(500).json({ error: 'Failed to fetch settings.' });
+        console.error(`Error fetching settings from ${req.params.collection}:`, error);
+        res.status(500).json({ error: `Failed to fetch settings from ${req.params.collection}.` });
     }
 });
 
-// API: サーバー設定の更新 (修正)
-app.post('/api/settings', isAuthenticated, isGuildAdmin, async (req, res) => {
+// API: サーバー設定の更新 (汎用)
+app.post('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
-        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const { collection } = req.params;
+        const settingsRef = doc(db, collection, req.session.guildId);
         await setDoc(settingsRef, req.body, { merge: true });
         res.status(200).json({ message: 'Settings updated successfully.' });
     } catch (error) {
-        console.error('Error updating settings:', error);
-        res.status(500).json({ error: 'Failed to update settings.' });
+        console.error(`Error updating settings for ${req.params.collection}:`, error);
+        res.status(500).json({ error: `Failed to update settings for ${req.params.collection}.` });
+    }
+});
+
+
+// === ロールボード専用API ===
+app.get('/api/roleboards', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const q = query(collection(db, 'roleboards'), where('guildId', '==', req.session.guildId));
+        const snapshot = await getDocs(q);
+        const boards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.json(boards);
+    } catch (error) {
+        console.error('Error fetching roleboards:', error);
+        res.status(500).json({ error: 'Failed to fetch roleboards.' });
+    }
+});
+
+app.post('/api/roleboards', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { title, description, color } = req.body;
+        const guildId = req.session.guildId;
+        const boardId = `rb_${guildId}_${Date.now()}`;
+        
+        const boardData = {
+            guildId,
+            title,
+            description: description || 'ボタンをクリックしてロールを取得・削除できます。',
+            color: parseInt(color.replace('#', ''), 16) || 0x5865F2,
+            roles: {},
+            genres: {},
+            createdBy: req.session.userId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        await setDoc(doc(db, 'roleboards', boardId), boardData);
+        res.status(201).json({ message: 'Roleboard created successfully.', board: {id: boardId, ...boardData} });
+    } catch (error) {
+        console.error('Error creating roleboard:', error);
+        res.status(500).json({ error: 'Failed to create roleboard.' });
+    }
+});
+
+app.put('/api/roleboards/:id', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const boardRef = doc(db, 'roleboards', id);
+        const boardDoc = await getDoc(boardRef);
+
+        if (!boardDoc.exists() || boardDoc.data().guildId !== req.session.guildId) {
+            return res.status(404).json({ error: 'Roleboard not found.' });
+        }
+        
+        const updateData = { ...req.body, updatedAt: new Date().toISOString() };
+        await updateDoc(boardRef, updateData);
+        res.status(200).json({ message: 'Roleboard updated successfully.' });
+
+    } catch (error) {
+        console.error(`Error updating roleboard ${req.params.id}:`, error);
+        res.status(500).json({ error: 'Failed to update roleboard.' });
+    }
+});
+
+app.delete('/api/roleboards/:id', isAuthenticated, isGuildAdmin, async (req, res) => {
+     try {
+        const { id } = req.params;
+        const boardRef = doc(db, 'roleboards', id);
+        const boardDoc = await getDoc(boardRef);
+
+        if (!boardDoc.exists() || boardDoc.data().guildId !== req.session.guildId) {
+            return res.status(404).json({ error: 'Roleboard not found.' });
+        }
+        
+        await deleteDoc(boardRef);
+        res.status(200).json({ message: 'Roleboard deleted successfully.' });
+
+    } catch (error) {
+        console.error(`Error deleting roleboard ${req.params.id}:`, error);
+        res.status(500).json({ error: 'Failed to delete roleboard.' });
+    }
+});
+
+// === 警告(Warn)専用API ===
+app.get('/api/warnings/:userId', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const q = query(
+            collection(db, 'warnings'),
+            where('guildId', '==', req.session.guildId),
+            where('userId', '==', userId),
+            orderBy('timestamp', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        const warnings = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                timestamp: data.timestamp.toDate().toISOString()
+            }
+        });
+        res.json(warnings);
+    } catch (error) {
+        console.error('Error fetching warnings:', error);
+        res.status(500).json({ error: 'Failed to fetch warnings.' });
     }
 });
 
@@ -187,11 +309,8 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/dashboard', (req, res) => {
-    if (req.session.userId && req.session.guildId) {
-        res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-    } else {
-        res.redirect('/login');
-    }
+    // 認証はクライアントサイドJSで /api/guild-info を叩いて行う
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 

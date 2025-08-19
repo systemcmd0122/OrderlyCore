@@ -2,9 +2,9 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
     <title>Overseer - 次世代Discord Bot</title>
-    <meta name="description" content="Overseerは、Gemini AIとの連携、高度なロール管理、カスタマイズ可能なウェルカム機能などを搭載した多機能Discord Botです。">
+    <meta name="description" content="Overseerは、Gemini AIとの連携、Webダッシュボードによる高度なサーバー管理、カスタマイズ可能な多機能Discord Botです。">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
@@ -61,10 +61,20 @@
             text-shadow: 0 0 5px var(--primary-color);
             margin-bottom: 20px;
         }
+        
+        h2 {
+            font-size: 2.5rem;
+        }
 
         section {
-            padding: 80px 0;
+            padding: 100px 0;
             border-bottom: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        section:last-of-type {
+            border-bottom: none;
         }
 
         /* --- Header --- */
@@ -108,11 +118,31 @@
             margin-left: 25px;
             font-size: 1em;
             transition: color 0.3s ease, text-shadow 0.3s ease;
+            position: relative;
+            padding: 5px 0;
+        }
+        
+        .nav-links a:before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: var(--primary-color);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s ease;
         }
 
         .nav-links a:hover {
             color: var(--primary-color);
             text-shadow: 0 0 3px var(--primary-color);
+        }
+        
+        .nav-links a:hover:before {
+            transform: scaleX(1);
+            transform-origin: left;
         }
 
         /* --- Hero Section --- */
@@ -127,7 +157,7 @@
         }
 
         .hero h1 {
-            font-size: 3.5rem;
+            font-size: 4.5rem;
             margin-bottom: 20px;
             animation: flicker 3s infinite alternate;
         }
@@ -149,11 +179,17 @@
 
 
         .hero-subtitle {
-            font-size: 1.4rem;
-            max-width: 700px;
-            margin: 0 auto 30px;
+            font-size: 1.5rem;
+            max-width: 800px;
+            margin: 0 auto 40px;
             color: var(--text-muted-color);
             line-height: 1.5;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
         }
 
         .cta-button {
@@ -175,6 +211,18 @@
             color: var(--primary-color);
             box-shadow: 0 0 25px var(--primary-color);
         }
+        
+        .cta-button.secondary {
+            background: transparent;
+            color: var(--text-color);
+            border-color: var(--border-color);
+            box-shadow: none;
+        }
+        .cta-button.secondary:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 15px var(--primary-color);
+        }
 
         /* --- Features Section --- */
         #features {
@@ -183,7 +231,7 @@
 
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 30px;
             margin-top: 50px;
         }
@@ -202,6 +250,30 @@
         .feature-card:hover {
             transform: translateY(-10px);
             box-shadow: 0 10px 20px rgba(0, 229, 255, 0.1);
+        }
+        
+        .feature-card.dashboard-card {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 40px;
+            padding: 50px;
+            background: linear-gradient(135deg, var(--surface-color) 0%, #1a2233 100%);
+        }
+        
+        .dashboard-card-content {
+            flex: 1;
+        }
+
+        .dashboard-card-image {
+            flex: 1;
+            max-width: 450px;
+        }
+         .dashboard-card-image img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
 
         .feature-card:before {
@@ -336,13 +408,16 @@
         /* --- Responsive --- */
         @media (max-width: 768px) {
             .hero h1 {
-                font-size: 2.5rem;
+                font-size: 3rem;
             }
             .hero-subtitle {
-                font-size: 1.1rem;
+                font-size: 1.2rem;
             }
             .nav-links {
                 display: none; /* Simplification for mobile */
+            }
+            .feature-card.dashboard-card {
+                flex-direction: column;
             }
         }
     </style>
@@ -356,7 +431,7 @@
                 <a href="#hero">Home</a>
                 <a href="#features">Features</a>
                 <a href="#commands">Commands</a>
-                <a href="YOUR_INVITE_LINK" target="_blank">Invite</a>
+                <a href="/dashboard" target="_blank">Dashboard</a>
             </nav>
         </div>
     </header>
@@ -366,10 +441,13 @@
             <div class="container">
                 <h1>OVERSEER</h1>
                 <p class="hero-subtitle">
-                    Gemini AIによる動的ステータス生成、高度なロールボード、詳細な統計機能。
+                    直感的なWebダッシュボードから、AIとの連携まで。
                     あなたのDiscordサーバー管理を次のレベルへ引き上げる、インテリジェントな監視者。
                 </p>
-                <a href="https://discord.com/oauth2/authorize?client_id=1406092882531848254" class="cta-button" target="_blank">サーバーに招待する</a>
+                <div class="cta-buttons">
+                    <a href="https://discord.com/oauth2/authorize?client_id=1406092882531848254" class="cta-button" target="_blank">サーバーに招待する</a>
+                    <a href="/dashboard" class="cta-button secondary" target="_blank">Webダッシュボードを開く</a>
+                </div>
             </div>
         </section>
 
@@ -377,10 +455,27 @@
             <div class="container">
                 <h2>// Core Systems</h2>
                 <div class="features-grid">
+                    <div class="feature-card dashboard-card">
+                        <div class="dashboard-card-content">
+                             <div class="feature-icon">🖥️</div>
+                            <h3>Webダッシュボード</h3>
+                            <p>もうコマンドを覚える必要はありません。ウェルカムメッセージからロールボード、モデレーションまで、ボットのほぼ全ての機能をウェブサイトから直感的に設定・管理できます。</p>
+                            <a href="/dashboard" class="cta-button" style="margin-top: 20px;" target="_blank">ダッシュボードを試す</a>
+                        </div>
+                        <div class="dashboard-card-image">
+                            <img src="/image_fc291c.png" alt="Overseer Dashboard Screenshot">
+                        </div>
+                    </div>
+
                     <div class="feature-card">
-                        <div class="feature-icon">🏆</div>
-                        <h3>インタラクティブ・レベリング</h3>
-                        <p>メッセージ投稿やVC滞在時間に応じてXPを獲得。レベルアップやランキングでサーバー内の活動を促進し、コミュニティを活性化させます。</p>
+                        <div class="feature-icon">🧠</div>
+                        <h3>Gemini AI 連携</h3>
+                        <p>GoogleのGemini AIを活用し、サーバーの状況に応じた動的なカスタムステータスを自動生成。レベルアップメッセージもAIが彩ります。</p>
+                    </div>
+                     <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>高機能モデレーション</h3>
+                        <p>NGワード、招待URLの自動削除から、警告システムの運用、サーバーの全操作を記録する監査ログまで。健全な運営を強力にサポートします。</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">🎭</div>
@@ -388,24 +483,19 @@
                         <p>ジャンル分け可能なボタン式ロールパネルを簡単に作成。メンバーはクリック一つで直感的にロールを取得・削除できます。</p>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">📊</div>
-                        <h3>詳細なサーバー統計</h3>
-                        <p>メンバーの参加・退出履歴から、ボイスチャンネルの活動ログまで。サーバーのアクティビティを分析し、コミュニティの成長を可視化します。</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">🧠</div>
-                        <h3>Gemini AI 連携</h3>
-                        <p>GoogleのGemini AIを活用し、サーバーの状況に応じた動的なカスタムステータスを自動生成。Botが生きているかのように振る舞います。</p>
-                    </div>
-                    <div class="feature-card">
                         <div class="feature-icon">⚙️</div>
                         <h3>高度なウェルカム設定</h3>
                         <p>参加・退出メッセージの完全カスタマイズ、自動ロール付与、ルールチャンネルへの誘導など、サーバーの第一印象を完璧に演出します。</p>
                     </div>
-                     <div class="feature-card">
-                        <div class="feature-icon">🛡️</div>
-                        <h3>高機能モデレーション</h3>
-                        <p>NGワード、招待URLの自動削除から、警告システムの運用、サーバーの全操作を記録する監査ログまで。健全な運営を強力にサポートします。</p>
+                    <div class="feature-card">
+                        <div class="feature-icon">🏆</div>
+                        <h3>インタラクティブ・レベリング</h3>
+                        <p>メッセージ投稿やVC滞在時間に応じてXPを獲得。レベルアップやランキングでサーバー内の活動を促進し、コミュニティを活性化させます。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>詳細なサーバー統計</h3>
+                        <p>メンバーの参加・退出履歴から、ボイスチャンネルの活動ログまで。サーバーのアクティビティを分析し、コミュニティの成長を可視化します。</p>
                     </div>
                 </div>
             </div>
@@ -438,6 +528,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             const commands = [
                 {
+                    cmd: "/login",
+                    desc: "Webダッシュボードにログインするためのワンタイムトークンを発行します。"
+                },
+                {
                     cmd: "/rank",
                     desc: "あなたの現在のレベル、XP、サーバー内ランキングを表示します。"
                 },
@@ -446,12 +540,8 @@
                     desc: "指定したユーザーの活動統計（レベル、VC滞在時間など）を表示します。"
                 },
                 {
-                    cmd: "/roleboard create",
-                    desc: "新しいインタラクティブなロールボードを作成します。"
-                },
-                {
-                    cmd: "/welcome-config setup",
-                    desc: "ウェルカム・お別れメッセージや自動ロール付与の基本設定を行います。"
+                    cmd: "/roleboard send",
+                    desc: "設定済みのインタラクティブなロールボードを送信します。"
                 },
                 {
                     cmd: "/vc-stats",
@@ -473,7 +563,6 @@
 
             function typeCommand() {
                 if (commandIndex >= commands.length) {
-                    // Start over
                     setTimeout(() => {
                         terminalBody.innerHTML = '';
                         commandIndex = 0;
@@ -528,12 +617,6 @@
 
                 setTimeout(typeCommand, 2000);
             }
-            
-            const inviteLink = "https://discord.com/oauth2/authorize?client_id=1406092882531848254";
-            document.querySelectorAll('a[href="YOUR_INVITE_LINK"]').forEach(a => {
-                a.href = inviteLink;
-            });
-
 
             typeCommand();
         });
