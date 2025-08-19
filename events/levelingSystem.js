@@ -102,61 +102,59 @@ async function handleMessage(message, client) {
     // 6. レベルアップした場合の通知処理
     if (leveledUp) {
         console.log(chalk.green(`[LEVEL UP] ${author.tag} reached level ${userData.level}!`));
-
-        const awesomeComment = await generateLevelUpComment(client, author, userData.level, guild.name);
-
-        const usersRef = collection(db, 'levels');
-        const q = query(usersRef, where('guildId', '==', guildId), orderBy('level', 'desc'), orderBy('xp', 'desc'));
-        const snapshot = await getDocs(q);
-        let rank = -1;
-        snapshot.docs.forEach((doc, index) => {
-            if (doc.data().userId === userId) {
-                rank = index + 1;
-            }
-        });
         
-        const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 20) : 0;
-        const progressBar = `**[** ${'🟦'.repeat(progress)}${'⬛'.repeat(20 - progress)} **]**`;
-
-        const levelUpEmbed = new EmbedBuilder()
-            .setColor(0x00FFFF)
-            .setAuthor({ name: `LEVEL UP! - ${author.displayName}`, iconURL: author.displayAvatarURL() })
-            .setTitle(`《 RANK UP: ${oldLevel}  ➔  ${userData.level} 》`)
-            .setDescription(awesomeComment)
-            .setThumbnail(author.displayAvatarURL({ dynamic: true, size: 256 }))
-            .addFields(
-                {
-                    name: '📊 現在のステータス',
-                    value: `**サーバー内順位:** **${rank !== -1 ? `#${rank}` : 'N/A'}**\n**総メッセージ数:** **${userData.messageCount.toLocaleString()}** 回`,
-                    inline: false
-                },
-                {
-                    name: `🚀 次のレベルまで (Lv. ${userData.level + 1})`,
-                    value: `あと **${(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar} **${userData.xp.toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: `偉業達成おめでとうございます！ | ${guild.name}`, iconURL: guild.iconURL() })
-            .setTimestamp();
+        // サーバーの通知設定を取得
+        const settingsRef = doc(db, 'guild_settings', guild.id);
+        const settingsSnap = await getDoc(settingsRef);
+        const settings = settingsSnap.exists() ? settingsSnap.data() : {};
         
-        try {
-            const settingsRef = doc(db, 'guild_settings', guild.id);
-            const settingsSnap = await getDoc(settingsRef);
-            const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+        // 通知チャンネルが設定されている場合のみ通知を送信
+        if (settings.levelUpChannel) {
+            const targetChannel = await client.channels.fetch(settings.levelUpChannel).catch(() => null);
             
-            let targetChannel;
-            if (settings.levelUpChannel) {
-                targetChannel = await client.channels.fetch(settings.levelUpChannel).catch(() => null);
-            }
-            if (!targetChannel) {
-                targetChannel = message.channel;
-            }
-
             if (targetChannel && targetChannel.isTextBased()) {
-                await targetChannel.send({ content: `||<@${userId}>||`, embeds: [levelUpEmbed] });
+                const awesomeComment = await generateLevelUpComment(client, author, userData.level, guild.name);
+
+                const usersRef = collection(db, 'levels');
+                const q = query(usersRef, where('guildId', '==', guildId), orderBy('level', 'desc'), orderBy('xp', 'desc'));
+                const snapshot = await getDocs(q);
+                let rank = -1;
+                snapshot.docs.forEach((doc, index) => {
+                    if (doc.data().userId === userId) {
+                        rank = index + 1;
+                    }
+                });
+                
+                const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 20) : 0;
+                const progressBar = `**[** ${'🟦'.repeat(progress)}${'⬛'.repeat(20 - progress)} **]**`;
+
+                const levelUpEmbed = new EmbedBuilder()
+                    .setColor(0x00FFFF)
+                    .setAuthor({ name: `LEVEL UP! - ${author.displayName}`, iconURL: author.displayAvatarURL() })
+                    .setTitle(`《 RANK UP: ${oldLevel}  ➔  ${userData.level} 》`)
+                    .setDescription(awesomeComment)
+                    .setThumbnail(author.displayAvatarURL({ dynamic: true, size: 256 }))
+                    .addFields(
+                        {
+                            name: '📊 現在のステータス',
+                            value: `**サーバー内順位:** **${rank !== -1 ? `#${rank}` : 'N/A'}**\n**総メッセージ数:** **${userData.messageCount.toLocaleString()}** 回`,
+                            inline: false
+                        },
+                        {
+                            name: `🚀 次のレベルまで (Lv. ${userData.level + 1})`,
+                            value: `あと **${(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar} **${userData.xp.toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
+                            inline: false
+                        }
+                    )
+                    .setFooter({ text: `偉業達成おめでとうございます！ | ${guild.name}`, iconURL: guild.iconURL() })
+                    .setTimestamp();
+                
+                try {
+                    await targetChannel.send({ content: `||<@${userId}>||`, embeds: [levelUpEmbed] });
+                } catch (error) {
+                    console.error(chalk.red('レベルアップ通知の送信に失敗しました:'), error);
+                }
             }
-        } catch (error) {
-            console.error(chalk.red('レベルアップ通知の送信に失敗しました:'), error);
         }
     }
 }
