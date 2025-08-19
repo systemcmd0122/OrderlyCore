@@ -6,7 +6,7 @@ const path = require('node:path');
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
-const cors = require('cors'); // corsをインポート
+const cors = require('cors');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
@@ -108,6 +108,68 @@ const isGuildAdmin = async (req, res, next) => {
         res.status(500).json({ error: 'Internal Server Error while verifying permissions.' });
     }
 };
+
+// === ▼▼▼▼▼ ここから追加 ▼▼▼▼▼ ===
+
+// --- ヘルスチェック用エンドポイント ---
+// 外部サービス（Koyebなど）からの死活監視用
+app.get('/ping', (req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// 詳細な死活監視用
+app.get('/health', (req, res) => {
+    const health = {
+        status: client.isReady() ? 'ok' : 'degraded',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        bot_status_code: client.ws.status
+    };
+    res.status(client.isReady() ? 200 : 503).json(health);
+});
+
+// --- Keep-alive機能 ---
+// 定期的に自分自身にリクエストを送り、スリープを防ぐ
+function keepAlive() {
+    const PING_INTERVAL = 2 * 60 * 1000; // 2分
+    const appUrl = process.env.APP_URL;
+
+    if (!appUrl) {
+        console.warn(chalk.yellow('⚠️ APP_URLが設定されていません。Keep-alive機能は無効になります。'));
+        return;
+    }
+
+    setInterval(async () => {
+        try {
+            const url = appUrl.endsWith('/ping') ? appUrl : `${appUrl}/ping`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000); // 5秒でタイムアウト
+
+            const response = await fetch(url, { 
+                signal: controller.signal,
+                headers: { 'User-Agent': `Overseer-Bot/${require('./package.json').version}` }
+            });
+            
+            clearTimeout(timeout);
+            
+            if (response.ok) {
+                 console.log(chalk.blueBright(`[Keep-Alive] Ping successful to ${url}. Status: ${response.status}`));
+            } else {
+                 console.error(chalk.yellow(`[Keep-Alive] Ping failed to ${url}. Status: ${response.status}`));
+            }
+        } catch (error) {
+            console.error(chalk.red(`[Keep-Alive] Error pinging ${appUrl}:`, error.message));
+        }
+    }, PING_INTERVAL);
+}
+
+
+// === ▲▲▲▲▲ ここまで追加 ▲▲▲▲▲ ===
+
 
 // API: 認証トークンの検証
 app.post('/api/verify', async (req, res) => {
@@ -218,8 +280,7 @@ app.post('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req,
     }
 });
 
-// === ロールボード専用API (省略、元のコードのまま) ===
-// (元のコードは問題ないため、ここでは省略します。必要であれば元のコードをそのままペーストしてください)
+// === ロールボード専用API ===
 app.get('/api/roleboards', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const q = query(collection(db, 'roleboards'), where('guildId', '==', req.session.guildId));
@@ -318,16 +379,9 @@ app.get('*', (req, res) => {
     // 基本はindex.htmlを返す
     return res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
-  // APIルートの場合は次のミドルウェアへ
-  // next(); // ここではAPIルートは既に定義済みなので不要
 });
 
-// --- コマンド・イベントの読み込みとボット起動 (省略、元のコードのまま) ---
-// (この部分も元のコードで問題ないため省略します)
-
-// (ここから下は元のindex.jsの「コマンド・イベントの読み込み」以降をそのままペーストしてください)
-// --- コマンド・イベントの読み込みとボット起動 (既存のコード) ---
-
+// --- コマンド・イベントの読み込みとボット起動 ---
 // ボットステータス管理
 const BotStatus = {
     INITIALIZING: '🔄 初期化中...',
@@ -456,6 +510,11 @@ client.once('ready', async () => {
     await deployCommands();
     
     app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
+    
+    // === ▼▼▼▼▼ ここから追加 ▼▼▼▼▼ ===
+    // Keep-alive機能を起動
+    keepAlive();
+    // === ▲▲▲▲▲ ここまで追加 ▲▲▲▲▲ ===
 
     const statuses = await generateStatuses(client);
     if (statuses && statuses.length > 0) {
