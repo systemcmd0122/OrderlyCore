@@ -136,6 +136,102 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
         },
+        analytics: async () => {
+            pageTitle.textContent = 'アナリティクス';
+            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
+            
+            const data = await api.get('/api/analytics/activity');
+
+            const createBarChart = (elementId, chartData, xLabel, yLabel) => {
+                const container = document.getElementById(elementId);
+                const svgNS = "http://www.w3.org/2000/svg";
+                const svg = document.createElementNS(svgNS, "svg");
+                
+                const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                const chartWidth = width - padding.left - padding.right;
+                const chartHeight = height - padding.top - padding.bottom;
+
+                const maxValue = Math.max(...chartData.map(d => d.value));
+                const xScale = chartWidth / chartData.length;
+                const yScale = chartHeight / (maxValue > 0 ? maxValue : 1);
+
+                // Grid lines
+                for (let i = 0; i <= 5; i++) {
+                    const y = padding.top + (chartHeight / 5 * i);
+                    const line = document.createElementNS(svgNS, 'line');
+                    line.setAttribute('x1', padding.left);
+                    line.setAttribute('y1', y);
+                    line.setAttribute('x2', width - padding.right);
+                    line.setAttribute('y2', y);
+                    line.setAttribute('class', 'grid-line');
+                    svg.appendChild(line);
+                }
+
+                chartData.forEach((d, i) => {
+                    // Bar
+                    const bar = document.createElementNS(svgNS, 'rect');
+                    bar.setAttribute('x', padding.left + i * xScale + xScale * 0.1);
+                    bar.setAttribute('y', padding.top + chartHeight - d.value * yScale);
+                    bar.setAttribute('width', xScale * 0.8);
+                    bar.setAttribute('height', d.value * yScale);
+                    bar.setAttribute('class', 'bar');
+                    svg.appendChild(bar);
+
+                    // X-axis label
+                    const text = document.createElementNS(svgNS, 'text');
+                    text.setAttribute('x', padding.left + i * xScale + xScale / 2);
+                    text.setAttribute('y', height - padding.bottom + 15);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('class', 'axis-label');
+                    text.textContent = d.label;
+                    svg.appendChild(text);
+                });
+
+                // Y-axis labels
+                for (let i = 0; i <= 5; i++) {
+                    const text = document.createElementNS(svgNS, 'text');
+                    const yValue = Math.round(maxValue / 5 * (5 - i));
+                    text.setAttribute('x', padding.left - 10);
+                    text.setAttribute('y', padding.top + (chartHeight / 5 * i) + 5);
+                    text.setAttribute('text-anchor', 'end');
+                    text.setAttribute('class', 'axis-label');
+                    text.textContent = yValue;
+                    svg.appendChild(text);
+                }
+
+                container.innerHTML = '';
+                container.appendChild(svg);
+            };
+
+            pageContent.innerHTML = `
+                <div class="grid-container" style="grid-template-columns: 2fr 1fr;">
+                    <div class="card">
+                        <div class="card-header"><h3>時間帯別アクティビティ (メッセージ)</h3></div>
+                        <div id="activity-chart" class="chart-container"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>メッセージ数ランキング</h3></div>
+                        <ol id="leaderboard-list" class="leaderboard"></ol>
+                    </div>
+                </div>
+            `;
+
+            createBarChart('activity-chart', data.activityByHour, '時間', 'メッセージ数');
+
+            const leaderboardList = document.getElementById('leaderboard-list');
+            leaderboardList.innerHTML = data.topUsers.map((user, index) => `
+                <li>
+                    <span class="rank">#${index + 1}</span>
+                    <div class="user-info">
+                        <div class="user-name">${user.displayName || user.username}</div>
+                        <div class="user-id">${user.userId}</div>
+                    </div>
+                    <span class="stat">${user.messageCount.toLocaleString()}</span>
+                </li>
+            `).join('');
+        },
         welcome: async () => {
             pageTitle.textContent = 'ウェルカム設定';
             const settings = await api.get('/api/settings/guilds');

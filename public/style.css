@@ -481,6 +481,73 @@ input:checked + .slider:before {
     color: var(--text-muted-color);
 }
 
+/* --- Analytics Page Specific Styles --- */
+.chart-container {
+    width: 100%;
+    height: 300px;
+    padding: 20px;
+    background-color: var(--background-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+.chart-container svg {
+    width: 100%;
+    height: 100%;
+}
+.chart-container .bar {
+    fill: var(--primary-color);
+    transition: fill 0.2s ease;
+}
+.chart-container .bar:hover {
+    fill: #fff;
+}
+.chart-container .axis-label {
+    font-size: 12px;
+    fill: var(--text-muted-color);
+    font-family: var(--font-mono);
+}
+.chart-container .grid-line {
+    stroke: var(--border-color);
+    stroke-dasharray: 2, 2;
+}
+
+.leaderboard {
+    list-style: none;
+    padding: 0;
+}
+.leaderboard li {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+.leaderboard li:last-child {
+    border-bottom: none;
+}
+.leaderboard .rank {
+    font-size: 1.2em;
+    font-weight: bold;
+    font-family: var(--font-mono);
+    width: 40px;
+    text-align: center;
+    color: var(--primary-color);
+}
+.leaderboard .user-info {
+    flex-grow: 1;
+}
+.leaderboard .user-name {
+    font-weight: 500;
+}
+.leaderboard .user-id {
+    font-size: 0.85em;
+    color: var(--text-muted-color);
+    font-family: var(--font-mono);
+}
+.leaderboard .stat {
+    font-weight: bold;
+    font-family: var(--font-mono);
+}
+
 /* --- 修正箇所 --- */
 .feature-card:before {
     content: '';

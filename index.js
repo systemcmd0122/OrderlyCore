@@ -109,18 +109,13 @@ const isGuildAdmin = async (req, res, next) => {
     }
 };
 
-// === ▼▼▼▼▼ ここから追加 ▼▼▼▼▼ ===
-
 // --- ヘルスチェック用エンドポイント ---
-// 外部サービス（Koyebなど）からの死活監視用
 app.get('/ping', (req, res) => {
     res.status(200).json({
         status: 'ok',
         timestamp: new Date().toISOString()
     });
 });
-
-// 詳細な死活監視用
 app.get('/health', (req, res) => {
     const health = {
         status: client.isReady() ? 'ok' : 'degraded',
@@ -133,9 +128,8 @@ app.get('/health', (req, res) => {
 });
 
 // --- Keep-alive機能 ---
-// 定期的に自分自身にリクエストを送り、スリープを防ぐ
 function keepAlive() {
-    const PING_INTERVAL = 2 * 60 * 1000; // 2分
+    const PING_INTERVAL = 2 * 60 * 1000;
     const appUrl = process.env.APP_URL;
 
     if (!appUrl) {
@@ -147,7 +141,7 @@ function keepAlive() {
         try {
             const url = appUrl.endsWith('/ping') ? appUrl : `${appUrl}/ping`;
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 5000); // 5秒でタイムアウト
+            const timeout = setTimeout(() => controller.abort(), 5000);
 
             const response = await fetch(url, { 
                 signal: controller.signal,
@@ -166,10 +160,6 @@ function keepAlive() {
         }
     }, PING_INTERVAL);
 }
-
-
-// === ▲▲▲▲▲ ここまで追加 ▲▲▲▲▲ ===
-
 
 // API: 認証トークンの検証
 app.post('/api/verify', async (req, res) => {
@@ -205,7 +195,7 @@ app.post('/api/logout', (req, res) => {
         if (err) {
             return res.status(500).json({ error: 'Could not log out.' });
         }
-        res.clearCookie('connect.sid'); // connect.sidはデフォルトのセッションクッキー名
+        res.clearCookie('connect.sid');
         res.status(200).json({ message: 'Logged out successfully.' });
     });
 });
@@ -220,7 +210,7 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
             .sort((a, b) => a.name.localeCompare(b.name));
             
         const roles = guild.roles.cache
-            .filter(r => r.id !== guild.id) // @everyoneを除外
+            .filter(r => r.id !== guild.id)
             .map(r => ({ id: r.id, name: r.name, color: r.hexColor }))
             .sort((a,b) => a.name.localeCompare(b.name));
         
@@ -243,11 +233,69 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
+// === ▼▼▼▼▼ ここからアナリティクスAPIを追加 ▼▼▼▼▼ ===
+app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guildId = req.session.guildId;
+        const guild = await client.guilds.fetch(guildId);
+
+        // Firestoreからレベル情報を取得
+        const levelsRef = collection(db, 'levels');
+        const q = query(levelsRef, where('guildId', '==', guildId));
+        const snapshot = await getDocs(q);
+
+        const allUsersData = [];
+        snapshot.forEach(doc => {
+            allUsersData.push(doc.data());
+        });
+
+        // 1. メッセージ数ランキング上位5名
+        const topUsers = allUsersData
+            .sort((a, b) => (b.messageCount || 0) - (a.messageCount || 0))
+            .slice(0, 5);
+        
+        // Discordから最新のユーザー情報を取得
+        const topUsersWithDetails = await Promise.all(topUsers.map(async (user) => {
+            try {
+                const member = await guild.members.fetch(user.userId);
+                return { ...user, displayName: member.displayName, username: member.user.username };
+            } catch {
+                return { ...user, displayName: '不明なユーザー', username: 'Unknown' };
+            }
+        }));
+
+        // 2. 時間帯別アクティビティ
+        const activityByHour = Array(24).fill(0);
+        allUsersData.forEach(user => {
+            if (user.lastMessageTimestamp) {
+                // タイムゾーンをJST (+9)と仮定して計算
+                const date = new Date(user.lastMessageTimestamp);
+                const hour = date.getHours(); // UTCの時間を取得
+                activityByHour[hour] = (activityByHour[hour] || 0) + 1; // ここではメッセージ数ではなくアクティブユーザー数
+            }
+        });
+
+        const activityByHourFormatted = activityByHour.map((count, hour) => ({
+            label: `${hour.toString().padStart(2, '0')}`,
+            value: count
+        }));
+
+        res.json({
+            topUsers: topUsersWithDetails,
+            activityByHour: activityByHourFormatted
+        });
+
+    } catch (error) {
+        console.error('Error fetching analytics data:', error);
+        res.status(500).json({ error: 'Failed to fetch analytics data.' });
+    }
+});
+// === ▲▲▲▲▲ ここまでアナリティクスAPIを追加 ▲▲▲▲▲ ===
+
 // API: サーバー設定の取得 (汎用)
 app.get('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { collection } = req.params;
-        // 不正なコレクション名を弾く
         if (!['guilds', 'guild_settings'].includes(collection)) {
             return res.status(400).json({ error: 'Invalid collection specified.' });
         }
@@ -256,7 +304,7 @@ app.get('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, 
         if (docSnap.exists()) {
             res.json(docSnap.data());
         } else {
-            res.json({}); // 設定がない場合は空のオブジェクトを返す
+            res.json({});
         }
     } catch (error) {
         console.error(`Error fetching settings from ${req.params.collection}:`, error);
@@ -364,25 +412,21 @@ app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// その他のルートは、index.htmlにフォールバックさせることで、フロントエンドのルーティングを有効にする
+// その他のルートは、index.htmlにフォールバックさせる
 app.get('*', (req, res) => {
-  // APIへのリクエストでなければ、静的ファイルにフォールバック
   if (!req.path.startsWith('/api/')) {
     const filePath = path.join(__dirname, 'public', req.path);
     if (fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
         return res.sendFile(filePath);
     }
-    // login.htmlへの直接アクセスも許可
     if (req.path === '/login') {
         return res.sendFile(path.join(__dirname, 'public', 'login.html'));
     }
-    // 基本はindex.htmlを返す
     return res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
 
 // --- コマンド・イベントの読み込みとボット起動 ---
-// ボットステータス管理
 const BotStatus = {
     INITIALIZING: '🔄 初期化中...',
     LOADING_COMMANDS: '📂 コマンド読み込み中...',
@@ -406,7 +450,6 @@ function updateBotStatus(status, details = '') {
     }
 }
 
-// コマンド読み込み
 updateBotStatus(BotStatus.LOADING_COMMANDS);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -427,7 +470,6 @@ for (const file of commandFiles) {
     }
 }
 
-// イベント読み込み
 updateBotStatus(BotStatus.LOADING_EVENTS);
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
@@ -447,13 +489,10 @@ if (fs.existsSync(eventsPath)) {
         }
     }
 }
-// 独立したリスナーもロード
 require('./events/auditLog')(client);
 require('./events/automodListener')(client);
 require('./events/levelingSystem')(client);
 
-
-// スラッシュコマンド登録
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 async function deployCommands() {
     try {
@@ -468,7 +507,6 @@ async function deployCommands() {
     }
 }
 
-// ステータス生成
 async function generateStatuses(client) {
     updateBotStatus(BotStatus.GENERATING_STATUS);
     try {
@@ -504,17 +542,13 @@ async function generateStatuses(client) {
     }
 }
 
-// ボット準備完了イベント
 client.once('ready', async () => {
     console.log(chalk.bold.greenBright(`🚀 ${client.user.tag} が起動しました！`));
     await deployCommands();
     
     app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
     
-    // === ▼▼▼▼▼ ここから追加 ▼▼▼▼▼ ===
-    // Keep-alive機能を起動
     keepAlive();
-    // === ▲▲▲▲▲ ここまで追加 ▲▲▲▲▲ ===
 
     const statuses = await generateStatuses(client);
     if (statuses && statuses.length > 0) {
@@ -538,15 +572,13 @@ client.once('ready', async () => {
                 i = (i + 1) % statuses.length;
             };
         updateStatus();
-        setInterval(updateStatus, 60000); // 60秒ごとに更新
+        setInterval(updateStatus, 60000);
     }
 });
 
-// エラーハンドリング
 client.on('error', console.error);
 process.on('unhandledRejection', error => {
     console.error('Unhandled promise rejection:', error);
 });
 
-// ボット起動
 client.login(process.env.DISCORD_TOKEN);
