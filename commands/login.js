@@ -31,7 +31,7 @@ module.exports = {
         try {
             await set(tokenRef, tokenData);
 
-            const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}/login`;
+            const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}login`;
 
             const embed = new EmbedBuilder()
                 .setColor(0x5865F2)
