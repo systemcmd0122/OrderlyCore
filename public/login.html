@@ -5,31 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overseer - ログイン</title>
     <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <div class="card">
-            <h1>Overseer Dashboard</h1>
-            <p>Discordサーバーで `/login` コマンドを実行して取得したトークンを入力してください。</p>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="token">認証トークン</label>
-                    <input type="text" id="token" name="token" required placeholder="ここにトークンを貼り付け">
+<body class="login-page-body">
+
+    <div class="login-container">
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+                <div class="terminal-title">overseer-auth</div>
+            </div>
+            <div class="terminal-body">
+                <h1 class="login-title">[O] Overseer Dashboard</h1>
+                <p class="login-description">Discordサーバーで `/login` コマンドを実行して取得したトークンを入力してください。</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="token" class="prompt">user@overseer:~$ token</label>
+                        <input type="text" id="token" name="token" required placeholder="ここにトークンを貼り付け" autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn login-btn">Authenticate</button>
+                </form>
+                <div id="message-container">
+                    <p id="message"></p>
                 </div>
-                <button type="submit" class="btn">ログイン</button>
-            </form>
-            <p id="message" class="message"></p>
+            </div>
         </div>
+        <a href="/" class="back-to-home">ホームページに戻る</a>
     </div>
+
     <script>
         const form = document.getElementById('login-form');
         const messageEl = document.getElementById('message');
+        const messageContainer = document.getElementById('message-container');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const token = document.getElementById('token').value;
+            messageContainer.style.display = 'block';
             messageEl.textContent = '認証中...';
-            messageEl.className = 'message';
+            messageEl.className = '';
 
             try {
                 const response = await fetch('/api/verify', {
@@ -41,9 +59,11 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageEl.textContent = 'ログイン成功！ダッシュボードに移動します...';
+                    messageEl.textContent = '認証成功！ダッシュボードにリダイレクトします...';
                     messageEl.classList.add('success');
-                    window.location.href = '/dashboard';
+                    setTimeout(() => {
+                         window.location.href = '/dashboard';
+                    }, 1000);
                 } else {
                     messageEl.textContent = `エラー: ${data.error || '不明なエラーが発生しました。'}`;
                     messageEl.classList.add('error');

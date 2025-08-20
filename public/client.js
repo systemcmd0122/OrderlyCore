@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const showMessage = (text, type = 'success') => {
         const el = document.createElement('div');
-        el.className = `message ${type}`;
+        el.className = `message-toast ${type}`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.classList.add('show'), 10);
