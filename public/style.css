@@ -14,11 +14,6 @@
     --font-mono: 'Share Tech Mono', monospace;
 }
 
-@keyframes background-pan {
-    from { background-position: 0 0, 20px 20px; }
-    to { background-position: 40px 40px, 60px 60px; }
-}
-
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -44,7 +39,7 @@ body {
         radial-gradient(var(--border-color) 1px, transparent 1px);
     background-size: 40px 40px;
     background-position: 0 0, 20px 20px;
-    animation: background-pan 30s linear infinite;
+    /* animation: background-pan 30s linear infinite; -- 動きがうるさいため削除 */
 }
 
 /* --- Loader --- */
@@ -324,9 +319,9 @@ body {
     transition: opacity 0.3s ease;
     pointer-events: none;
 }
-.card:hover:before {
+/* .card:hover:before { -- 動きがうるさいため削除
     opacity: 1;
-}
+} */
 .card-header {
     display: flex;
     justify-content: space-between;

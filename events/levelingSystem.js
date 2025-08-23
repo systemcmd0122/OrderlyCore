@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/events/levelingSystem.js
 const { Events, EmbedBuilder } = require('discord.js');
 const { doc, getDoc, setDoc, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');
@@ -31,7 +30,8 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
         return text;
     } catch (error) {
         console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
-        return `**<@${user.id}> が新たな境地へ到達しました！**\n絶え間ない努力が実を結び、サーバー内での存在感がさらに増しました。`;
+        // ▼▼▼ 修正 ▼▼▼ メンションを外して、ユーザー名（displayName）を表示するように変更
+        return `**${user.displayName} が新たな境地へ到達しました！**\n絶え間ない努力が実を結び、サーバー内での存在感がさらに増しました。`;
     }
 }
 
@@ -150,7 +150,8 @@ async function handleMessage(message, client) {
                     .setTimestamp();
                 
                 try {
-                    await targetChannel.send({ content: `||<@${userId}>||`, embeds: [levelUpEmbed] });
+                    // ▼▼▼ 修正 ▼▼▼ contentのメンションを削除
+                    await targetChannel.send({ embeds: [levelUpEmbed] });
                 } catch (error) {
                     console.error(chalk.red('レベルアップ通知の送信に失敗しました:'), error);
                 }
