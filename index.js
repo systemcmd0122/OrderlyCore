@@ -1,6 +1,6 @@
 // systemcmd0122/overseer/overseer-c77a6dcfa2cc76f806b03dad35fc4cfbde460231/index.js
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js'); // EmbedBuilderを追加
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
@@ -10,7 +10,8 @@ const cors = require('cors');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, Timestamp, orderBy } = require('firebase/firestore');
+// limit を getDocs の隣に追加
+const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, Timestamp, orderBy, limit } = require('firebase/firestore');
 const { getDatabase, ref, set, get, remove } = require('firebase/database');
 
 // --- Express アプリケーション設定 ---
@@ -542,6 +543,126 @@ async function generateStatuses(client) {
     }
 }
 
+// ▼▼▼ ランキングボード更新機能 ▼▼▼
+const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
+
+async function updateRankboards(client) {
+    console.log(chalk.cyan('[Rankboard] Starting periodic update...'));
+    const db = client.db;
+    const rtdb = client.rtdb;
+    const settingsCol = collection(db, 'guild_settings');
+    const q = query(settingsCol, where('rankBoard', '!=', null));
+
+    try {
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+            console.log(chalk.cyan('[Rankboard] No active rankboards found.'));
+            return;
+        }
+
+        for (const guildSettingsDoc of snapshot.docs) {
+            const settings = guildSettingsDoc.data();
+            const guildId = guildSettingsDoc.id;
+            const rankBoardConfig = settings.rankBoard;
+
+            if (!rankBoardConfig || !rankBoardConfig.channelId || !rankBoardConfig.messageId) {
+                continue;
+            }
+
+            const guild = await client.guilds.fetch(guildId).catch(err => {
+                console.error(chalk.red(`[Rankboard] Failed to fetch guild ${guildId}`), err);
+                return null;
+            });
+            if (!guild) continue;
+
+            try {
+                // 1. Firestoreから上位10ユーザーの累計レベル情報を取得
+                const levelsRef = collection(db, 'levels');
+                const levelQuery = query(
+                    levelsRef,
+                    where('guildId', '==', guildId),
+                    orderBy('level', 'desc'),
+                    orderBy('xp', 'desc'),
+                    limit(10)
+                );
+                const levelSnapshot = await getDocs(levelQuery);
+                const userStats = [];
+                levelSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    userStats.push({
+                        userId: data.userId,
+                        level: data.level || 0,
+                        xp: data.xp || 0,
+                    });
+                });
+
+                // 2. Realtime DBから現在オンラインのユーザー全員のセッション情報を取得
+                const allSessionsRef = ref(rtdb, `voiceSessions/${guild.id}`);
+                const allSessionsSnapshot = await get(allSessionsRef);
+                const onlineUsers = allSessionsSnapshot.exists() ? allSessionsSnapshot.val() : {};
+
+                // 3. 累計XPと現在のVCセッションXPを合算して最終的なXPを計算
+                const finalStats = userStats.map(stat => {
+                    let currentXp = stat.xp;
+                    if (onlineUsers[stat.userId]) {
+                        const sessionDurationMs = Date.now() - onlineUsers[stat.userId].joinedAt;
+                        const minutesStayed = Math.floor(sessionDurationMs / 60000);
+                        const vcXpGained = minutesStayed * 5; // vcStateLog.jsと同じレート
+                        currentXp += vcXpGained;
+                    }
+                    return { ...stat, finalXp: currentXp };
+                });
+
+                // 4. 再度ソートして最終ランキングを作成
+                finalStats.sort((a, b) => {
+                    if (b.level !== a.level) {
+                        return b.level - a.level;
+                    }
+                    return b.finalXp - a.finalXp;
+                });
+                
+                // 5. Embedを作成
+                const rankEmbed = new EmbedBuilder()
+                    .setColor(0x00FFFF)
+                    .setTitle(`🏆 ${guild.name} リアルタイムランキング`)
+                    .setThumbnail(guild.iconURL({ dynamic: true }))
+                    .setTimestamp()
+                    .setFooter({ text: '🟢: VC参加中 | 5分ごとに更新' });
+                
+                if (finalStats.length === 0) {
+                    rankEmbed.setDescription('まだデータがありません。\nメンバーがチャットやVCで活動を始めると、ここにランキングが表示されます。');
+                } else {
+                    const rankPromises = finalStats.map(async (stat, index) => {
+                        const member = await guild.members.fetch(stat.userId).catch(() => null);
+                        const medal = ['🥇', '🥈', '🥉'][index] || `**#${index + 1}**`;
+                        const requiredXp = calculateRequiredXp(stat.level);
+                        const isOnline = onlineUsers[stat.userId] ? '🟢' : '';
+
+                        return `${medal} ${isOnline} **${member ? member.displayName : '不明なユーザー'}**\n> LV: \`${stat.level}\` | XP: \`${stat.finalXp.toLocaleString()} / ${requiredXp.toLocaleString()}\``;
+                    });
+                    const rankStrings = await Promise.all(rankPromises);
+                    rankEmbed.setDescription(rankStrings.join('\n\n'));
+                }
+
+                // 6. メッセージを更新
+                const channel = await client.channels.fetch(rankBoardConfig.channelId).catch(() => null);
+                if (channel) {
+                    const message = await channel.messages.fetch(rankBoardConfig.messageId).catch(() => null);
+                    if (message) {
+                        await message.edit({ embeds: [rankEmbed] });
+                        console.log(chalk.green(`[Rankboard] Updated for guild: ${guild.name}`));
+                    }
+                }
+            } catch (error) {
+                console.error(chalk.red(`[Rankboard] Error updating board for guild ${guildId}:`), error);
+            }
+        }
+    } catch (error) {
+        console.error(chalk.red('[Rankboard] Failed to query for guild settings:'), error);
+    }
+}
+// ▲▲▲ ランキングボード更新機能 ▲▲▲
+
 client.once('ready', async () => {
     console.log(chalk.bold.greenBright(`🚀 ${client.user.tag} が起動しました！`));
     await deployCommands();
@@ -549,6 +670,12 @@ client.once('ready', async () => {
     app.listen(PORT, () => console.log(chalk.green(`✅ Webサーバーがポート ${PORT} で起動しました。`)));
     
     keepAlive();
+
+    // ▼▼▼ ランキングボードの定期更新を開始 ▼▼▼
+    // 起動10秒後に初回更新、その後5分ごとに更新
+    setTimeout(() => updateRankboards(client), 10000);
+    setInterval(() => updateRankboards(client), 5 * 60 * 1000);
+    // ▲▲▲ ここまで追加 ▲▲▲
 
     const statuses = await generateStatuses(client);
     if (statuses && statuses.length > 0) {
