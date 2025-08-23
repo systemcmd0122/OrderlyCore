@@ -8,33 +8,56 @@ module.exports = {
         try {
             const guildId = member.guild.id;
             const user = member.user;
-            
-            // Botの場合は処理しない
-            if (user.bot) return;
-            
-            console.log(`🎉 ${user.tag} が ${member.guild.name} に参加しました`);
-            
+
             // Firestoreからサーバー設定を取得
-            const guildConfigRef = doc(client.db, 'guilds', guildId);
-            const guildConfigSnap = await getDoc(guildConfigRef);
-            
-            let guildConfig = {};
-            if (guildConfigSnap.exists()) {
-                guildConfig = guildConfigSnap.data();
+            const guildSettingsRef = doc(client.db, 'guild_settings', guildId);
+            const guildConfigRef = doc(client.db, 'guilds', guildId); // For welcome messages
+            const [guildSettingsSnap, guildConfigSnap] = await Promise.all([
+                getDoc(guildSettingsRef),
+                getDoc(guildConfigRef)
+            ]);
+
+            const guildSettings = guildSettingsSnap.exists() ? guildSettingsSnap.data() : {};
+            let guildConfig = guildConfigSnap.exists() ? guildConfigSnap.data() : {};
+
+            // ▼▼▼ Bot用の自動ロール付与機能 ▼▼▼
+            if (user.bot) {
+                console.log(`🤖 Bot ${user.tag} が ${member.guild.name} に参加しました`);
+                if (guildSettings.botAutoroleId) {
+                    const role = member.guild.roles.cache.get(guildSettings.botAutoroleId);
+                    if (role) {
+                        try {
+                            if (member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles) && role.position < member.guild.members.me.roles.highest.position) {
+                                await member.roles.add(role);
+                                console.log(`✅ ${user.tag} にBot用ロール ${role.name} を付与しました`);
+                            } else {
+                                console.log(`⚠️ Botロール(${role.name})の付与に失敗しました。権限またはロール階層を確認してください。`);
+                            }
+                        } catch (error) {
+                            console.error(`❌ Botへのロール付与エラー:`, error.message);
+                        }
+                    } else {
+                        console.log(`⚠️ 設定されているBot用ロール（ID: ${guildSettings.botAutoroleId}）が見つかりません`);
+                    }
+                }
+                return; // Botの場合は以降のウェルカム処理をスキップ
             }
-            
+            // ▲▲▲ Bot用の自動ロール付与機能ここまで ▲▲▲
+
+            console.log(`🎉 ${user.tag} が ${member.guild.name} に参加しました`);
+
             // ウェルカムチャンネルが設定されていない場合は何もしない
             if (!guildConfig.welcomeChannelId) {
                 console.log(`📝 ${member.guild.name} にはウェルカムチャンネルが設定されていません`);
                 return;
             }
-            
+
             const welcomeChannel = member.guild.channels.cache.get(guildConfig.welcomeChannelId);
             if (!welcomeChannel) {
                 console.log(`⚠️ ウェルカムチャンネル ${guildConfig.welcomeChannelId} が見つかりません`);
                 return;
             }
-            
+
             // 権限チェック
             if (!welcomeChannel.permissionsFor(client.user).has([
                 PermissionsBitField.Flags.SendMessages,
@@ -43,12 +66,12 @@ module.exports = {
                 console.log(`❌ ${welcomeChannel.name} に送信権限がありません`);
                 return;
             }
-            
+
             // メンバー情報の取得
             const memberCount = member.guild.memberCount;
             const joinedDate = member.joinedAt;
             const accountAge = Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24));
-            
+
             // ウェルカムメッセージのEmbed作成
             const welcomeEmbed = new EmbedBuilder()
                 .setColor(0x00ff00)
@@ -90,7 +113,7 @@ module.exports = {
                     iconURL: member.guild.iconURL() || null
                 })
                 .setTimestamp();
-            
+
             // サーバールールチャンネルがある場合
             if (guildConfig.rulesChannelId) {
                 const rulesChannel = member.guild.channels.cache.get(guildConfig.rulesChannelId);
@@ -104,7 +127,7 @@ module.exports = {
                     ]);
                 }
             }
-            
+
             // ウェルカムロールがある場合は付与
             if (guildConfig.welcomeRoleId) {
                 const welcomeRole = member.guild.roles.cache.get(guildConfig.welcomeRoleId);
@@ -114,7 +137,7 @@ module.exports = {
                         if (welcomeRole.position < member.guild.members.me.roles.highest.position) {
                             await member.roles.add(welcomeRole);
                             console.log(`✅ ${user.tag} に ${welcomeRole.name} ロールを付与しました`);
-                            
+
                             welcomeEmbed.addFields([
                                 {
                                     name: '🎭 ロール付与完了',
@@ -130,25 +153,25 @@ module.exports = {
                     }
                 }
             }
-            
+
             // ウェルカムメッセージをチャンネルに送信
             try {
                 const messageContent = guildConfig.mentionOnWelcome ? `<@${user.id}>` : null;
-                
-                await welcomeChannel.send({ 
+
+                await welcomeChannel.send({
                     content: messageContent,
-                    embeds: [welcomeEmbed] 
+                    embeds: [welcomeEmbed]
                 });
-                
+
                 console.log(`🎉 ${user.tag} のウェルカムメッセージを ${welcomeChannel.name} に送信しました`);
             } catch (error) {
                 console.error(`❌ ウェルカムメッセージ送信エラー:`, error.message);
             }
-            
+
             // 統計情報を更新
             try {
                 const currentStats = guildConfig.statistics || {};
-                
+
                 await setDoc(guildConfigRef, {
                     ...guildConfig,
                     statistics: {
@@ -163,12 +186,12 @@ module.exports = {
                         updatedAt: Date.now()
                     }
                 }, { merge: true });
-                
+
                 console.log(`📊 ${user.tag} の参加統計を更新しました`);
             } catch (error) {
                 console.error(`❌ 統計情報更新エラー:`, error.message);
             }
-            
+
         } catch (error) {
             console.error('❌ guildMemberAdd イベントエラー:', error);
         }

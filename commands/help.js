@@ -34,7 +34,7 @@ module.exports = {
                     };
 
                     // コマンド名に基づいてカテゴリ分け
-                    if (command.data.name.includes('config') || command.data.name.includes('list')) {
+                    if (command.data.name.includes('config') || command.data.name.includes('list') || command.data.name.includes('board')) {
                         commands.management.push(commandData);
                     } else if (command.data.name.includes('role')) {
                         commands.roles.push(commandData);
