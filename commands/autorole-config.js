@@ -9,10 +9,10 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('set')
-                .setDescription('Botに自動で付与するロールを設定します。')
-                .addRoleOption(option =>
-                    option.setName('role')
-                        .setDescription('Botに付与するロール')
+                .setDescription('Botに自動で付与するロールを設定または作成します。')
+                .addStringOption(option => // RoleOptionからStringOptionに変更
+                    option.setName('role-name')
+                        .setDescription('Botに付与するロール名（存在しない場合は新規作成）')
                         .setRequired(true)
                 )
         )
@@ -37,11 +37,28 @@ module.exports = {
 
         try {
             if (subcommand === 'set') {
-                const role = interaction.options.getRole('role');
+                const roleName = interaction.options.getString('role-name');
+                let role = interaction.guild.roles.cache.find(r => r.name === roleName);
 
                 // Botの権限チェック
                 if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageRoles)) {
                     return await interaction.editReply({ content: '❌ ボットに「ロールの管理」権限がありません。' });
+                }
+
+                // ロールが存在しない場合は作成
+                if (!role) {
+                    try {
+                        role = await interaction.guild.roles.create({
+                            name: roleName,
+                            color: '#a9cce3', // 薄い青色
+                            permissions: [], // 権限なし
+                            reason: `Overseer: Bot用自動ロールとして ${interaction.user.tag} によって作成されました。`
+                        });
+                        await interaction.followUp({ content: `✅ ロール「${role.name}」が存在しなかったため、新しく作成しました。`, ephemeral: true });
+                    } catch (error) {
+                        console.error('ロールの作成に失敗:', error);
+                        return await interaction.editReply({ content: '❌ ロールの作成に失敗しました。権限設定を確認してください。' });
+                    }
                 }
 
                 // ロール階層チェック

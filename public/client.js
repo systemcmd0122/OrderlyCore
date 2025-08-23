@@ -303,6 +303,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             await renderRoleboardList();
             document.getElementById('add-roleboard-btn').addEventListener('click', showAddRoleboardModal);
         },
+        // ▼▼▼ Bot 自動ロール設定ページを追加 ▼▼▼
+        autorole: async () => {
+            pageTitle.textContent = 'Bot 自動ロール設定';
+            const settings = await api.get('/api/settings/guild_settings');
+            settingsCache['guild_settings'] = settings;
+
+            const createSelect = (id, options, selected) => `
+                <select id="${id}">
+                    <option value="">未設定 (自動付与しない)</option>
+                    ${options.map(o => `<option value="${o.id}" ${o.id === selected ? 'selected' : ''}>${o.name}</option>`).join('')}
+                </select>`;
+            
+            pageContent.innerHTML = `
+                <form id="autorole-form">
+                    <div class="card">
+                        <div class="card-header"><h3>Bot用ロール</h3></div>
+                        <div class="form-group">
+                            <label for="botAutoroleId">自動付与ロール</label>
+                            ${createSelect('botAutoroleId', guildInfo.roles, settings.botAutoroleId)}
+                            <p style="font-size: 0.9em; color: var(--text-muted-color); margin-top: 10px;">
+                                新しいBotがサーバーに参加した際に、ここで選択したロールが自動的に付与されます。
+                            </p>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>
+            `;
+            document.getElementById('autorole-form').addEventListener('submit', handleFormSubmit);
+        },
+        // ▲▲▲ ここまで追加 ▲▲▲
         automod: async() => {
              pageTitle.textContent = 'オートモッド設定';
              const settings = await api.get('/api/settings/guild_settings');
@@ -602,7 +632,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Event Handlers & Routing ---
-    // ▼▼▼ 修正箇所 ▼▼▼
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -629,6 +658,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     sendGoodbyeDM: form.querySelector('#sendGoodbyeDM').checked,
                 };
                 break;
+            // ▼▼▼ Bot 自動ロール設定の保存処理を追加 ▼▼▼
+            case 'autorole':
+                collection = 'guild_settings';
+                settings = {
+                    botAutoroleId: form.querySelector('#botAutoroleId').value || null
+                };
+                break;
+            // ▲▲▲ ここまで追加 ▲▲▲
             case 'automod':
                  collection = 'guild_settings';
                  settings = {
@@ -651,7 +688,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                  };
                  break;
             default:
-                // 不明なフォームの場合はボタンを元に戻して終了
                 submitButton.disabled = false;
                 submitButton.textContent = originalButtonText;
                 return;
@@ -659,17 +695,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             await api.post(`/api/settings/${collection}`, settings);
-            showMessage('設定を保存しました。'); // 成功メッセージ
+            showMessage('設定を保存しました。');
             settingsCache[collection] = { ...settingsCache[collection], ...settings }; // キャッシュ更新
         } catch (error) {
-            showMessage(`保存エラー: ${error.message}`, 'error'); // エラーメッセージ
+            showMessage(`保存エラー: ${error.message}`, 'error');
         } finally {
-            // 成功・失敗にかかわらずボタンを元に戻す
             submitButton.disabled = false;
             submitButton.textContent = originalButtonText;
         }
     };
-    // ▲▲▲ 修正ここまで ▲▲▲
     
     const navigate = async () => {
         const page = window.location.hash.substring(1) || 'dashboard';
