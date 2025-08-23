@@ -602,9 +602,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Event Handlers & Routing ---
+    // ▼▼▼ 修正箇所 ▼▼▼
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
+
+        // ボタンをローディング状態にする
+        submitButton.disabled = true;
+        submitButton.textContent = '保存中...';
+
         const page = new URL(location.href).hash.substring(1);
         let settings;
         let collection;
@@ -643,17 +651,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                  };
                  break;
             default:
+                // 不明なフォームの場合はボタンを元に戻して終了
+                submitButton.disabled = false;
+                submitButton.textContent = originalButtonText;
                 return;
         }
 
         try {
             await api.post(`/api/settings/${collection}`, settings);
-            showMessage('設定を保存しました。');
+            showMessage('設定を保存しました。'); // 成功メッセージ
             settingsCache[collection] = { ...settingsCache[collection], ...settings }; // キャッシュ更新
         } catch (error) {
-            showMessage(`保存エラー: ${error.message}`, 'error');
+            showMessage(`保存エラー: ${error.message}`, 'error'); // エラーメッセージ
+        } finally {
+            // 成功・失敗にかかわらずボタンを元に戻す
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
         }
     };
+    // ▲▲▲ 修正ここまで ▲▲▲
     
     const navigate = async () => {
         const page = window.location.hash.substring(1) || 'dashboard';
