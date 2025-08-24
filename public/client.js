@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-c77a6dcfa2cc76f806b03dad35fc4cfbde460231/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loader');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
@@ -233,7 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             `).join('');
         },
         welcome: async () => {
-            pageTitle.textContent = 'ウェルカム設定';
+            pageTitle.textContent = '参加・退出設定';
             const settings = await api.get('/api/settings/guilds');
             settingsCache['guilds'] = settings;
             
@@ -288,6 +287,82 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             document.getElementById('welcome-form').addEventListener('submit', handleFormSubmit);
         },
+        // ★★★★★【ここから追加・変更】★★★★★
+        'welcome-message': async () => {
+            pageTitle.textContent = 'ウェルカムメッセージ設定';
+            const settings = await api.get('/api/settings/welcome-message');
+            settingsCache['welcome-message'] = settings;
+
+            pageContent.innerHTML = `
+                <form id="welcome-message-form">
+                    <div class="card">
+                        <div class="card-header"><h3>メッセージ設定</h3></div>
+                        <div class="form-group">
+                            <label>カスタムウェルカムメッセージを有効化</label>
+                            <label class="switch">
+                                <input type="checkbox" id="welcome-enabled" ${settings.enabled ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="welcome-type">メッセージタイプ</label>
+                            <select id="welcome-type">
+                                <option value="default" ${settings.type === 'default' ? 'selected' : ''}>デフォルトメッセージ</option>
+                                <option value="gemini" ${settings.type === 'gemini' ? 'selected' : ''}>AI (Gemini) が生成</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card" id="default-message-settings" style="display: ${settings.type === 'default' ? 'block' : 'none'};">
+                        <div class="card-header"><h3>メッセージ内容</h3></div>
+                        <div class="form-group">
+                           <label for="welcome-title">埋め込みタイトル</label>
+                           <input type="text" id="welcome-title" value="${settings.title || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="welcome-description">埋め込み説明文</label>
+                            <textarea id="welcome-description" rows="8">${settings.description || ''}</textarea>
+                            <p class="form-hint">
+                                <b>利用可能な変数:</b><br>
+                                <code>{user.name}</code> - ユーザー名 (例: user)<br>
+                                <code>{user.tag}</code> - ユーザー名#識別子 (例: user#1234)<br>
+                                <code>{user.displayName}</code> - サーバーでの表示名<br>
+                                <code>{user.mention}</code> - ユーザーへのメンション<br>
+                                <code>{server.name}</code> - サーバー名<br>
+                                <code>{server.memberCount}</code> - サーバーのメンバー数<br>
+                                <code>{rulesChannel}</code> - 設定したルールチャンネルへのメンション
+                            </p>
+                        </div>
+                        <div class="form-group">
+                           <label for="welcome-imageUrl">画像URL</label>
+                           <input type="text" id="welcome-imageUrl" placeholder="https://example.com/image.png" value="${settings.imageUrl || ''}">
+                        </div>
+                    </div>
+                     <div class="card" id="gemini-message-settings" style="display: ${settings.type === 'gemini' ? 'block' : 'none'};">
+                        <div class="card-header"><h3>AIによるメッセージ生成</h3></div>
+                        <p>このオプションを選択すると、新しいメンバーが参加するたびに、Gemini AIがサーバーの雰囲気やメンバーの情報に基づいて、ユニークで歓迎の意のこもったメッセージを自動で生成します。</p>
+                        <p class="form-hint">AIは以下の情報を考慮してメッセージを作成します: サーバー名、参加したユーザーの表示名、総メンバー数。</p>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>
+            `;
+
+            const typeSelect = document.getElementById('welcome-type');
+            const defaultSettings = document.getElementById('default-message-settings');
+            const geminiSettings = document.getElementById('gemini-message-settings');
+
+            typeSelect.addEventListener('change', () => {
+                if (typeSelect.value === 'gemini') {
+                    defaultSettings.style.display = 'none';
+                    geminiSettings.style.display = 'block';
+                } else {
+                    defaultSettings.style.display = 'block';
+                    geminiSettings.style.display = 'none';
+                }
+            });
+            
+            document.getElementById('welcome-message-form').addEventListener('submit', handleFormSubmit);
+        },
+        // ★★★★★【ここまで追加・変更】★★★★★
         roleboard: async () => {
             pageTitle.textContent = 'ロールボード管理';
             pageContent.innerHTML = `
@@ -646,57 +721,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         let settings;
         let collection;
 
-        switch(page) {
-            case 'welcome':
-                collection = 'guilds';
-                settings = {
-                    welcomeChannelId: form.querySelector('#welcomeChannelId').value || null,
-                    goodbyeChannelId: form.querySelector('#goodbyeChannelId').value || null,
-                    rulesChannelId: form.querySelector('#rulesChannelId').value || null,
-                    welcomeRoleId: form.querySelector('#welcomeRoleId').value || null,
-                    mentionOnWelcome: form.querySelector('#mentionOnWelcome').checked,
-                    sendGoodbyeDM: form.querySelector('#sendGoodbyeDM').checked,
-                };
-                break;
-            // ▼▼▼ Bot 自動ロール設定の保存処理を追加 ▼▼▼
-            case 'autorole':
-                collection = 'guild_settings';
-                settings = {
-                    botAutoroleId: form.querySelector('#botAutoroleId').value || null
-                };
-                break;
-            // ▲▲▲ ここまで追加 ▲▲▲
-            case 'automod':
-                 collection = 'guild_settings';
-                 settings = {
-                     automod: {
-                        ngWords: form.querySelector('#ngWords').value.split(',').map(w => w.trim()).filter(Boolean),
-                        blockInvites: form.querySelector('#blockInvites').checked
-                     }
-                 };
-                 break;
-            case 'logging':
-                collection = 'guild_settings';
-                settings = {
-                    auditLogChannel: form.querySelector('#auditLogChannel').value || null
-                };
-                break;
-            case 'leveling':
-                 collection = 'guild_settings';
-                 settings = {
-                     levelUpChannel: form.querySelector('#levelUpChannel').value || null
-                 };
-                 break;
-            default:
-                submitButton.disabled = false;
-                submitButton.textContent = originalButtonText;
-                return;
-        }
-
         try {
-            await api.post(`/api/settings/${collection}`, settings);
+            switch(page) {
+                case 'welcome':
+                    collection = 'guilds';
+                    settings = {
+                        welcomeChannelId: form.querySelector('#welcomeChannelId').value || null,
+                        goodbyeChannelId: form.querySelector('#goodbyeChannelId').value || null,
+                        rulesChannelId: form.querySelector('#rulesChannelId').value || null,
+                        welcomeRoleId: form.querySelector('#welcomeRoleId').value || null,
+                        mentionOnWelcome: form.querySelector('#mentionOnWelcome').checked,
+                        sendGoodbyeDM: form.querySelector('#sendGoodbyeDM').checked,
+                    };
+                    await api.post(`/api/settings/${collection}`, settings);
+                    break;
+                // ★★★★★【ここから追加・変更】★★★★★
+                case 'welcome-message':
+                    settings = {
+                        enabled: form.querySelector('#welcome-enabled').checked,
+                        type: form.querySelector('#welcome-type').value,
+                        title: form.querySelector('#welcome-title').value,
+                        description: form.querySelector('#welcome-description').value,
+                        imageUrl: form.querySelector('#welcome-imageUrl').value,
+                    };
+                    await api.post(`/api/settings/welcome-message`, settings);
+                    break;
+                // ★★★★★【ここまで追加・変更】★★★★★
+                case 'autorole':
+                    collection = 'guild_settings';
+                    settings = {
+                        botAutoroleId: form.querySelector('#botAutoroleId').value || null
+                    };
+                    await api.post(`/api/settings/${collection}`, settings);
+                    break;
+                case 'automod':
+                     collection = 'guild_settings';
+                     settings = {
+                         automod: {
+                            ngWords: form.querySelector('#ngWords').value.split(',').map(w => w.trim()).filter(Boolean),
+                            blockInvites: form.querySelector('#blockInvites').checked
+                         }
+                     };
+                     await api.post(`/api/settings/${collection}`, settings);
+                     break;
+                case 'logging':
+                    collection = 'guild_settings';
+                    settings = {
+                        auditLogChannel: form.querySelector('#auditLogChannel').value || null
+                    };
+                    await api.post(`/api/settings/${collection}`, settings);
+                    break;
+                case 'leveling':
+                     collection = 'guild_settings';
+                     settings = {
+                         levelUpChannel: form.querySelector('#levelUpChannel').value || null
+                     };
+                     await api.post(`/api/settings/${collection}`, settings);
+                     break;
+                default:
+                    submitButton.disabled = false;
+                    submitButton.textContent = originalButtonText;
+                    return;
+            }
             showMessage('設定を保存しました。');
-            settingsCache[collection] = { ...settingsCache[collection], ...settings }; // キャッシュ更新
         } catch (error) {
             showMessage(`保存エラー: ${error.message}`, 'error');
         } finally {

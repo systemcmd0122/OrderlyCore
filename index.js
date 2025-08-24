@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-c77a6dcfa2cc76f806b03dad35fc4cfbde460231/index.js
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js'); // EmbedBuilderを追加
 const fs = require('node:fs');
@@ -292,6 +291,43 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
     }
 });
 // === ▲▲▲▲▲ ここまでアナリティクスAPIを追加 ▲▲▲▲▲ ===
+
+// ★★★★★【ここから追加・変更】★★★★★
+// API: ウェルカムメッセージ設定の取得
+app.get('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists() && docSnap.data().welcomeMessage) {
+            res.json(docSnap.data().welcomeMessage);
+        } else {
+            // デフォルト値を返す
+            res.json({
+                enabled: true,
+                type: 'default',
+                title: '🎉 {server.name} へようこそ！',
+                description: '**{user.displayName}** さん、サーバーへのご参加ありがとうございます！\n\nまずはルールをご確認ください: {rulesChannel}',
+                imageUrl: ''
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching welcome message settings:', error);
+        res.status(500).json({ error: 'Failed to fetch welcome message settings.' });
+    }
+});
+
+// API: ウェルカムメッセージ設定の更新
+app.post('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        await setDoc(settingsRef, { welcomeMessage: req.body }, { merge: true });
+        res.status(200).json({ message: 'Welcome message settings updated successfully.' });
+    } catch (error) {
+        console.error('Error updating welcome message settings:', error);
+        res.status(500).json({ error: 'Failed to update welcome message settings.' });
+    }
+});
+// ★★★★★【ここまで追加・変更】★★★★★
 
 // API: サーバー設定の取得 (汎用)
 app.get('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {

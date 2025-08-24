@@ -2,6 +2,60 @@
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
 const { doc, getDoc, setDoc } = require('firebase/firestore');
 
+// ★★★★★【ここから追加・変更】★★★★★
+// Geminiでウェルカムメッセージを生成する関数
+async function generateWelcomeWithGemini(client, member) {
+    const { user, guild } = member;
+    try {
+        const prompt = `あなたはDiscordサーバーの歓迎担当AIです。新しく参加したユーザーを温かく、そしてクリエイティブに歓迎するメッセージを作成してください。
+
+# 指示
+- ポジティブで、歓迎の意が伝わるフレンドリーな文章を生成してください。
+- 以下の情報を文章に必ず含めてください。
+  - ユーザー名: ${user.displayName}
+  - サーバー名: ${guild.name}
+  - 現在のメンバー数: ${guild.memberCount}
+- 生成する文章は必ず**タイトル**と**説明文**の2つの部分に分けてください。
+- タイトルは「🎉」や「ようこそ！」などの絵文字を含んだ短いフレーズにしてください。（20文字以内）
+- 説明文は、ユーザーへの呼びかけから始まり、サーバーの簡単な紹介や、これから始まる素晴らしい体験への期待感を抱かせるような、少し長めの文章にしてください。（150文字以内）
+- 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式で出力してください。
+
+# 生成例
+{
+  "title": "🎉 新たな仲間が参加しました！",
+  "description": "${user.displayName}さん、ようこそ！${guild.name}の${guild.memberCount}人目のメンバーとして、あなたを心から歓迎します。ここではたくさんの素晴らしい出会いと楽しい時間が待っていますよ！"
+}`;
+
+        const result = await client.geminiModel.generateContent(prompt);
+        const text = result.response.text().replace(/```json|```/g, '').trim();
+        return JSON.parse(text);
+    } catch (error) {
+        console.error('❌ Geminiでのウェルカムメッセージ生成エラー:', error);
+        // フォールバック
+        return {
+            title: `🎉 ${guild.name}へようこそ！`,
+            description: `**${user.displayName}**さん、サーバーへのご参加ありがとうございます！これから一緒に楽しみましょう！`
+        };
+    }
+}
+
+// テキスト内の変数を置換する関数
+function replacePlaceholders(text, member, config) {
+    const { user, guild } = member;
+    const rulesChannel = config.rulesChannelId ? `<#${config.rulesChannelId}>` : 'ルールチャンネル';
+
+    return text
+        .replace(/{user.name}/g, user.username)
+        .replace(/{user.tag}/g, user.tag)
+        .replace(/{user.displayName}/g, user.displayName)
+        .replace(/{user.mention}/g, `<@${user.id}>`)
+        .replace(/{server.name}/g, guild.name)
+        .replace(/{server.memberCount}/g, guild.memberCount.toLocaleString())
+        .replace(/{rulesChannel}/g, rulesChannel);
+}
+// ★★★★★【ここまで追加・変更】★★★★★
+
+
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member, client) {
@@ -66,85 +120,72 @@ module.exports = {
                 console.log(`❌ ${welcomeChannel.name} に送信権限がありません`);
                 return;
             }
+            
+            // ★★★★★【ここから追加・変更】★★★★★
+            // カスタムウェルカムメッセージ設定を取得
+            const welcomeMsgConfig = guildSettings.welcomeMessage || { enabled: false };
 
-            // メンバー情報の取得
-            const memberCount = member.guild.memberCount;
-            const joinedDate = member.joinedAt;
-            const accountAge = Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+            if (welcomeMsgConfig.enabled) {
+                let title, description;
 
-            // ウェルカムメッセージのEmbed作成
-            const welcomeEmbed = new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setTitle(`🎉 ${member.guild.name} へようこそ！`)
-                .setDescription([
-                    `**${user.displayName}** さん、サーバーへのご参加ありがとうございます！`,
-                    '',
-                    '🌟 **サーバーでの過ごし方**',
-                    '• チャンネルを確認して、適切な場所で会話を楽しんでください',
-                    '• 他のメンバーとの交流を大切にしましょう',
-                    '• サーバールールを守って、楽しい時間をお過ごしください',
-                    '',
-                    '何かご質問がございましたら、お気軽にスタッフまでお声がけください！'
-                ].join('\n'))
-                .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
-                .addFields([
-                    {
-                        name: '👤 あなたの情報',
-                        value: [
-                            `**ユーザー名**: ${user.tag}`,
-                            `**表示名**: ${user.displayName}`,
-                            `**アカウント作成**: <t:${Math.floor(user.createdAt.getTime() / 1000)}:R>`,
-                            `**アカウント年数**: ${accountAge}日`
-                        ].join('\n'),
-                        inline: true
-                    },
-                    {
-                        name: '📊 サーバー統計',
-                        value: [
-                            `**総メンバー数**: ${memberCount.toLocaleString()}人`,
-                            `**あなたは**: ${memberCount}番目の参加者`,
-                            `**参加日時**: <t:${Math.floor(joinedDate.getTime() / 1000)}:F>`
-                        ].join('\n'),
-                        inline: true
-                    }
-                ])
-                .setFooter({
-                    text: `ユーザーID: ${user.id} | メンバー数: ${memberCount}`,
-                    iconURL: member.guild.iconURL() || null
-                })
-                .setTimestamp();
-
-            // サーバールールチャンネルがある場合
-            if (guildConfig.rulesChannelId) {
-                const rulesChannel = member.guild.channels.cache.get(guildConfig.rulesChannelId);
-                if (rulesChannel) {
-                    welcomeEmbed.addFields([
-                        {
-                            name: '📋 重要なお知らせ',
-                            value: `まずは ${rulesChannel} をお読みください！\nサーバーを快適にご利用いただくためのルールが記載されています。`,
-                            inline: false
-                        }
-                    ]);
+                if (welcomeMsgConfig.type === 'gemini') {
+                    const generated = await generateWelcomeWithGemini(client, member);
+                    title = generated.title;
+                    description = generated.description;
+                } else {
+                    title = replacePlaceholders(welcomeMsgConfig.title, member, guildConfig);
+                    description = replacePlaceholders(welcomeMsgConfig.description, member, guildConfig);
                 }
+
+                const welcomeEmbed = new EmbedBuilder()
+                    .setColor(0x00ff00)
+                    .setTitle(title)
+                    .setDescription(description)
+                    .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+                    .setTimestamp();
+                
+                if (welcomeMsgConfig.imageUrl) {
+                    welcomeEmbed.setImage(welcomeMsgConfig.imageUrl);
+                }
+
+                await welcomeChannel.send({
+                    content: guildConfig.mentionOnWelcome ? `<@${user.id}>` : null,
+                    embeds: [welcomeEmbed]
+                });
+                
+                console.log(`💌 ${user.tag} のカスタムウェルカムメッセージを送信しました`);
+
+            } else {
+                // --- 従来のウェルカムメッセージ（フォールバック） ---
+                const welcomeEmbed = new EmbedBuilder()
+                    .setColor(0x00ff00)
+                    .setTitle(`🎉 ${member.guild.name} へようこそ！`)
+                    .setDescription(`**${user.displayName}** さん、サーバーへのご参加ありがとうございます！`)
+                    .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }));
+                
+                if (guildConfig.rulesChannelId) {
+                    const rulesChannel = member.guild.channels.cache.get(guildConfig.rulesChannelId);
+                    if (rulesChannel) {
+                        welcomeEmbed.addFields([{ name: '📋 重要', value: `まずは ${rulesChannel} をご確認ください！` }]);
+                    }
+                }
+                
+                await welcomeChannel.send({
+                    content: guildConfig.mentionOnWelcome ? `<@${user.id}>` : null,
+                    embeds: [welcomeEmbed]
+                });
+                console.log(`🎉 ${user.tag} のデフォルトウェルカムメッセージを送信しました`);
             }
+            // ★★★★★【ここまで追加・変更】★★★★★
 
             // ウェルカムロールがある場合は付与
             if (guildConfig.welcomeRoleId) {
                 const welcomeRole = member.guild.roles.cache.get(guildConfig.welcomeRoleId);
                 if (welcomeRole && member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
                     try {
-                        // ボットのロール階層チェック
                         if (welcomeRole.position < member.guild.members.me.roles.highest.position) {
                             await member.roles.add(welcomeRole);
                             console.log(`✅ ${user.tag} に ${welcomeRole.name} ロールを付与しました`);
-
-                            welcomeEmbed.addFields([
-                                {
-                                    name: '🎭 ロール付与完了',
-                                    value: `${welcomeRole} ロールを付与しました！`,
-                                    inline: false
-                                }
-                            ]);
                         } else {
                             console.log(`⚠️ ${welcomeRole.name} はボットより上位のロールです`);
                         }
@@ -154,26 +195,10 @@ module.exports = {
                 }
             }
 
-            // ウェルカムメッセージをチャンネルに送信
-            try {
-                const messageContent = guildConfig.mentionOnWelcome ? `<@${user.id}>` : null;
-
-                await welcomeChannel.send({
-                    content: messageContent,
-                    embeds: [welcomeEmbed]
-                });
-
-                console.log(`🎉 ${user.tag} のウェルカムメッセージを ${welcomeChannel.name} に送信しました`);
-            } catch (error) {
-                console.error(`❌ ウェルカムメッセージ送信エラー:`, error.message);
-            }
-
             // 統計情報を更新
             try {
                 const currentStats = guildConfig.statistics || {};
-
                 await setDoc(guildConfigRef, {
-                    ...guildConfig,
                     statistics: {
                         ...currentStats,
                         totalJoins: (currentStats.totalJoins || 0) + 1,
@@ -186,7 +211,6 @@ module.exports = {
                         updatedAt: Date.now()
                     }
                 }, { merge: true });
-
                 console.log(`📊 ${user.tag} の参加統計を更新しました`);
             } catch (error) {
                 console.error(`❌ 統計情報更新エラー:`, error.message);
