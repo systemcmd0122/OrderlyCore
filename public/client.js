@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-73bfc1e5f235bcccdbf7f2400b84767315a3e964/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loader');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
@@ -287,7 +288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             document.getElementById('welcome-form').addEventListener('submit', handleFormSubmit);
         },
-        // ★★★★★【ここから追加・変更】★★★★★
         'welcome-message': async () => {
             pageTitle.textContent = 'ウェルカムメッセージ設定';
             const settings = await api.get('/api/settings/welcome-message');
@@ -362,7 +362,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             document.getElementById('welcome-message-form').addEventListener('submit', handleFormSubmit);
         },
-        // ★★★★★【ここまで追加・変更】★★★★★
         roleboard: async () => {
             pageTitle.textContent = 'ロールボード管理';
             pageContent.innerHTML = `
@@ -378,7 +377,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await renderRoleboardList();
             document.getElementById('add-roleboard-btn').addEventListener('click', showAddRoleboardModal);
         },
-        // ▼▼▼ Bot 自動ロール設定ページを追加 ▼▼▼
         autorole: async () => {
             pageTitle.textContent = 'Bot 自動ロール設定';
             const settings = await api.get('/api/settings/guild_settings');
@@ -407,7 +405,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             document.getElementById('autorole-form').addEventListener('submit', handleFormSubmit);
         },
-        // ▲▲▲ ここまで追加 ▲▲▲
         automod: async() => {
              pageTitle.textContent = 'オートモッド設定';
              const settings = await api.get('/api/settings/guild_settings');
@@ -488,7 +485,45 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </form>
             `;
              document.getElementById('leveling-form').addEventListener('submit', handleFormSubmit);
-        }
+        },
+        // ★★★★★【ここから追加】★★★★★
+        ai: async () => {
+            pageTitle.textContent = 'AI設定';
+            const settings = await api.get('/api/settings/guild_settings');
+            settingsCache['guild_settings'] = settings;
+            const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
+
+            pageContent.innerHTML = `
+                <form id="ai-form">
+                    <div class="card">
+                        <div class="card-header"><h3>メンション応答機能</h3></div>
+                        <div class="form-group">
+                            <label>メンションへの自動応答を有効化</label>
+                            <label class="switch">
+                                <input type="checkbox" id="mentionReplyEnabled" ${aiConfig.mentionReplyEnabled ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                             <p class="form-hint" style="margin-top: 10px;">
+                                Botにメンション（@Overseer）して話しかけると、AIが自動で返信します。
+                            </p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>AIのペルソナ（性格）設定</h3></div>
+                        <div class="form-group">
+                            <label for="aiPersonalityPrompt">AIへの指示（プロンプト）</label>
+                            <textarea id="aiPersonalityPrompt" rows="8" placeholder="例：あなたは猫のキャラクターです。全ての返答の語尾に「にゃん」を付けてください。">${aiConfig.aiPersonalityPrompt || ''}</textarea>
+                            <p class="form-hint">
+                                ここでAIの役割や性格、口調などを指定できます。空欄の場合は、デフォルトのフレンドリーなアシスタントとして応答します。
+                            </p>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>
+            `;
+            document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
+        },
+        // ★★★★★【ここまで追加】★★★★★
     };
     
     const renderRoleboardList = async () => {
@@ -735,7 +770,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
                     await api.post(`/api/settings/${collection}`, settings);
                     break;
-                // ★★★★★【ここから追加・変更】★★★★★
                 case 'welcome-message':
                     settings = {
                         enabled: form.querySelector('#welcome-enabled').checked,
@@ -746,7 +780,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     };
                     await api.post(`/api/settings/welcome-message`, settings);
                     break;
-                // ★★★★★【ここまで追加・変更】★★★★★
                 case 'autorole':
                     collection = 'guild_settings';
                     settings = {
@@ -778,6 +811,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                      };
                      await api.post(`/api/settings/${collection}`, settings);
                      break;
+                // ★★★★★【ここから追加】★★★★★
+                case 'ai':
+                    collection = 'guild_settings';
+                    settings = {
+                        ai: {
+                           mentionReplyEnabled: form.querySelector('#mentionReplyEnabled').checked,
+                           aiPersonalityPrompt: form.querySelector('#aiPersonalityPrompt').value
+                        }
+                    };
+                    await api.post(`/api/settings/${collection}`, settings);
+                    break;
+                // ★★★★★【ここまで追加】★★★★★
                 default:
                     submitButton.disabled = false;
                     submitButton.textContent = originalButtonText;

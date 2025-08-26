@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-73bfc1e5f235bcccdbf7f2400b84767315a3e964/index.js
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js'); // EmbedBuilderを追加
 const fs = require('node:fs');
@@ -529,6 +530,10 @@ if (fs.existsSync(eventsPath)) {
 require('./events/auditLog')(client);
 require('./events/automodListener')(client);
 require('./events/levelingSystem')(client);
+// ★★★★★【ここから追加】★★★★★
+require('./events/mentionReply')(client);
+// ★★★★★【ここまで追加】★★★★★
+
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 async function deployCommands() {
