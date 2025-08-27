@@ -4,11 +4,12 @@ const { doc, getDoc } = require('firebase/firestore');
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
-        // ボタンインタラクション以外は処理しない
-        if (!interaction.isButton()) return;
-        
-        // ロールボタンかどうかチェック
-        if (!interaction.customId.startsWith('role_')) return;
+        // ボタンインタラクション以外、またはロールボタン以外は処理しない
+        if (!interaction.isButton() || !interaction.customId.startsWith('role_')) return;
+
+        // 先に応答を保留し、タイムアウトを防ぐ
+        // ephemeral: true にすることで、応答はユーザーにのみ表示される
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const roleId = interaction.customId.split('_')[1];
@@ -19,34 +20,30 @@ module.exports = {
             // ロールの存在確認
             const role = guild.roles.cache.get(roleId);
             if (!role) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ このロールは削除されているか、見つかりません。',
-                    ephemeral: true
                 });
             }
 
             // ボットの権限チェック
             if (!guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ ボットにロール管理権限がありません。サーバー管理者に連絡してください。',
-                    ephemeral: true
                 });
             }
 
             // ロール階層チェック
             const botHighestRole = guild.members.me.roles.highest;
             if (role.position >= botHighestRole.position) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: `❌ ${role.name} はボットより上位のロールのため、操作できません。`,
-                    ephemeral: true
                 });
             }
-
+            
             // @everyone ロールのチェック
             if (role.id === guild.id) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ @everyone ロールは操作できません。',
-                    ephemeral: true
                 });
             }
 
@@ -59,16 +56,15 @@ module.exports = {
                 PermissionsBitField.Flags.BanMembers,
                 PermissionsBitField.Flags.KickMembers
             ])) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ 管理権限を含むロールは自動付与できません。',
-                    ephemeral: true
                 });
             }
+
 
             // ロールボードの設定を取得（ログ用）
             let roleboardConfig = null;
             try {
-                // メッセージからロールボード情報を取得
                 const messageEmbed = interaction.message.embeds[0];
                 if (messageEmbed && messageEmbed.footer && messageEmbed.footer.text) {
                     const footerText = messageEmbed.footer.text;
@@ -95,129 +91,81 @@ module.exports = {
                 })
                 .setTimestamp();
 
-            try {
-                if (hasRole) {
-                    // ロールを削除
-                    await member.roles.remove(role);
-                    
-                    embed.setColor(0xff6b6b)
-                        .setTitle('🗑️ ロールを削除しました')
-                        .setDescription(`**${role.name}** ロールを削除しました。`)
-                        .addFields([
-                            {
-                                name: '📋 詳細情報',
-                                value: [
-                                    `**操作**: ロール削除`,
-                                    `**ロール**: ${role}`,
-                                    `**ユーザー**: ${user}`,
-                                    `**実行日時**: <t:${Math.floor(Date.now() / 1000)}:F>`
-                                ].join('\n'),
-                                inline: false
-                            }
-                        ]);
-
-                    console.log(`✅ ${user.tag} に ${role.name} ロールを付与しました`);
-                }
-
-                // ロールの説明や特典がある場合は追加情報を表示
-                if (roleboardConfig && roleboardConfig.roles && roleboardConfig.roles[roleId]) {
-                    const roleData = roleboardConfig.roles[roleId];
-                    if (roleData.genre) {
-                        embed.addFields([
-                            {
-                                name: '🏷️ ロール情報',
-                                value: `**カテゴリ**: ${roleData.genre}`,
-                                inline: true
-                            }
-                        ]);
-                    }
-                }
-
-                // 現在のロール数を表示
-                const userRoleCount = member.roles.cache.filter(r => r.id !== guild.id).size;
-                embed.addFields([
-                    {
-                        name: '📊 現在の状況',
-                        value: `あなたが持っているロール数: **${userRoleCount}個**`,
-                        inline: false
-                    }
-                ]);
-
-                await interaction.reply({ embeds: [embed], ephemeral: true });
-
-            } catch (roleError) {
-                console.error(`❌ ロール操作エラー (${user.tag} -> ${role.name}):`, roleError);
-                
-                let errorMessage = '❌ ロールの操作中にエラーが発生しました。';
-                
-                // エラーの種類に応じたメッセージ
-                if (roleError.code === 50013) {
-                    errorMessage = '❌ ボットに十分な権限がありません。サーバー管理者に連絡してください。';
-                } else if (roleError.code === 50001) {
-                    errorMessage = '❌ このロールにアクセスする権限がありません。';
-                } else if (roleError.message.includes('hierarchy')) {
-                    errorMessage = '❌ ロールの階層が原因で操作できませんでした。';
-                }
-
-                const errorEmbed = new EmbedBuilder()
-                    .setColor(0xff0000)
-                    .setTitle('❌ エラーが発生しました')
-                    .setDescription(errorMessage)
-                    .addFields([
-                        {
-                            name: '🔧 対処方法',
-                            value: [
-                                '• サーバー管理者にボットの権限を確認してもらってください',
-                                '• ボットのロールがより上位にあることを確認してください',
-                                '• しばらく時間をおいてから再度お試しください'
-                            ].join('\n'),
-                            inline: false
-                        },
-                        {
-                            name: '📝 エラー詳細',
-                            value: `エラーコード: ${roleError.code || 'Unknown'}\nロール: ${role.name}`,
-                            inline: false
-                        }
-                    ])
-                    .setFooter({
-                        text: `ユーザー: ${user.tag}`,
-                        iconURL: user.displayAvatarURL()
-                    })
-                    .setTimestamp();
-
-                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+            if (hasRole) {
+                // ロールを削除
+                await member.roles.remove(role);
+                embed.setColor(0xff6b6b)
+                    .setTitle('🗑️ ロールを削除しました')
+                    .setDescription(`**${role.name}** ロールを削除しました。`);
+                console.log(`✅ ${user.tag} から ${role.name} ロールを削除しました`);
+            } else {
+                // ロールを付与
+                await member.roles.add(role);
+                embed.setColor(0x4caf50)
+                    .setTitle('✅ ロールを付与しました')
+                    .setDescription(`**${role.name}** ロールを付与しました。`);
+                console.log(`✅ ${user.tag} に ${role.name} ロールを付与しました`);
             }
+
+            // ロールの説明や特典がある場合は追加情報を表示
+            if (roleboardConfig && roleboardConfig.roles && roleboardConfig.roles[roleId]) {
+                const roleData = roleboardConfig.roles[roleId];
+                if (roleData.genre) {
+                    embed.addFields([
+                        {
+                            name: '🏷️ ロール情報',
+                            value: `**カテゴリ**: ${roleData.genre}`,
+                            inline: true
+                        }
+                    ]);
+                }
+            }
+
+            // 現在のロール数を表示
+            const userRoleCount = member.roles.cache.filter(r => r.id !== guild.id).size;
+            embed.addFields([
+                {
+                    name: '📊 現在の状況',
+                    value: `あなたが持っているロール数: **${userRoleCount}個**`,
+                    inline: false
+                }
+            ]);
+
+            await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
             console.error('❌ ロールボードインタラクションエラー:', error);
             
-            try {
-                const errorEmbed = new EmbedBuilder()
-                    .setColor(0xff0000)
-                    .setTitle('❌ システムエラー')
-                    .setDescription('予期しないエラーが発生しました。しばらく時間をおいてから再度お試しください。')
-                    .addFields([
-                        {
-                            name: '🛠️ サポート情報',
-                            value: [
-                                'このエラーが続く場合は、サーバー管理者に以下の情報をお伝えください：',
-                                `• エラー時刻: <t:${Math.floor(Date.now() / 1000)}:F>`,
-                                `• ユーザー: ${interaction.user.tag}`,
-                                `• ボタンID: ${interaction.customId}`
-                            ].join('\n'),
-                            inline: false
-                        }
-                    ])
-                    .setTimestamp();
-
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
-                } else {
-                    await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-                }
-            } catch (replyError) {
-                console.error('❌ エラーメッセージの送信にも失敗しました:', replyError);
+            // エラーの種類に応じたメッセージを作成
+            let errorMessage = '❌ ロールの操作中に予期しないエラーが発生しました。';
+            if (error.code === 50013) { // Missing Permissions
+                errorMessage = '❌ ボットに十分な権限がありません。サーバー管理者に連絡してください。';
+            } else if (error.code === 10008) { // Unknown Message
+                 errorMessage = '❌ 元のメッセージが見つかりませんでした。再度コマンドを実行してください。';
             }
+
+            const errorEmbed = new EmbedBuilder()
+                .setColor(0xff0000)
+                .setTitle('❌ エラーが発生しました')
+                .setDescription(errorMessage)
+                .addFields([
+                    {
+                        name: '🔧 対処方法',
+                        value: [
+                            '• サーバー管理者にボットの権限を確認してもらってください。',
+                            '• ボットのロールが対象ロールより上位にあることを確認してください。',
+                            '• しばらく時間をおいてから再度お試しください。'
+                        ].join('\n'),
+                    },
+                    {
+                        name: '📝 エラー詳細',
+                        value: `\`\`\`${error.message}\`\`\``
+                    }
+                ])
+                .setTimestamp();
+
+            // deferReply後なので、editReplyでエラーメッセージを送信
+            await interaction.editReply({ embeds: [errorEmbed] });
         }
     },
-}
+};
