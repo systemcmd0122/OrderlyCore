@@ -65,7 +65,7 @@ const db = getFirestore(firebaseApp);
 const rtdb = getDatabase(firebaseApp);
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const client = new Client({
     intents: [
@@ -581,7 +581,7 @@ app.get('/dashboard', (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 app.get('*', (req, res) => {
@@ -616,12 +616,6 @@ let currentStatus = BotStatus.INITIALIZING;
 function updateBotStatus(status, details = '') {
     currentStatus = status;
     console.log(`[${new Date().toLocaleString('ja-JP')}] ${status} ${details}`);
-    if (client.user && !client.isReady()) {
-         client.user.setPresence({
-            activities: [{ name: 'status', type: ActivityType.Custom, state: status }],
-            status: 'dnd'
-        });
-    }
 }
 
 updateBotStatus(BotStatus.LOADING_COMMANDS);
@@ -747,8 +741,10 @@ function startStatusRotation() {
         if (!client.isReady()) return;
 
         let statusToShow;
+        console.log(chalk.gray(`[Status Rotator] Running update cycle. Mode: ${statusMode}`));
 
         if (statusMode === 'ai') {
+            console.log(chalk.gray(`[Status Rotator] Generating AI status...`));
             statusToShow = await generateAIStatus();
         } else {
             if (dynamicStatuses && dynamicStatuses.length > 0) {
@@ -759,21 +755,28 @@ function startStatusRotation() {
                 statusToShow = { emoji: statusTemplate.emoji, state: statusState };
                 i = (i + 1) % dynamicStatuses.length;
             } else {
+                console.log(chalk.yellow(`[Status Rotator] Custom mode is active but no statuses are configured.`));
                 statusToShow = { emoji: '🔧', state: 'ステータス設定待ち' };
             }
         }
 
         if (statusToShow) {
-            client.user.setPresence({
-                activities: [{
-                    name: 'customstatus',
-                    type: ActivityType.Custom,
-                    state: statusToShow.state,
-                    emoji: statusToShow.emoji
-                }],
-                status: 'online'
-            });
-            console.log(chalk.cyan(`🎯 ステータス更新 (${statusMode}): ${statusToShow.emoji} ${statusToShow.state}`));
+            try {
+                await client.user.setPresence({
+                    activities: [{
+                        name: 'customstatus',
+                        type: ActivityType.Custom,
+                        state: statusToShow.state,
+                        emoji: statusToShow.emoji
+                    }],
+                    status: 'online'
+                });
+                console.log(chalk.cyan(`🎯 ステータス更新 (${statusMode}): ${statusToShow.emoji} ${statusToShow.state}`));
+            } catch (error) {
+                console.error(chalk.red('[Status Rotator] Failed to set presence:'), error);
+            }
+        } else {
+             console.log(chalk.yellow('[Status Rotator] No status to show in this cycle.'));
         }
     };
 
@@ -784,6 +787,7 @@ function startStatusRotation() {
 const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
 
 async function updateRankboards(client) {
+    if (!client.isReady()) return;
     console.log(chalk.cyan('[Rankboard] Starting periodic update...'));
     const db = client.db;
     const rtdb = client.rtdb;
@@ -901,12 +905,15 @@ client.once('ready', async () => {
 
     keepAlive();
 
-
+    // ランキングボードの初回更新を少し遅らせて、他の処理が完了するのを待つ
     setTimeout(() => updateRankboards(client), 10000);
     setInterval(() => updateRankboards(client), 5 * 60 * 1000);
 
+    // ステータス設定の読み込みとローテーション開始
     dynamicStatuses = await loadStatusSettings();
     startStatusRotation();
+
+    updateBotStatus(BotStatus.READY);
 });
 
 client.on('error', console.error);
@@ -914,4 +921,5 @@ process.on('unhandledRejection', error => {
     console.error('Unhandled promise rejection:', error);
 });
 
+updateBotStatus(BotStatus.CONNECTING);
 client.login(process.env.DISCORD_TOKEN);
