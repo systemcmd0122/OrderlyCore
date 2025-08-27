@@ -1,5 +1,5 @@
-// systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/events/voiceStateLog.js
-const { Events, EmbedBuilder } = require('discord.js');
+// systemcmd0122/overseer/overseer-af267ce1d661f675c497b5c195d79df6613865e9/events/voiceStateLog.js
+const { Events, EmbedBuilder, PermissionsBitField } = require('discord.js'); // PermissionsBitField を追加
 const chalk = require('chalk');
 const { getFirestore, doc, getDoc, setDoc, updateDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const { getDatabase, ref, set, remove, get } = require('firebase/database');
@@ -58,7 +58,6 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
         return text;
     } catch (error) {
         console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
-        // ▼▼▼ 修正 ▼▼▼ メンションを外して、ユーザー名（displayName）を表示するように変更
         return `**${user.displayName} が新たな境地へ到達しました！**\n絶え間ない努力が実を結び、サーバー内での存在感がさらに増しました。`;
     }
 }
@@ -73,6 +72,49 @@ async function getLevelData(db, guildId, userId) {
     }
     return { guildId, userId, xp: 0, level: 0, messageCount: 0, lastMessageTimestamp: 0 };
 }
+
+// ★★★★★【ここから追加】★★★★★
+// levelingSystem.js と同じロール報酬処理関数
+async function handleRoleRewards(member, oldLevel, newLevel, settings) {
+    const levelingSettings = settings.leveling || {};
+    const roleRewards = levelingSettings.roleRewards || [];
+    if (roleRewards.length === 0) return;
+
+    const rewardsToGive = roleRewards
+        .filter(reward => reward.level > oldLevel && reward.level <= newLevel)
+        .sort((a, b) => a.level - b.level);
+
+    if (rewardsToGive.length === 0) return;
+
+    if (!member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+        console.error(chalk.red(`[Role Reward] Bot does not have Manage Roles permission in ${member.guild.name}.`));
+        return;
+    }
+
+    let awardedRoles = [];
+    for (const reward of rewardsToGive) {
+        try {
+            const role = member.guild.roles.cache.get(reward.roleId);
+            if (!role) {
+                console.warn(chalk.yellow(`[Role Reward] Role ID ${reward.roleId} for level ${reward.level} not found.`));
+                continue;
+            }
+            if (role.position >= member.guild.members.me.roles.highest.position) {
+                console.warn(chalk.yellow(`[Role Reward] Cannot assign role ${role.name} as it is higher than or equal to the bot's role.`));
+                continue;
+            }
+            if (!member.roles.cache.has(role.id)) {
+                await member.roles.add(role);
+                awardedRoles.push(role);
+                console.log(chalk.green(`[Role Reward] Awarded role "${role.name}" to ${member.user.tag} for reaching level ${reward.level} (VC).`));
+            }
+        } catch (error) {
+            console.error(chalk.red(`[Role Reward] Failed to award role for level ${reward.level} to ${member.user.tag} (VC):`), error);
+        }
+    }
+    return awardedRoles;
+}
+// ★★★★★【ここまで追加】★★★★★
 
 async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
     if (!guildId || !voiceChannelId) return null;
@@ -128,6 +170,11 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
         const settingsSnap = await getDoc(settingsRef);
         const settings = settingsSnap.exists() ? settingsSnap.data() : {};
 
+        // ★★★★★【ここから変更】★★★★★
+        // ロール報酬処理
+        const awardedRoles = await handleRoleRewards(member, oldLevel, userData.level, settings);
+        // ★★★★★【ここまで変更】★★★★★
+
         if (settings.levelUpChannel) {
             const targetChannel = await client.channels.fetch(settings.levelUpChannel).catch(() => null);
             if (targetChannel && targetChannel.isTextBased()) {
@@ -166,9 +213,18 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                     )
                     .setFooter({ text: `ボイスチャンネルでの活動、お疲れ様です！ | ${guild.name}`, iconURL: guild.iconURL() })
                     .setTimestamp();
+                
+                // ★★★★★【ここから追加】★★★★★
+                if (awardedRoles && awardedRoles.length > 0) {
+                    levelUpEmbed.addFields({
+                        name: '🏆 獲得したロール報酬',
+                        value: awardedRoles.map(r => r.toString()).join('\n'),
+                        inline: false
+                    });
+                }
+                // ★★★★★【ここまで追加】★★★★★
 
                 try {
-                    // ▼▼▼ 修正 ▼▼▼ contentのメンションを削除
                     await targetChannel.send({ embeds: [levelUpEmbed] });
                 } catch (error) {
                     console.error(chalk.red('VCレベルアップ通知の送信に失敗しました:'), error);

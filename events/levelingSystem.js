@@ -1,4 +1,5 @@
-const { Events, EmbedBuilder } = require('discord.js');
+// systemcmd0122/overseer/overseer-af267ce1d661f675c497b5c195d79df6613865e9/events/levelingSystem.js
+const { Events, EmbedBuilder, PermissionsBitField } = require('discord.js'); // PermissionsBitField を追加
 const { doc, getDoc, setDoc, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');
 
@@ -30,7 +31,6 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
         return text;
     } catch (error) {
         console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
-        // ▼▼▼ 修正 ▼▼▼ メンションを外して、ユーザー名（displayName）を表示するように変更
         return `**${user.displayName} が新たな境地へ到達しました！**\n絶え間ない努力が実を結び、サーバー内での存在感がさらに増しました。`;
     }
 }
@@ -57,25 +57,71 @@ async function getLevelData(db, guildId, userId) {
     };
 }
 
+// ★★★★★【ここから追加】★★★★★
+// ロール報酬を処理する関数
+async function handleRoleRewards(member, oldLevel, newLevel, settings) {
+    const levelingSettings = settings.leveling || {};
+    const roleRewards = levelingSettings.roleRewards || [];
+    if (roleRewards.length === 0) return;
+
+    // 付与すべきロールを特定
+    const rewardsToGive = roleRewards
+        .filter(reward => reward.level > oldLevel && reward.level <= newLevel)
+        .sort((a, b) => a.level - b.level);
+
+    if (rewardsToGive.length === 0) return;
+
+    // ボットの権限チェック
+    if (!member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+        console.error(chalk.red(`[Role Reward] Bot does not have Manage Roles permission in ${member.guild.name}.`));
+        return;
+    }
+
+    let awardedRoles = [];
+    for (const reward of rewardsToGive) {
+        try {
+            const role = member.guild.roles.cache.get(reward.roleId);
+            if (!role) {
+                console.warn(chalk.yellow(`[Role Reward] Role ID ${reward.roleId} for level ${reward.level} not found.`));
+                continue;
+            }
+
+            // ロール階層チェック
+            if (role.position >= member.guild.members.me.roles.highest.position) {
+                console.warn(chalk.yellow(`[Role Reward] Cannot assign role ${role.name} as it is higher than or equal to the bot's role.`));
+                continue;
+            }
+
+            if (!member.roles.cache.has(role.id)) {
+                await member.roles.add(role);
+                awardedRoles.push(role);
+                console.log(chalk.green(`[Role Reward] Awarded role "${role.name}" to ${member.user.tag} for reaching level ${reward.level}.`));
+            }
+        } catch (error) {
+            console.error(chalk.red(`[Role Reward] Failed to award role for level ${reward.level} to ${member.user.tag}:`), error);
+        }
+    }
+    return awardedRoles;
+}
+// ★★★★★【ここまで追加】★★★★★
+
+
 // レベリング処理のメイン関数
 async function handleMessage(message, client) {
     if (!message.guild || message.author.bot) return;
 
-    const { guild, author } = message;
+    const { guild, author, member } = message; // member を追加
     const db = client.db;
     const guildId = guild.id;
     const userId = author.id;
     
-    // 1. ユーザーデータを取得
     const userData = await getLevelData(db, guildId, userId);
 
-    // 2. 60秒間のクールダウンをチェック
     const now = Date.now();
     if (now - (userData.lastMessageTimestamp || 0) < 60000) {
         return;
     }
 
-    // 3. ローカル変数でXPとステータスを更新
     const xpGained = Math.floor(Math.random() * 11) + 15;
     userData.xp += xpGained;
     userData.messageCount += 1;
@@ -87,7 +133,6 @@ async function handleMessage(message, client) {
     const oldLevel = userData.level;
     let requiredXp = calculateRequiredXp(userData.level);
 
-    // 4. レベルアップ判定と計算
     while (userData.xp >= requiredXp) {
         userData.xp -= requiredXp;
         userData.level += 1;
@@ -95,20 +140,21 @@ async function handleMessage(message, client) {
         requiredXp = calculateRequiredXp(userData.level);
     }
 
-    // 5. 計算後の最終データをFirestoreに保存
     const userRef = doc(db, 'levels', `${guildId}_${userId}`);
     await setDoc(userRef, userData, { merge: true });
 
-    // 6. レベルアップした場合の通知処理
     if (leveledUp) {
         console.log(chalk.green(`[LEVEL UP] ${author.tag} reached level ${userData.level}!`));
         
-        // サーバーの通知設定を取得
         const settingsRef = doc(db, 'guild_settings', guild.id);
         const settingsSnap = await getDoc(settingsRef);
         const settings = settingsSnap.exists() ? settingsSnap.data() : {};
         
-        // 通知チャンネルが設定されている場合のみ通知を送信
+        // ★★★★★【ここから変更】★★★★★
+        // ロール報酬処理
+        const awardedRoles = await handleRoleRewards(member, oldLevel, userData.level, settings);
+        // ★★★★★【ここまで変更】★★★★★
+
         if (settings.levelUpChannel) {
             const targetChannel = await client.channels.fetch(settings.levelUpChannel).catch(() => null);
             
@@ -149,8 +195,17 @@ async function handleMessage(message, client) {
                     .setFooter({ text: `偉業達成おめでとうございます！ | ${guild.name}`, iconURL: guild.iconURL() })
                     .setTimestamp();
                 
+                // ★★★★★【ここから追加】★★★★★
+                if (awardedRoles && awardedRoles.length > 0) {
+                    levelUpEmbed.addFields({
+                        name: '🏆 獲得したロール報酬',
+                        value: awardedRoles.map(r => r.toString()).join('\n'),
+                        inline: false
+                    });
+                }
+                // ★★★★★【ここまで追加】★★★★★
+
                 try {
-                    // ▼▼▼ 修正 ▼▼▼ contentのメンションを削除
                     await targetChannel.send({ embeds: [levelUpEmbed] });
                 } catch (error) {
                     console.error(chalk.red('レベルアップ通知の送信に失敗しました:'), error);

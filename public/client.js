@@ -1,4 +1,4 @@
-// systemcmd0122/overseer/overseer-73bfc1e5f235bcccdbf7f2400b84767315a3e964/public/client.js
+// systemcmd0122/overseer/overseer-af267ce1d661f675c497b5c195d79df6613865e9/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     const loader = document.getElementById('loader');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
@@ -460,33 +460,107 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             document.getElementById('logging-form').addEventListener('submit', handleFormSubmit);
         },
+        // ★★★★★【ここから変更】★★★★★
         leveling: async () => {
             pageTitle.textContent = 'レベリング設定';
             const settings = await api.get('/api/settings/guild_settings');
             settingsCache['guild_settings'] = settings;
-             const createSelect = (id, options, selected) => `
+            const levelingSettings = settings.leveling || { roleRewards: [] };
+
+            const createSelect = (id, options, selected, placeholder = "未設定") => `
                 <select id="${id}">
-                    <option value="">未設定 (レベルアップしたチャンネルに通知)</option>
-                    ${options.map(o => `<option value="${o.id}" ${o.id === selected ? 'selected' : ''}>#${o.name}</option>`).join('')}
+                    <option value="">${placeholder}</option>
+                    ${options.map(o => `<option value="${o.id}" ${o.id === selected ? 'selected' : ''}>${o.name}</option>`).join('')}
                 </select>`;
+            
+            const renderRoleRewards = (rewards) => {
+                const listEl = document.getElementById('role-rewards-list');
+                if (!rewards || rewards.length === 0) {
+                    listEl.innerHTML = '<p>ロール報酬はまだ設定されていません。</p>';
+                    return;
+                }
+                listEl.innerHTML = rewards
+                    .sort((a, b) => a.level - b.level)
+                    .map((reward, index) => {
+                        const role = guildInfo.roles.find(r => r.id === reward.roleId);
+                        return `
+                        <div class="role-item" data-index="${index}">
+                            <div class="role-info">
+                                <span class="role-name">Lv. ${reward.level}</span>
+                                <span class="role-genre-tag">${role ? role.name : '不明なロール'}</span>
+                            </div>
+                            <div class="role-actions">
+                                <button class="btn btn-danger btn-small remove-reward-btn">&times;</button>
+                            </div>
+                        </div>
+                    `}).join('');
+
+                listEl.querySelectorAll('.remove-reward-btn').forEach(btn => {
+                    btn.onclick = (e) => {
+                        const index = parseInt(e.target.closest('.role-item').dataset.index, 10);
+                        levelingSettings.roleRewards.splice(index, 1);
+                        renderRoleRewards(levelingSettings.roleRewards);
+                    };
+                });
+            };
+
             pageContent.innerHTML = `
                 <form id="leveling-form">
                     <div class="card">
                         <div class="card-header"><h3>レベルアップ通知</h3></div>
                         <div class="form-group">
                             <label for="levelUpChannel">通知チャンネル</label>
-                            ${createSelect('levelUpChannel', guildInfo.channels.filter(c => c.type === 0), settings.levelUpChannel)}
-                            <p style="font-size: 0.9em; color: var(--text-muted-color); margin-top: 10px;">
-                                設定しない場合、ユーザーがレベルアップしたチャンネルに直接通知が送信されます。
-                            </p>
+                            ${createSelect('levelUpChannel', guildInfo.channels.filter(c => c.type === 0), settings.levelUpChannel, 'レベルアップしたチャンネルに通知')}
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><h3>ロール報酬</h3></div>
+                        <div id="role-rewards-list" style="margin-bottom: 20px;"></div>
+                        <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 20px;">
+                            <label>新しい報酬を追加</label>
+                            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                                <input type="number" id="reward-level" placeholder="レベル" style="flex: 1;" min="1">
+                                ${createSelect('reward-role-id', guildInfo.roles, '', 'ロールを選択')}
+                                <button type="button" id="add-reward-btn" class="btn">追加</button>
+                            </div>
                         </div>
                     </div>
                      <button type="submit" class="btn">設定を保存</button>
                 </form>
             `;
-             document.getElementById('leveling-form').addEventListener('submit', handleFormSubmit);
+
+            renderRoleRewards(levelingSettings.roleRewards);
+
+            document.getElementById('add-reward-btn').onclick = () => {
+                const level = parseInt(document.getElementById('reward-level').value, 10);
+                const roleId = document.getElementById('reward-role-id').value;
+
+                if (!level || !roleId || level < 1) {
+                    return showMessage('有効なレベルとロールを選択してください。', 'error');
+                }
+                if (levelingSettings.roleRewards.some(r => r.level === level)) {
+                    return showMessage(`レベル ${level} の報酬は既に存在します。`, 'error');
+                }
+
+                levelingSettings.roleRewards.push({ level, roleId });
+                renderRoleRewards(levelingSettings.roleRewards);
+
+                document.getElementById('reward-level').value = '';
+                document.getElementById('reward-role-id').value = '';
+            };
+
+            document.getElementById('leveling-form').addEventListener('submit', (e) => {
+                 e.preventDefault();
+                 const form = e.target;
+                 const updatedSettings = {
+                     levelUpChannel: form.querySelector('#levelUpChannel').value || null,
+                     leveling: levelingSettings
+                 };
+                 handleFormSubmit(e, updatedSettings);
+            });
         },
-        // ★★★★★【ここから追加】★★★★★
+        // ★★★★★【ここまで変更】★★★★★
         ai: async () => {
             pageTitle.textContent = 'AI設定';
             const settings = await api.get('/api/settings/guild_settings');
@@ -523,7 +597,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
         },
-        // ★★★★★【ここまで追加】★★★★★
     };
     
     const renderRoleboardList = async () => {
@@ -742,13 +815,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Event Handlers & Routing ---
-    const handleFormSubmit = async (e) => {
+    // ★★★★★【ここから変更】★★★★★
+    const handleFormSubmit = async (e, directSettings = null) => {
         e.preventDefault();
         const form = e.target;
         const submitButton = form.querySelector('button[type="submit"]');
         const originalButtonText = submitButton.textContent;
 
-        // ボタンをローディング状態にする
         submitButton.disabled = true;
         submitButton.textContent = '保存中...';
 
@@ -757,77 +830,72 @@ document.addEventListener('DOMContentLoaded', async () => {
         let collection;
 
         try {
-            switch(page) {
-                case 'welcome':
-                    collection = 'guilds';
-                    settings = {
-                        welcomeChannelId: form.querySelector('#welcomeChannelId').value || null,
-                        goodbyeChannelId: form.querySelector('#goodbyeChannelId').value || null,
-                        rulesChannelId: form.querySelector('#rulesChannelId').value || null,
-                        welcomeRoleId: form.querySelector('#welcomeRoleId').value || null,
-                        mentionOnWelcome: form.querySelector('#mentionOnWelcome').checked,
-                        sendGoodbyeDM: form.querySelector('#sendGoodbyeDM').checked,
-                    };
-                    await api.post(`/api/settings/${collection}`, settings);
-                    break;
-                case 'welcome-message':
-                    settings = {
-                        enabled: form.querySelector('#welcome-enabled').checked,
-                        type: form.querySelector('#welcome-type').value,
-                        title: form.querySelector('#welcome-title').value,
-                        description: form.querySelector('#welcome-description').value,
-                        imageUrl: form.querySelector('#welcome-imageUrl').value,
-                    };
-                    await api.post(`/api/settings/welcome-message`, settings);
-                    break;
-                case 'autorole':
-                    collection = 'guild_settings';
-                    settings = {
-                        botAutoroleId: form.querySelector('#botAutoroleId').value || null
-                    };
-                    await api.post(`/api/settings/${collection}`, settings);
-                    break;
-                case 'automod':
-                     collection = 'guild_settings';
-                     settings = {
-                         automod: {
-                            ngWords: form.querySelector('#ngWords').value.split(',').map(w => w.trim()).filter(Boolean),
-                            blockInvites: form.querySelector('#blockInvites').checked
-                         }
-                     };
-                     await api.post(`/api/settings/${collection}`, settings);
-                     break;
-                case 'logging':
-                    collection = 'guild_settings';
-                    settings = {
-                        auditLogChannel: form.querySelector('#auditLogChannel').value || null
-                    };
-                    await api.post(`/api/settings/${collection}`, settings);
-                    break;
-                case 'leveling':
-                     collection = 'guild_settings';
-                     settings = {
-                         levelUpChannel: form.querySelector('#levelUpChannel').value || null
-                     };
-                     await api.post(`/api/settings/${collection}`, settings);
-                     break;
-                // ★★★★★【ここから追加】★★★★★
-                case 'ai':
-                    collection = 'guild_settings';
-                    settings = {
-                        ai: {
-                           mentionReplyEnabled: form.querySelector('#mentionReplyEnabled').checked,
-                           aiPersonalityPrompt: form.querySelector('#aiPersonalityPrompt').value
-                        }
-                    };
-                    await api.post(`/api/settings/${collection}`, settings);
-                    break;
-                // ★★★★★【ここまで追加】★★★★★
-                default:
-                    submitButton.disabled = false;
-                    submitButton.textContent = originalButtonText;
-                    return;
+            if (directSettings) {
+                collection = 'guild_settings';
+                settings = directSettings;
+            } else {
+                switch(page) {
+                    case 'welcome':
+                        collection = 'guilds';
+                        settings = {
+                            welcomeChannelId: form.querySelector('#welcomeChannelId').value || null,
+                            goodbyeChannelId: form.querySelector('#goodbyeChannelId').value || null,
+                            rulesChannelId: form.querySelector('#rulesChannelId').value || null,
+                            welcomeRoleId: form.querySelector('#welcomeRoleId').value || null,
+                            mentionOnWelcome: form.querySelector('#mentionOnWelcome').checked,
+                            sendGoodbyeDM: form.querySelector('#sendGoodbyeDM').checked,
+                        };
+                        break;
+                    case 'welcome-message':
+                        settings = {
+                            enabled: form.querySelector('#welcome-enabled').checked,
+                            type: form.querySelector('#welcome-type').value,
+                            title: form.querySelector('#welcome-title').value,
+                            description: form.querySelector('#welcome-description').value,
+                            imageUrl: form.querySelector('#welcome-imageUrl').value,
+                        };
+                        await api.post(`/api/settings/welcome-message`, settings);
+                        showMessage('設定を保存しました。');
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalButtonText;
+                        return; // 専用エンドポイントのためここで終了
+                    case 'autorole':
+                        collection = 'guild_settings';
+                        settings = {
+                            botAutoroleId: form.querySelector('#botAutoroleId').value || null
+                        };
+                        break;
+                    case 'automod':
+                         collection = 'guild_settings';
+                         settings = {
+                             automod: {
+                                ngWords: form.querySelector('#ngWords').value.split(',').map(w => w.trim()).filter(Boolean),
+                                blockInvites: form.querySelector('#blockInvites').checked
+                             }
+                         };
+                         break;
+                    case 'logging':
+                        collection = 'guild_settings';
+                        settings = {
+                            auditLogChannel: form.querySelector('#auditLogChannel').value || null
+                        };
+                        break;
+                    case 'ai':
+                        collection = 'guild_settings';
+                        settings = {
+                            ai: {
+                               mentionReplyEnabled: form.querySelector('#mentionReplyEnabled').checked,
+                               aiPersonalityPrompt: form.querySelector('#aiPersonalityPrompt').value
+                            }
+                        };
+                        break;
+                    default:
+                        submitButton.disabled = false;
+                        submitButton.textContent = originalButtonText;
+                        return;
+                }
             }
+            await api.post(`/api/settings/${collection}`, settings);
             showMessage('設定を保存しました。');
         } catch (error) {
             showMessage(`保存エラー: ${error.message}`, 'error');
@@ -836,6 +904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             submitButton.textContent = originalButtonText;
         }
     };
+    // ★★★★★【ここまで変更】★★★★★
     
     const navigate = async () => {
         const page = window.location.hash.substring(1) || 'dashboard';
