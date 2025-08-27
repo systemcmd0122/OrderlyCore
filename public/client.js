@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    // DOM要素の取得
+    // DOM elements
     const loader = document.getElementById('loader');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
     const pageContent = document.getElementById('page-content');
@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Utility Functions ---
 
-    // APIリクエストを統一的に扱うオブジェクト
+    // Unified API request handler
     const api = {
         _request: async (endpoint, options = {}) => {
             try {
@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!res.ok) throw new Error(data.error || `Request failed with status ${res.status}`);
                 return data;
             } catch (err) { 
-                console.error(`API request error:`, err); 
+                console.error(`API request error on ${endpoint}:`, err); 
+                showMessage(`Error: ${err.message}`, 'error');
                 throw err; 
             }
         },
@@ -45,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         delete: (endpoint) => api._request(endpoint, { method: 'DELETE' })
     };
 
-    // 画面右下に通知メッセージ（トースト）を表示する関数
+    // Toast notification function
     const showMessage = (text, type = 'success') => {
         const el = document.createElement('div');
         el.className = `message-toast ${type}`;
@@ -58,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     };
 
-    // モーダルウィンドウを生成する関数
+    // Modal creation function
     const createModal = (title, content, footerButtons) => {
         document.querySelector('#modal-container').innerHTML = `
             <div class="modal-backdrop">
@@ -82,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return backdrop.querySelector('.modal');
     };
 
-    // モーダルウィンドウを閉じる関数
+    // Modal close function
     const closeModal = () => {
         const backdrop = document.querySelector('.modal-backdrop');
         if (backdrop) {
@@ -91,7 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // カスタムセレクトボックス（Tom Select）を初期化する関数
+    // Tom Select initialization (now without bootstrap theme)
     const initializeTomSelect = (selector, options = {}) => {
         const elements = typeof selector === 'string' ? document.querySelectorAll(selector) : [selector];
         elements.forEach(el => {
@@ -674,7 +675,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
             
-            // ローカルボードのコピーを作成
             const localBoard = JSON.parse(JSON.stringify(board));
             
             const selectEl = modal.querySelector('#add-role-select');
@@ -712,19 +712,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return showMessage('このロールは既に追加されています。', 'warning');
                 }
                 
-                localBoard.roles[roleId] = { 
-                    name: role.name, 
-                    genre, 
-                    emoji: null 
-                };
+                localBoard.roles[roleId] = { name: role.name, genre, emoji: null };
                 
                 localBoard.genres = localBoard.genres || {};
-                if (!localBoard.genres[genre]) {
-                    localBoard.genres[genre] = [];
-                }
-                if (!localBoard.genres[genre].includes(roleId)) {
-                    localBoard.genres[genre].push(roleId);
-                }
+                if (!localBoard.genres[genre]) localBoard.genres[genre] = [];
+                if (!localBoard.genres[genre].includes(roleId)) localBoard.genres[genre].push(roleId);
                 
                 renderModalRoleList();
                 modal.querySelector('#add-role-genre').value = '';
@@ -733,7 +725,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             modal.querySelector('#modal-role-list').onclick = e => {
                 if (e.target.classList.contains('remove-role-btn')) {
-                    const roleId = e.target.closest('.role-item').dataset.id;
+                    const roleItem = e.target.closest('.role-item');
+                    const roleId = roleItem.dataset.id;
                     const roleGenre = localBoard.roles[roleId].genre;
                     
                     delete localBoard.roles[roleId];
@@ -750,9 +743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             document.getElementById('save-board-changes').onclick = async () => {
                 const title = modal.querySelector('#edit-title').value.trim();
-                if (!title) {
-                    return showMessage('タイトルは必須です。', 'error');
-                }
+                if (!title) return showMessage('タイトルは必須です。', 'error');
                 
                 try { 
                     await api.put(`/api/roleboards/${boardId}`, { 
@@ -902,17 +893,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             try { 
                 await renderers[page](); 
             } catch(error) { 
-                console.error('Page render error:', error);
-                pageContent.innerHTML = `<p class="message error show">ページ読込失敗: ${error.message}</p>`; 
+                pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`; 
             }
         } else { 
-            pageContent.innerHTML = `<p class="message error show">ページが見つかりません。</p>`; 
+            pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページが見つかりません。</p>`; 
         }
         
-        // Feather icons refresh
-        if (window.feather) {
-            feather.replace();
-        }
+        feather.replace();
     };
 
     // --- Initialization ---
@@ -933,7 +920,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     await api.post('/api/logout'); 
                     window.location.href = '/login'; 
                 } catch(err) { 
-                    showMessage('ログアウト失敗', 'error'); 
+                    showMessage('ログアウトに失敗しました', 'error'); 
                 } 
             });
             
@@ -942,8 +929,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             
         } catch (error) {
-            console.error('Init error:', error);
-            loader.innerHTML = `<p class="message error">読込失敗。再ログインしてください。</p><a href="/login" class="btn">ログインページへ</a>`;
+            loader.innerHTML = `<p class="message error" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
         }
     };
 

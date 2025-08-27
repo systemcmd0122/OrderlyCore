@@ -51,7 +51,7 @@ body {
 .login-btn { width: 100%; padding: 12px; font-size: 1.1rem; min-height: 48px; }
 .back-to-home { display: inline-flex; align-items: center; gap: 8px; text-align: center; margin-top: 20px; color: var(--text-muted-color); text-decoration: none; transition: color var(--transition-speed) ease; width: 100%; justify-content: center; }
 .back-to-home:hover { color: var(--primary-color); }
-#message-container { margin-top: 20px; text-align: center; }
+#message-container { margin-top: 20px; text-align: center; min-height: 20px; }
 #message { font-weight: bold; }
 #message.success { color: var(--success-color); }
 #message.error { color: var(--error-color); }
@@ -66,7 +66,7 @@ body {
 .prompt { color: var(--primary-color); font-family: var(--font-mono); }
 .input-with-icon { position: relative; }
 .input-with-icon i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted-color); width: 20px; height: 20px; pointer-events: none; transition: color var(--transition-speed) ease; }
-.input-with-icon input:focus + i { color: var(--primary-color); }
+.input-with-icon input:focus ~ i { color: var(--primary-color); } /* Updated selector */
 .input-with-icon input { padding-left: 45px !important; }
 .loader-ring-small { width: 20px; height: 20px; border: 2px solid var(--background-color); border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
 
@@ -93,9 +93,9 @@ body {
 .btn:hover:not(:disabled) { background-color: var(--primary-color-hover); border-color: var(--primary-color-hover); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-secondary { background-color: var(--surface-light-color); color: var(--text-color); border-color: var(--border-color); }
-.btn-secondary:hover:not(:disabled) { background-color: var(--border-color); border-color: var(--text-muted-color); }
+.btn-secondary:hover:not(:disabled) { background-color: var(--border-color); border-color: var(--text-muted-color); box-shadow: none; }
 .btn-danger { background-color: transparent; color: var(--error-color); border-color: var(--error-color); }
-.btn-danger:hover:not(:disabled) { background-color: var(--error-color); color: white; }
+.btn-danger:hover:not(:disabled) { background-color: var(--error-color); color: white; box-shadow: 0 4px 15px rgba(248, 81, 73, 0.2); }
 .btn-small { padding: 5px 10px; font-size: 0.9em; }
 .card { background: var(--background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: var(--border-radius); margin-bottom: 30px; transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease; }
 .card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); }
@@ -114,17 +114,27 @@ input[type="color"] { width: 48px; height: 48px; padding: 0; background-color: t
 input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
 input[type="color"]::-moz-color-swatch { border-radius: 5px; border: none; }
 .color-input-wrapper input[type="text"] { font-family: var(--font-mono); width: 120px; }
-.ts-control { background-color: #010409 !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; padding: 11px 12px !important; }
-.ts-control.focus { border-color: var(--primary-color) !important; box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2) !important; }
-.ts-dropdown { background: var(--surface-light-color) !important; border: 1px solid var(--border-color) !important; /* ▼▼▼【アニメーション追加】▼▼▼ */ transition: opacity 0.15s, transform 0.15s; transform-origin: top center; }
-.ts-dropdown .option { padding: 10px 12px !important; }
-.ts-dropdown .active { background-color: var(--primary-color) !important; color: var(--background-color) !important; }
+
+/* --- Perfect Toggle Switch --- */
 .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--border-color); transition: var(--transition-speed)s; border-radius: 28px; }
-.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: var(--transition-speed)s; border-radius: 50%; }
-input:checked + .slider { background-color: var(--primary-color); }
+.slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--border-color); transition: var(--transition-speed) ease; border-radius: 28px; }
+.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: var(--transition-speed) ease; border-radius: 50%; }
+input:checked + .slider { background-color: var(--primary-color); box-shadow: 0 0 10px var(--primary-color); }
 input:checked + .slider:before { transform: translateX(22px); }
+
+/* --- Perfect Dropdown (Tom Select Customization) --- */
+.ts-control { background-color: #010409 !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; padding: 11px 12px !important; transition: all var(--transition-speed) ease; }
+.ts-wrapper.single .ts-control, .ts-wrapper.single .ts-control input { color: var(--text-color); }
+.ts-control:hover { border-color: var(--text-muted-color) !important; }
+.ts-control.focus { border-color: var(--primary-color) !important; box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2) !important; }
+.ts-dropdown { background: var(--surface-light-color) !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; margin-top: 5px !important; }
+.ts-dropdown .option { padding: 10px 12px !important; color: var(--text-muted-color) !important; }
+.ts-dropdown .option:hover { background-color: var(--surface-color) !important; color: var(--text-color) !important; }
+.ts-dropdown .active { background-color: var(--primary-color) !important; color: var(--background-color) !important; }
+.ts-wrapper.single .ts-control:after { border-color: var(--text-muted-color) transparent transparent transparent !important; }
+
+/* --- Other Components --- */
 .message-toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 6px; color: white; font-weight: 700; z-index: 1000; opacity: 0; transform: translateY(20px); transition: all 0.3s; pointer-events: none; }
 .message-toast.show { opacity: 1; transform: translateY(0); }
 .message-toast.success { background-color: var(--success-color); }
