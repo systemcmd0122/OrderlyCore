@@ -4,9 +4,152 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overseer - Admin Login</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        :root {
+            --primary-color: #00e5ff;
+            --background-color: #0d1117;
+            --surface-color: #161b22;
+            --text-color: #e6edf3;
+            --text-muted-color: #848d97;
+            --border-color: #30363d;
+            --error-color: #f85149;
+            --success-color: #2ea043;
+            --font-mono: 'Share Tech Mono', monospace;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 500px;
+            animation: fadeIn 0.7s ease-out;
+        }
+
+        .terminal {
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            padding: 10px 15px;
+            background: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+        .terminal-title { flex-grow: 1; text-align: center; color: var(--text-muted-color); font-family: var(--font-mono); }
+
+        .terminal-body { padding: 30px; }
+
+        .login-title {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            color: var(--primary-color);
+            text-shadow: 0 0 8px var(--primary-color);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .login-description {
+            color: var(--text-muted-color);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group { margin-bottom: 25px; }
+        .prompt { color: var(--primary-color); font-family: var(--font-mono); }
+        .prompt:after { content: ' _'; animation: blink 1.2s infinite steps(1); }
+
+        .input-with-icon { position: relative; }
+        .input-with-icon i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted-color); }
+        
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 12px 12px 45px;
+            background-color: #010409;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 1em;
+            font-family: var(--font-mono);
+            transition: all 0.3s;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px;
+            width: 100%;
+            background-color: var(--primary-color);
+            color: var(--background-color);
+            border: 1px solid var(--primary-color);
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: transparent;
+            color: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-color);
+        }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .loader-ring-small {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--background-color);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        #message-container { margin-top: 20px; text-align: center; min-height: 20px; font-weight: bold; }
+        #message.success { color: var(--success-color); }
+        #message.error { color: var(--error-color); }
+
+        .back-to-home { display: inline-flex; align-items: center; gap: 8px; text-align: center; margin-top: 20px; color: var(--text-muted-color); text-decoration: none; transition: color 0.3s ease; width: 100%; justify-content: center; }
+        .back-to-home:hover { color: var(--primary-color); }
+    </style>
 </head>
 <body class="login-page-body">
 
@@ -20,17 +163,17 @@
             </div>
             <div class="terminal-body">
                 <h1 class="login-title">[O] Overseer Admin Panel</h1>
-                <p class="login-description">管理者パスワードを入力してログインしてください。</p>
+                <p class="login-description">管理者パスワードを入力して認証してください。</p>
                 <form id="login-form">
                     <div class="form-group">
-                        <label for="password" class="prompt">admin@overseer:~$ password</label>
+                        <label for="password" class="prompt">admin@overseer:~$ sudo login</label>
                         <div class="input-with-icon">
                             <i data-feather="lock"></i>
-                            <input type="password" id="password" name="password" required placeholder="管理者パスワード" autocomplete="off">
+                            <input type="password" id="password" name="password" required placeholder="[Password]" autocomplete="current-password">
                         </div>
                     </div>
                     <button type="submit" class="btn login-btn" id="submit-btn">
-                        <span class="btn-text">Login</span>
+                        <span class="btn-text">Authenticate</span>
                         <div class="loader-ring-small" style="display: none;"></div>
                     </button>
                 </form>
@@ -41,7 +184,7 @@
         </div>
         <a href="/" class="back-to-home">
             <i data-feather="home"></i>
-            <span>ホームページに戻る</span>
+            <span>Return to Homepage</span>
         </a>
     </div>
 
