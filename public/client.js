@@ -654,13 +654,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div id="modal-role-list"></div>
                 <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                     <label>ロールを追加</label>
-                    <div style="display: flex; gap: 10px; align-items: flex-end;">
-                        <select id="add-role-select" style="flex: 2;" placeholder="ロールを選択...">
-                            <option value="">ロールを選択...</option>
-                            ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                        </select>
-                        <input type="text" id="add-role-genre" placeholder="ジャンル" style="flex: 1;">
-                        <button id="add-role-btn" class="btn">追加</button>
+                    <div class="add-role-grid">
+                        <div class="form-group">
+                            <select id="add-role-select" placeholder="ロールを選択...">
+                                <option value="">ロールを選択...</option>
+                                ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                           <input type="text" id="add-role-genre" placeholder="ジャンル">
+                        </div>
+                         <div class="form-group add-role-btn-wrapper">
+                            <button id="add-role-btn" class="btn">追加</button>
+                        </div>
                     </div>
                 </div>`, 
                 [{id: 'save-board-changes', text: '保存', class: 'btn'}]

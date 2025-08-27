@@ -66,7 +66,7 @@ body {
 .prompt { color: var(--primary-color); font-family: var(--font-mono); }
 .input-with-icon { position: relative; }
 .input-with-icon i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted-color); width: 20px; height: 20px; pointer-events: none; transition: color var(--transition-speed) ease; }
-.input-with-icon input:focus ~ i { color: var(--primary-color); }
+.input-with-icon input:focus ~ i { color: var(--primary-color); } /* Updated selector */
 .input-with-icon input { padding-left: 45px !important; }
 .loader-ring-small { width: 20px; height: 20px; border: 2px solid var(--background-color); border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
 
@@ -82,21 +82,6 @@ body {
 .nav-item:hover { background-color: var(--surface-color); color: var(--text-color); }
 .nav-item.active { background-color: var(--surface-light-color); color: var(--primary-color); font-weight: 700; border-left-color: var(--primary-color); }
 .sidebar-footer { margin-top: auto; }
-
-/* --- Sidebar Dropdown Menu --- */
-.nav-dropdown .dropdown-toggle { position: absolute; left: -9999px; opacity: 0; }
-.nav-dropdown .for-dropdown { justify-content: space-between; cursor: pointer; }
-.nav-dropdown .for-dropdown div { display: flex; align-items: center; }
-.nav-dropdown .arrow { transition: transform var(--transition-speed) ease; width: 18px; height: 18px; color: var(--text-muted-color); }
-.nav-dropdown .dropdown-toggle:checked + .for-dropdown .arrow { transform: rotate(180deg); color: var(--primary-color); }
-.nav-dropdown .dropdown-toggle:checked + .for-dropdown { background-color: var(--surface-color); color: var(--text-color); }
-.nav-dropdown .submenu { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-in-out; }
-.nav-dropdown .dropdown-toggle:checked ~ .submenu { max-height: 500px; /* Adjust as needed */ }
-.nav-dropdown .submenu .nav-item { padding-left: 53px; /* Icon width + margin + indent */ }
-.nav-dropdown .submenu .nav-item:hover { background-color: var(--surface-light-color); }
-.nav-dropdown .submenu .nav-item.active { color: var(--primary-color); background-color: transparent; border-left-color: transparent; }
-.nav-dropdown .submenu .nav-item.active span { border-bottom: 1px solid var(--primary-color); }
-
 .main-content { flex-grow: 1; display: flex; flex-direction: column; background-color: #010409; overflow: hidden; }
 .main-header { display: flex; align-items: center; gap: 15px; padding: 20px 40px; border-bottom: 1px solid var(--border-color); background-color: rgba(13, 17, 23, 0.8); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 10; }
 .main-header h1 { font-family: var(--font-mono); color: var(--text-color); font-size: 1.8em; margin: 0; }
@@ -121,29 +106,38 @@ body {
 .form-hint { font-size: 0.9em; color: var(--text-muted-color); margin-top: 10px; line-height: 1.5; }
 .form-hint code { background-color: var(--surface-light-color); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono); }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-input[type="text"], input[type="number"], textarea, input[type="password"] { width: 100%; padding: 12px; background-color: #010409; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); font-size: 1em; font-family: var(--font-primary); transition: all var(--transition-speed); }
-input[type="text"]:focus, input[type="number"]:focus, textarea:focus, input[type="password"]:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2); }
+input[type="text"], input[type="number"], textarea { width: 100%; padding: 12px; background-color: #010409; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-color); font-size: 1em; font-family: var(--font-primary); transition: all var(--transition-speed); }
+input[type="text"]:focus, input[type="number"]:focus, textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2); }
 textarea { resize: vertical; min-height: 120px; }
 .color-input-wrapper { display: flex; align-items: center; gap: 10px; }
 input[type="color"] { width: 48px; height: 48px; padding: 0; background-color: transparent; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
 input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
 input[type="color"]::-moz-color-swatch { border-radius: 5px; border: none; }
 .color-input-wrapper input[type="text"] { font-family: var(--font-mono); width: 120px; }
-.ts-control { background-color: #010409 !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; padding: 11px 12px !important; transition: all var(--transition-speed) ease; }
-.ts-wrapper.single .ts-control, .ts-wrapper.single .ts-control input { color: var(--text-color); }
-.ts-control:hover { border-color: var(--text-muted-color) !important; }
-.ts-control.focus { border-color: var(--primary-color) !important; box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2) !important; }
-.ts-dropdown { background: var(--surface-light-color) !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; margin-top: 5px !important; }
-.ts-dropdown .option { padding: 10px 12px !important; color: var(--text-muted-color) !important; }
-.ts-dropdown .option:hover { background-color: var(--surface-color) !important; color: var(--text-color) !important; }
-.ts-dropdown .active { background-color: var(--primary-color) !important; color: var(--background-color) !important; }
-.ts-wrapper.single .ts-control:after { border-color: var(--text-muted-color) transparent transparent transparent !important; }
+
+/* --- Perfect Toggle Switch --- */
 .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--border-color); transition: var(--transition-speed) ease; border-radius: 28px; }
-.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: var(--transition-speed) ease; border-radius: 50%; }
-input:checked + .slider { background-color: var(--primary-color); box-shadow: 0 0 10px var(--primary-color); }
-input:checked + .slider:before { transform: translateX(22px); }
+.slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--surface-light-color); transition: var(--transition-speed) ease; border-radius: 28px; border: 1px solid var(--border-color); }
+.slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: var(--text-muted-color); transition: var(--transition-speed) ease; border-radius: 50%; }
+input:checked + .slider { background-color: var(--primary-color); border-color: var(--primary-color); box-shadow: 0 0 10px rgba(0, 229, 255, 0.5); }
+input:checked + .slider:before { background-color: white; transform: translateX(22px); }
+
+
+/* --- Perfect Dropdown (Tom Select Customization) --- */
+.ts-control { background-color: #010409 !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; padding: 11px 12px !important; transition: all var(--transition-speed) ease; }
+.ts-wrapper.single .ts-control, .ts-wrapper.single .ts-control input { color: var(--text-color); font-family: var(--font-primary); }
+.ts-control:hover { border-color: var(--text-muted-color) !important; }
+.ts-control.focus { border-color: var(--primary-color) !important; box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2) !important; }
+.ts-dropdown { background: var(--surface-color) !important; border: 1px solid var(--border-color) !important; border-radius: 6px !important; margin-top: 5px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+.ts-dropdown .option { padding: 10px 12px !important; color: var(--text-muted-color) !important; }
+.ts-dropdown .option:hover { background-color: var(--surface-light-color) !important; color: var(--text-color) !important; }
+.ts-dropdown .active { background-color: var(--primary-color) !important; color: var(--background-color) !important; }
+.ts-wrapper.single .ts-control:after { border-color: var(--text-muted-color) transparent transparent transparent !important; transition: transform var(--transition-speed) ease; }
+.ts-wrapper.single.dropdown-active .ts-control:after { transform: rotate(180deg); }
+
+
+/* --- Other Components --- */
 .message-toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 6px; color: white; font-weight: 700; z-index: 1000; opacity: 0; transform: translateY(20px); transition: all 0.3s; pointer-events: none; }
 .message-toast.show { opacity: 1; transform: translateY(0); }
 .message-toast.success { background-color: var(--success-color); }
@@ -176,6 +170,21 @@ input:checked + .slider:before { transform: translateX(22px); }
 .leaderboard .user-id { font-size: 0.85em; color: var(--text-muted-color); font-family: var(--font-mono); }
 .leaderboard .stat { font-weight: 700; font-family: var(--font-mono); font-size: 1.1em; }
 
+/* --- Improved Roleboard Modal Layout --- */
+.add-role-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 15px;
+    align-items: flex-end;
+}
+.add-role-grid .form-group {
+    margin-bottom: 0; /* Reset margin for grid items */
+}
+.add-role-grid .add-role-btn-wrapper {
+    grid-column: 2; /* Place button in the second column */
+}
+
+
 /* Responsive Design */
 .menu-toggle-btn { display: none; background: none; border: none; color: var(--text-color); cursor: pointer; padding: 5px; }
 .menu-toggle-btn i { width: 24px; height: 24px; }
@@ -190,4 +199,7 @@ input:checked + .slider:before { transform: translateX(22px); }
     .modal { width: 95%; max-height: 85vh; }
     .modal-body { padding: 20px; }
     .modal-footer { padding: 15px 20px; }
+    .add-role-grid { grid-template-columns: 1fr; }
+    .add-role-grid .add-role-btn-wrapper { grid-column: 1; }
+    .add-role-grid .btn { width: 100%; }
 }

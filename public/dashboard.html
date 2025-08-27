@@ -20,12 +20,12 @@
             <div class="sidebar-header">
                 <a href="/" class="logo">[O] Overseer</a>
             </div>
-
+            
             <div class="server-info">
                 <img id="server-icon" src="" alt="Server Icon" class="server-icon">
                 <h2 id="server-name">サーバー名</h2>
             </div>
-
+            
             <nav class="sidebar-nav">
                 <a href="#dashboard" class="nav-item active" data-page="dashboard">
                     <i data-feather="grid"></i>
@@ -35,54 +35,44 @@
                     <i data-feather="bar-chart-2"></i>
                     <span>アナリティクス</span>
                 </a>
-
-                <div class="nav-dropdown">
-                    <input class="dropdown-toggle" type="checkbox" id="welcome-dropdown" name="welcome-dropdown"/>
-                    <label class="nav-item for-dropdown" for="welcome-dropdown">
-                        <div><i data-feather="user-plus"></i><span>参加・退出</span></div>
-                        <i data-feather="chevron-down" class="arrow"></i>
-                    </label>
-                    <div class="submenu">
-                        <a href="#welcome" class="nav-item" data-page="welcome"><span>基本設定</span></a>
-                        <a href="#welcome-message" class="nav-item" data-page="welcome-message"><span>メッセージ設定</span></a>
-                    </div>
-                </div>
-
-                <div class="nav-dropdown">
-                    <input class="dropdown-toggle" type="checkbox" id="mod-dropdown" name="mod-dropdown"/>
-                    <label class="nav-item for-dropdown" for="mod-dropdown">
-                        <div><i data-feather="shield"></i><span>モデレーション</span></div>
-                        <i data-feather="chevron-down" class="arrow"></i>
-                    </label>
-                    <div class="submenu">
-                        <a href="#automod" class="nav-item" data-page="automod"><span>オートモッド</span></a>
-                        <a href="#logging" class="nav-item" data-page="logging"><span>ログ設定</span></a>
-                         <a href="#autorole" class="nav-item" data-page="autorole"><span>Bot 自動ロール</span></a>
-                    </div>
-                </div>
-                
+                <a href="#announcements" class="nav-item" data-page="announcements">
+                    <i data-feather="bell"></i>
+                    <span>お知らせ設定</span>
+                </a>
+                <a href="#welcome" class="nav-item" data-page="welcome">
+                    <i data-feather="user-plus"></i>
+                    <span>参加・退出設定</span>
+                </a>
+                <a href="#welcome-message" class="nav-item" data-page="welcome-message">
+                    <i data-feather="mail"></i>
+                    <span>ウェルカムメッセージ</span>
+                </a>
                 <a href="#roleboard" class="nav-item" data-page="roleboard">
                     <i data-feather="trello"></i>
                     <span>ロールボード</span>
+                </a>
+                <a href="#autorole" class="nav-item" data-page="autorole">
+                    <i data-feather="user-check"></i>
+                    <span>Bot 自動ロール</span>
+                </a>
+                <a href="#automod" class="nav-item" data-page="automod">
+                    <i data-feather="shield"></i>
+                    <span>オートモッド</span>
+                </a>
+                <a href="#logging" class="nav-item" data-page="logging">
+                    <i data-feather="edit-3"></i>
+                    <span>ログ設定</span>
                 </a>
                 <a href="#leveling" class="nav-item" data-page="leveling">
                     <i data-feather="trending-up"></i>
                     <span>レベリング</span>
                 </a>
-
-                <div class="nav-dropdown">
-                    <input class="dropdown-toggle" type="checkbox" id="bot-settings-dropdown" name="bot-settings-dropdown"/>
-                    <label class="nav-item for-dropdown" for="bot-settings-dropdown">
-                        <div><i data-feather="settings"></i><span>Bot設定</span></div>
-                        <i data-feather="chevron-down" class="arrow"></i>
-                    </label>
-                    <div class="submenu">
-                        <a href="#ai" class="nav-item" data-page="ai"><span>AI設定</span></a>
-                        <a href="#announcements" class="nav-item" data-page="announcements"><span>お知らせ設定</span></a>
-                    </div>
-                </div>
+                <a href="#ai" class="nav-item" data-page="ai">
+                    <i data-feather="cpu"></i>
+                    <span>AI設定</span>
+                </a>
             </nav>
-
+            
             <div class="sidebar-footer">
                 <button id="logout-btn" class="btn btn-secondary">
                     <i data-feather="log-out"></i>
@@ -90,7 +80,7 @@
                 </button>
             </div>
         </aside>
-
+        
         <main class="main-content">
             <header class="main-header">
                 <button id="menu-toggle" class="menu-toggle-btn">
@@ -98,7 +88,7 @@
                 </button>
                 <h1 id="page-title">ダッシュボード</h1>
             </header>
-
+            
             <div id="page-content-wrapper">
                 <div id="page-content" class="page-content">
                     </div>
@@ -110,11 +100,19 @@
 
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script src="/client.js"></script>
-
+    
     <script>
+        // Initial call to render icons
         feather.replace();
-        window.addEventListener('error', (e) => console.error('Global error:', e.error));
-        window.addEventListener('unhandledrejection', (e) => console.error('Unhandled promise rejection:', e.reason));
+
+        // Error handling
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error);
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
     </script>
 </body>
 </html>
