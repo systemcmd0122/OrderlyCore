@@ -4,42 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overseer - Admin Login</title>
-    <link rel="stylesheet" href="/admin.css">
+    <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body class="login-page-body">
 
     <div class="login-container">
-        <div class="terminal-window" id="login-terminal">
+        <div class="terminal">
             <div class="terminal-header">
-                <div class="header-dots">
-                    <span class="dot red"></span>
-                    <span class="dot yellow"></span>
-                    <span class="dot green"></span>
-                </div>
-                <div class="header-title">overseer-auth-system --root</div>
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+                <div class="terminal-title">overseer-admin-auth</div>
             </div>
             <div class="terminal-body">
-                <div id="terminal-output">
-                    <div class="line">Initializing secure connection... <span class="text-success">OK</span></div>
-                    <div class="line">Awaiting administrator credentials...</div>
-                </div>
-                <form id="login-form" class="login-form">
-                    <div class="line prompt-line">
-                        <span class="prompt">root@overseer:~#</span>
-                        <div class="input-container">
-                            <i data-feather="key" class="input-icon"></i>
-                            <input type="password" id="password" name="password" required placeholder="Enter Admin Password..." autocomplete="current-password" class="terminal-input">
-                            <span class="caret"></span>
+                <h1 class="login-title">[O] Overseer Admin Panel</h1>
+                <p class="login-description">管理者パスワードを入力してログインしてください。</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="password" class="prompt">admin@overseer:~$ password</label>
+                        <div class="input-with-icon">
+                            <i data-feather="lock"></i>
+                            <input type="password" id="password" name="password" required placeholder="管理者パスワード" autocomplete="off">
                         </div>
                     </div>
-                    <button type="submit" class="hidden-submit"></button>
+                    <button type="submit" class="btn login-btn" id="submit-btn">
+                        <span class="btn-text">Login</span>
+                        <div class="loader-ring-small" style="display: none;"></div>
+                    </button>
                 </form>
-                <div id="message-container" class="line"></div>
+                <div id="message-container">
+                    <p id="message"></p>
+                </div>
             </div>
         </div>
-         <a href="/" class="back-to-home">
+        <a href="/" class="back-to-home">
             <i data-feather="home"></i>
             <span>ホームページに戻る</span>
         </a>
@@ -51,26 +51,25 @@
 
             const form = document.getElementById('login-form');
             const passwordInput = document.getElementById('password');
+            const messageEl = document.getElementById('message');
             const messageContainer = document.getElementById('message-container');
-            const terminalOutput = document.getElementById('terminal-output');
-            const loginTerminal = document.getElementById('login-terminal');
-
-            // Focus on input when terminal is clicked
-            loginTerminal.addEventListener('click', () => {
-                passwordInput.focus();
-            });
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnLoader = submitBtn.querySelector('.loader-ring-small');
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const password = passwordInput.value;
 
                 if (!password) {
-                    showMessage('ERROR: Password cannot be empty.', 'error');
+                    showMessage('パスワードを入力してください。', 'error');
                     return;
                 }
-                
-                passwordInput.disabled = true;
-                showMessage('Authenticating... Please wait.', 'loading');
+
+                submitBtn.disabled = true;
+                btnText.style.display = 'none';
+                btnLoader.style.display = 'block';
+                messageContainer.style.display = 'none';
 
                 try {
                     const response = await fetch('/api/admin/login', {
@@ -82,27 +81,25 @@
                     const data = await response.json();
 
                     if (response.ok) {
-                        showMessage(`ACCESS GRANTED. Welcome, admin. Redirecting to secure panel...`, 'success');
+                        showMessage('認証成功！管理パネルに移動します...', 'success');
                         setTimeout(() => {
                              window.location.href = '/admin.html';
-                        }, 2000);
+                        }, 1500);
                     } else {
-                        throw new Error(data.error || 'Authentication failed');
+                        throw new Error(data.error || '不明なエラー');
                     }
                 } catch (error) {
-                    showMessage(`ACCESS DENIED: ${error.message}`, 'error');
-                    passwordInput.disabled = false;
-                    passwordInput.value = '';
-                    passwordInput.focus();
+                    showMessage(`エラー: ${error.message}`, 'error');
+                    submitBtn.disabled = false;
+                    btnText.style.display = 'inline';
+                    btnLoader.style.display = 'none';
                 }
             });
 
             const showMessage = (text, type) => {
-                const line = document.createElement('div');
-                line.className = `line text-${type}`;
-                line.textContent = text;
-                messageContainer.innerHTML = ''; // Clear previous message
-                messageContainer.appendChild(line);
+                messageContainer.style.display = 'block';
+                messageEl.textContent = text;
+                messageEl.className = type;
             };
         });
     </script>
