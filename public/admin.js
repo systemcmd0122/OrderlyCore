@@ -43,21 +43,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     };
 
-    const typeEffect = (element, text, callback) => {
-        let i = 0;
-        element.innerHTML = '';
-        const typing = () => {
-            if (i < text.length) {
-                element.innerHTML += text.charAt(i);
-                i++;
-                setTimeout(typing, 10);
-            } else if (callback) {
-                callback();
-            }
-        };
-        typing();
-    };
-
     const renderToTerminal = (command, content) => {
         const line = document.createElement('div');
         line.innerHTML = `<div class="line prompt-line"><span class="prompt">root@overseer:~#</span><span class="command-text">${command}</span></div>`;
@@ -80,10 +65,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageContent.appendChild(output);
             feather.replace();
             terminalBody.scrollTop = terminalBody.scrollHeight;
-        }, 500 + Math.random() * 500);
+        }, 300 + Math.random() * 200);
     };
 
-    // ページ描画
+    // ページ描画ロジック
     const renderers = {
         'fetch-activity': async () => {
             headerTitle.textContent = "overseer-admin-panel --view ./activity_stats";
@@ -159,10 +144,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <button id="save-statuses-btn" class="btn">設定を保存</button>
             `;
             renderToTerminal('./bot_status', content);
+            
             document.getElementById('status-mode-select').addEventListener('change', (e) => {
                 document.getElementById('custom-status-editor').style.display = e.target.value === 'custom' ? 'block' : 'none';
             });
-            renderStatusList(statuses);
+            
+            renderStatusList(statuses); // 最初にリストを描画
+            
             document.getElementById('add-status-btn').addEventListener('click', () => {
                 const list = document.getElementById('status-list');
                 const newItem = document.createElement('div');
@@ -173,26 +161,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button class="btn btn-danger btn-small remove-status-btn"><i data-feather="trash-2"></i></button>
                 `;
                 list.appendChild(newItem);
-                feather.replace();
-                newItem.querySelector('.remove-status-btn').addEventListener('click', (e) => e.target.closest('.status-item').remove());
+                feather.replace(); // ★ 修正点: アイコンを再描画
+                newItem.querySelector('.remove-status-btn').addEventListener('click', (e) => {
+                    e.target.closest('.status-item').remove();
+                });
             });
+            
             document.getElementById('save-statuses-btn').addEventListener('click', handleSaveStatuses);
         }
     };
-
+    
+    // ★ 修正点: ステータスリストの描画関数
     const renderStatusList = (statuses) => {
         const listEl = document.getElementById('status-list');
-        listEl.innerHTML = statuses.map(status => `
-            <div class="status-item">
-                <input type="text" class="emoji-input" placeholder="絵文字" value="${status.emoji}">
-                <input type="text" class="text-input" placeholder="ステータステキスト" value="${status.state}">
-                <button class="btn btn-danger btn-small remove-status-btn"><i data-feather="trash-2"></i></button>
-            </div>
-        `).join('');
-        listEl.querySelectorAll('.remove-status-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => e.target.closest('.status-item').remove());
-        });
-        feather.replace();
+        if (!listEl) return; // 要素が存在しない場合は何もしない
+        
+        listEl.innerHTML = ''; // 一旦空にする
+        if (statuses && statuses.length > 0) {
+            statuses.forEach(status => {
+                const item = document.createElement('div');
+                item.className = 'status-item';
+                item.innerHTML = `
+                    <input type="text" class="emoji-input" placeholder="絵文字" value="${status.emoji || ''}">
+                    <input type="text" class="text-input" placeholder="ステータステキスト" value="${status.state || ''}">
+                    <button class="btn btn-danger btn-small remove-status-btn"><i data-feather="trash-2"></i></button>
+                `;
+                item.querySelector('.remove-status-btn').addEventListener('click', (e) => {
+                    e.target.closest('.status-item').remove();
+                });
+                listEl.appendChild(item);
+            });
+        }
+        feather.replace(); // 描画後にアイコンを有効化
     };
 
     const handleSaveStatuses = async (event) => {
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const statuses = Array.from(statusItems).map(item => ({
             emoji: item.querySelector('.emoji-input').value.trim(),
             state: item.querySelector('.text-input').value.trim()
-        })).filter(s => s.emoji && s.state);
+        })).filter(s => s.state); // stateが空でないものだけを保存
         try {
             await api.post('/api/admin/statuses', { statuses, mode });
             showMessage('ステータス設定を保存しました。');
