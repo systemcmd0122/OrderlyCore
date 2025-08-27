@@ -88,18 +88,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageTitle.textContent = 'ステータス管理';
             pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
             try {
-                const statuses = await api.get('/api/admin/statuses');
+                const settings = await api.get('/api/admin/statuses');
+                const statuses = settings.list || [];
+                const mode = settings.mode || 'custom';
+
                 pageContent.innerHTML = `
                     <div class="card">
-                        <div class="card-header"><h3>カスタムステータス編集</h3></div>
-                        <p class="form-hint">ボットが定期的に切り替えて表示するステータスを編集します。変更はリアルタイムで反映されます。</p>
-                        <div id="status-list" style="margin-top: 20px;"></div>
-                        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                            <button id="add-status-btn" class="btn btn-secondary">ステータスを追加</button>
-                            <button id="save-statuses-btn" class="btn">変更を保存</button>
+                        <div class="card-header"><h3>ステータスモード選択</h3></div>
+                        <div class="form-group">
+                            <select id="status-mode-select">
+                                <option value="custom">カスタムリスト</option>
+                                <option value="ai">AI 自動生成</option>
+                            </select>
+                            <p class="form-hint">ボットのステータス表示方法を選択します。「AI 自動生成」を選択すると、下のカスタムリストは無視されます。</p>
                         </div>
                     </div>
+
+                    <div id="custom-status-editor">
+                        <div class="card">
+                            <div class="card-header"><h3>カスタムステータス編集</h3></div>
+                            <p class="form-hint">ボットが定期的に切り替えて表示するステータスを編集します。利用可能な変数: <code>\${serverCount}</code>, <code>\${userCount}</code></p>
+                            <div id="status-list" style="margin-top: 20px;"></div>
+                            <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                                <button id="add-status-btn" class="btn btn-secondary">ステータスを追加</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="save-statuses-btn" class="btn">設定を保存</button>
                 `;
+
+                const statusModeSelect = document.getElementById('status-mode-select');
+                statusModeSelect.value = mode;
+
+                const customStatusEditor = document.getElementById('custom-status-editor');
+                const toggleEditorVisibility = () => {
+                    customStatusEditor.style.display = statusModeSelect.value === 'custom' ? 'block' : 'none';
+                };
+
+                toggleEditorVisibility();
+                statusModeSelect.addEventListener('change', toggleEditorVisibility);
+
                 renderStatusList(statuses);
 
                 document.getElementById('add-status-btn').addEventListener('click', () => {
@@ -144,7 +172,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const btn = event.target;
         btn.disabled = true;
         btn.textContent = '保存中...';
-
+        
+        const mode = document.getElementById('status-mode-select').value;
         const statusItems = document.querySelectorAll('#status-list .status-item');
         const statuses = Array.from(statusItems).map(item => ({
             emoji: item.querySelector('.emoji-input').value.trim(),
@@ -152,13 +181,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         })).filter(s => s.emoji && s.state);
 
         try {
-            await api.post('/api/admin/statuses', { statuses });
-            showMessage('ステータスを保存しました。');
+            await api.post('/api/admin/statuses', { statuses, mode });
+            showMessage('ステータス設定を保存しました。');
         } catch (error) {
             showMessage(`保存エラー: ${error.message}`, 'error');
         } finally {
             btn.disabled = false;
-            btn.textContent = '変更を保存';
+            btn.textContent = '設定を保存';
         }
     };
 

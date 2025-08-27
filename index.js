@@ -89,6 +89,7 @@ client.geminiModel = geminiModel;
 // --- グローバル変数 ---
 let dynamicStatuses = []; // ステータスを保持するグローバル変数
 let statusInterval = null; // ステータス更新用のインターバルID
+let statusMode = 'custom'; // 'custom' or 'ai'
 
 // --- Webダッシュボード用ミドルウェアとAPI ---
 
@@ -568,29 +569,49 @@ app.post('/api/admin/announce', isAdminAuthenticated, async (req, res) => {
 });
 
 // API: カスタムステータスの取得
-app.get('/api/admin/statuses', isAdminAuthenticated, (req, res) => {
-    res.json(dynamicStatuses);
+app.get('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
+    const settingsRef = doc(db, 'bot_settings', 'statuses');
+    const docSnap = await getDoc(settingsRef);
+    if (docSnap.exists()) {
+        res.json(docSnap.data());
+    } else {
+        // デフォルト値を返す
+        res.json({ list: [], mode: 'custom' });
+    }
 });
 
 // API: カスタムステータスの更新
 app.post('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
-    const { statuses } = req.body;
-    if (!Array.isArray(statuses)) {
-        return res.status(400).json({ error: 'Statuses must be an array.' });
+    const { statuses, mode } = req.body;
+    if (!['ai', 'custom'].includes(mode)) {
+        return res.status(400).json({ error: 'Invalid mode specified.' });
+    }
+    if (mode === 'custom' && !Array.isArray(statuses)) {
+        return res.status(400).json({ error: 'Statuses must be an array for custom mode.' });
     }
 
     try {
         const settingsRef = doc(db, 'bot_settings', 'statuses');
-        await setDoc(settingsRef, { list: statuses });
-        dynamicStatuses = statuses; // グローバル変数を更新
-        startStatusRotation(); // ステータスローテーションを再開
-        res.status(200).json({ message: 'Statuses updated successfully.' });
+        // AIモードに切り替える際も、既存のカスタムリストは保持する
+        const currentSettings = (await getDoc(settingsRef)).data() || {};
+        const newSettings = {
+            mode: mode,
+            list: mode === 'custom' ? statuses : currentSettings.list || []
+        };
+        await setDoc(settingsRef, newSettings);
+
+        // グローバル変数を更新
+        statusMode = mode;
+        if (mode === 'custom') {
+            dynamicStatuses = statuses;
+        }
+        startStatusRotation(); // 新しい設定でローテーションを再開
+        res.status(200).json({ message: 'Statuses settings updated successfully.' });
     } catch (error) {
         console.error("Error updating statuses:", error);
         res.status(500).json({ error: 'Failed to update statuses.' });
     }
 });
-
 
 // ページルーティング (SPAなので、/dashboardへのアクセスはdashboard.htmlを返す)
 app.get('/dashboard', (req, res) => {
@@ -627,7 +648,7 @@ const BotStatus = {
     LOADING_EVENTS: '🎯 イベント読み込み中...',
     CONNECTING: '🌐 Discord に接続中...',
     REGISTERING_COMMANDS: '⚙️ コマンド登録中...',
-    GENERATING_STATUS: '🤖 AIステータス生成中...',
+    LOADING_STATUS_SETTINGS: '📝 ステータス設定読み込み中...',
     READY: '✅ 正常稼働中',
     ERROR: '❌ エラー発生'
 };
@@ -703,66 +724,105 @@ async function deployCommands() {
     }
 }
 
-// ステータスをFirestoreから読み込む関数
-async function loadStatuses() {
-    updateBotStatus(BotStatus.GENERATING_STATUS);
+// Gemini AIにステータスを生成させる関数
+async function generateAIStatus() {
+    try {
+        const userCount = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
+        const prompt = `あなたは「Overseer」という名前のDiscordボットです。あなたの現在のユニークで面白いステータスを生成してください。
+
+# 指示
+- サーバー数 (${client.guilds.cache.size}個) や、総ユーザー数 (${userCount}人) などの動的な情報を含めることができます。
+- 短く、キャッチーで、少しユーモラスなものが望ましいです。
+- 必ずJSON形式で {"emoji": "絵文字", "state": "ステータスメッセージ"} の形式で出力してください。
+- ステータスメッセージは30文字以内にしてください。
+
+# 生成例
+{ "emoji": "☕", "state": "コードをコンパイル中..." }
+{ "emoji": "🧠", "state": "${client.guilds.cache.size}個のサーバーを思考中。" }
+{ "emoji": "🤖", "state": "AIの夢を見ています。" }
+{ "emoji": "📈", "state": "${userCount}人のユーザーを監視中。" }`;
+
+        const result = await client.geminiModel.generateContent(prompt);
+        const text = result.response.text().replace(/```json|```/g, '').trim();
+        return JSON.parse(text);
+    } catch (error) {
+        console.error(chalk.red('❌ Geminiによるステータス生成に失敗:'), error);
+        return { emoji: '⚠️', state: 'AI思考エラー' };
+    }
+}
+
+// ステータス設定をFirestoreから読み込む関数
+async function loadStatusSettings() {
+    updateBotStatus(BotStatus.LOADING_STATUS_SETTINGS);
     try {
         const settingsRef = doc(db, 'bot_settings', 'statuses');
         const docSnap = await getDoc(settingsRef);
-        if (docSnap.exists() && docSnap.data().list.length > 0) {
-            console.log(chalk.green('✅ Firestoreからカスタムステータスを読み込みました。'));
-            return docSnap.data().list;
+
+        if (docSnap.exists() && docSnap.data().list) {
+            const settings = docSnap.data();
+            statusMode = settings.mode || 'custom';
+            console.log(chalk.green(`✅ Firestoreからステータス設定を読み込みました。モード: ${statusMode}`));
+            return settings.list;
         } else {
-            console.log(chalk.yellow('⚠️ Firestoreにステータス設定が見つかりません。デフォルトを使用します。'));
+            console.log(chalk.yellow('⚠️ Firestoreにステータス設定が見つかりません。デフォルトを作成します。'));
             const defaultStatuses = [
                 { emoji: '✅', state: '正常稼働中' },
                 { emoji: '💡', state: '/help でコマンド一覧' },
                 { emoji: '🛡️', state: '${serverCount} サーバーを保護中' },
             ];
-            await setDoc(settingsRef, { list: defaultStatuses });
+            await setDoc(settingsRef, { list: defaultStatuses, mode: 'custom' });
+            statusMode = 'custom';
             return defaultStatuses;
         }
     } catch (error) {
         console.error(chalk.red('❌ Firestoreからのステータス読み込みに失敗:'), error.message);
-        return [
-            { emoji: '❌', state: 'ステータス読込エラー' },
-        ];
+        return [{ emoji: '❌', state: 'ステータス読込エラー' }];
     }
 }
 
 // ステータスローテーションを開始/再開する関数
 function startStatusRotation() {
-    // 既存のインターバルがあればクリア
     if (statusInterval) {
         clearInterval(statusInterval);
     }
 
-    if (dynamicStatuses && dynamicStatuses.length > 0) {
-        let i = 0;
-        const updateStatus = () => {
-            if (!client.isReady()) return;
-            const statusTemplate = dynamicStatuses[i];
-            const statusState = statusTemplate.state
-                .replace(/\$\{serverCount\}/g, client.guilds.cache.size)
-                .replace(/\$\{userCount\}/g, client.guilds.cache.reduce((a, g) => a + g.memberCount, 0));
+    let i = 0;
+    const updateStatus = async () => {
+        if (!client.isReady()) return;
 
+        let statusToShow;
+
+        if (statusMode === 'ai') {
+            statusToShow = await generateAIStatus();
+        } else {
+            if (dynamicStatuses && dynamicStatuses.length > 0) {
+                const statusTemplate = dynamicStatuses[i];
+                const statusState = statusTemplate.state
+                    .replace(/\$\{serverCount\}/g, client.guilds.cache.size)
+                    .replace(/\$\{userCount\}/g, client.guilds.cache.reduce((a, g) => a + g.memberCount, 0));
+                statusToShow = { emoji: statusTemplate.emoji, state: statusState };
+                i = (i + 1) % dynamicStatuses.length;
+            } else {
+                statusToShow = { emoji: '🔧', state: 'ステータス設定待ち' };
+            }
+        }
+
+        if (statusToShow) {
             client.user.setPresence({
                 activities: [{
                     name: 'customstatus',
                     type: ActivityType.Custom,
-                    state: statusState,
-                    emoji: statusTemplate.emoji
+                    state: statusToShow.state,
+                    emoji: statusToShow.emoji
                 }],
                 status: 'online'
             });
-            console.log(chalk.cyan(`🎯 ステータス更新: ${statusTemplate.emoji} ${statusState}`));
-            i = (i + 1) % dynamicStatuses.length;
-        };
-        updateStatus(); // 即時実行
-        statusInterval = setInterval(updateStatus, 60000); // 1分ごとに更新
-    } else {
-        console.log(chalk.yellow('⚠️ 表示するステータスがありません。'));
-    }
+            console.log(chalk.cyan(`🎯 ステータス更新 (${statusMode}): ${statusToShow.emoji} ${statusToShow.state}`));
+        }
+    };
+
+    updateStatus();
+    statusInterval = setInterval(updateStatus, 60000); // 1分ごとに更新
 }
 
 // ▼▼▼ ランキングボード更新機能 ▼▼▼
@@ -900,7 +960,7 @@ client.once('ready', async () => {
     // ▲▲▲ ここまで追加 ▲▲▲
 
     // ステータスを読み込んでローテーションを開始
-    dynamicStatuses = await loadStatuses();
+    dynamicStatuses = await loadStatusSettings();
     startStatusRotation();
 });
 
