@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overseer - ログイン</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body class="login-page-body">
+
+    <div class="login-container">
+        <div class="terminal">
+            <div class="terminal-header">
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+                <div class="terminal-title">overseer-auth</div>
+            </div>
+            <div class="terminal-body">
+                <h1 class="login-title">[O] Overseer Dashboard</h1>
+                <p class="login-description">Discordサーバーで `/login` コマンドを実行して取得したワンタイムトークンを入力してください。</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="token" class="prompt">user@overseer:~$ one-time-token</label>
+                        <div class="input-with-icon">
+                            <i data-feather="key"></i>
+                            <input type="text" id="token" name="token" required placeholder="ここにトークンを貼り付け" autocomplete="off">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn login-btn" id="submit-btn">
+                        <span class="btn-text">Authenticate</span>
+                        <div class="loader-ring-small" style="display: none;"></div>
+                    </button>
+                </form>
+                <div id="message-container">
+                    <p id="message"></p>
+                </div>
+            </div>
+        </div>
+        <a href="/" class="back-to-home">
+            <i data-feather="home"></i>
+            <span>ホームページに戻る</span>
+        </a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace(); // アイコンを描画
+
+            const form = document.getElementById('login-form');
+            const tokenInput = document.getElementById('token');
+            const messageEl = document.getElementById('message');
+            const messageContainer = document.getElementById('message-container');
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnLoader = submitBtn.querySelector('.loader-ring-small');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const token = tokenInput.value.trim();
+
+                if (!token) {
+                    showMessage('トークンを入力してください。', 'error');
+                    return;
+                }
+
+                // ローディング表示に切り替え
+                submitBtn.disabled = true;
+                btnText.style.display = 'none';
+                btnLoader.style.display = 'block';
+                messageContainer.style.display = 'none';
+                messageEl.className = '';
+                messageEl.textContent = '';
+
+                try {
+                    const response = await fetch('/api/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        showMessage('認証成功！ダッシュボードに移動します...', 'success');
+                        setTimeout(() => {
+                             window.location.href = '/dashboard';
+                        }, 1500);
+                    } else {
+                        throw new Error(data.error || '不明なエラーが発生しました。');
+                    }
+                } catch (error) {
+                    showMessage(`エラー: ${error.message}`, 'error');
+                } finally {
+                     // 成功時はリダイレクトされるので、エラー時のみ元に戻す
+                    if (!submitBtn.disabled || btnLoader.style.display !== 'none') {
+                         submitBtn.disabled = false;
+                         btnText.style.display = 'inline';
+                         btnLoader.style.display = 'none';
+                    }
+                }
+            });
+
+            // メッセージ表示用の関数
+            const showMessage = (text, type) => {
+                messageContainer.style.display = 'block';
+                messageEl.textContent = text;
+                messageEl.className = type;
+            };
+        });
+    </script>
+</body>
+</html>

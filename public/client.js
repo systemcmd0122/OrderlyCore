@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => backdrop.remove(), 300);
         }
     };
-    
+
     // カスタムセレクトボックス（Tom Select）を初期化する関数
     const initializeTomSelect = (selector, options = {}) => {
         document.querySelectorAll(selector).forEach(el => {
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="card-header"><h3>メッセージ数ランキング</h3></div>
                     <ol id="leaderboard-list" class="leaderboard"></ol>
                 </div>`;
-            
+
             const listEl = document.getElementById('leaderboard-list');
             if (data.topUsers.length === 0) {
                  listEl.innerHTML = `<p style="text-align:center; color: var(--text-muted-color);">まだランキングデータがありません。</p>`
@@ -111,12 +111,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </li>`).join('');
             }
         },
+        announcements: async () => {
+            pageTitle.textContent = 'お知らせ設定';
+            const settings = await api.get('/api/settings/guild_settings');
+            settingsCache['guild_settings'] = settings;
+
+            pageContent.innerHTML = `
+                <form id="announcements-form">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>ボットからのお知らせ受信</h3>
+                        </div>
+                        <div class="form-group">
+                            <label for="announcementChannelId">受信チャンネル</label>
+                            <select id="announcementChannelId" placeholder="チャンネルを選択しない（受信しない）">
+                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                            </select>
+                            <p class="form-hint">
+                                ボットのアップデート情報や重要なお知らせなど、開発者からのお知らせを受信するチャンネルを指定します。
+                                <br>
+                                不要な場合は、チャンネルを選択しないでください。
+                            </p>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>
+            `;
+            initializeTomSelect('#announcementChannelId', { items: [settings.announcementChannelId] });
+            document.getElementById('announcements-form').addEventListener('submit', handleFormSubmit);
+        },
         welcome: async () => {
             pageTitle.textContent = '参加・退出設定';
             const settings = await api.get('/api/settings/guilds');
             settingsCache['guilds'] = settings;
             const createSelectOptions = (options) => options.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
-            
+
             pageContent.innerHTML = `
                 <form id="welcome-form">
                     <div class="card">
@@ -162,11 +191,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
-            
-            // ▼▼▼【修正箇所】▼▼▼
-            // このドロップダウンにカスタムスタイルを適用する処理を追加
+
             initializeTomSelect('#welcome-type');
-            // ▲▲▲【修正完了】▲▲▲
 
             document.getElementById('welcome-type').addEventListener('change', (e) => {
                 document.getElementById('default-settings').style.display = e.target.value === 'default' ? 'block' : 'none';
@@ -269,9 +295,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
         },
     };
-    
+
     // --- Roleboard, Modals, Forms, Navigation, Init ( 省略なし、前回の回答と同じ ) ---
-    // ... (以下、前回の回答と同じコードのため省略せずペースト)
     const renderRoleboardList = async () => {
         const listEl = document.getElementById('roleboard-list');
         listEl.innerHTML = '<div class="loader-ring" style="margin: 20px auto;"></div>';
@@ -360,6 +385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 switch(page) {
                     case 'welcome': collection = 'guilds'; settings = { welcomeChannelId: form.querySelector('#welcomeChannelId').value || null, goodbyeChannelId: form.querySelector('#goodbyeChannelId').value || null, rulesChannelId: form.querySelector('#rulesChannelId').value || null, welcomeRoleId: form.querySelector('#welcomeRoleId').value || null, mentionOnWelcome: form.querySelector('#mentionOnWelcome').checked, sendGoodbyeDM: form.querySelector('#sendGoodbyeDM').checked }; break;
                     case 'welcome-message': await api.post(`/api/settings/welcome-message`, { enabled: form.querySelector('#welcome-enabled').checked, type: form.querySelector('#welcome-type').value, title: form.querySelector('#welcome-title').value, description: form.querySelector('#welcome-description').value, imageUrl: form.querySelector('#welcome-imageUrl').value }); showMessage('設定を保存しました。'); btn.disabled = false; btn.textContent = btnText; return;
+                    case 'announcements': collection = 'guild_settings'; settings = { announcementChannelId: form.querySelector('#announcementChannelId').value || null }; break;
                     case 'autorole': collection = 'guild_settings'; settings = { botAutoroleId: form.querySelector('#botAutoroleId').value || null }; break;
                     case 'automod': collection = 'guild_settings'; settings = { automod: { ngWords: form.querySelector('#ngWords').value.split(',').map(w => w.trim()).filter(Boolean), blockInvites: form.querySelector('#blockInvites').checked }}; break;
                     case 'logging': collection = 'guild_settings'; settings = { auditLogChannel: form.querySelector('#auditLogChannel').value || null }; break;

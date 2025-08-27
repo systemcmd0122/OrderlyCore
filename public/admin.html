@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overseer - Admin Panel</title>
+    <link rel="stylesheet" href="/admin.css"> <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    <div id="loader" class="loader-container">
+        <div class="loader-ring"></div>
+        <p>管理者情報を読み込み中...</p>
+    </div>
+
+    <div class="dashboard-wrapper" style="display: none;">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <a href="/admin.html" class="logo">[O] Admin Panel</a>
+            </div>
+             <div class="server-info">
+                <img id="bot-avatar" src="" alt="Bot Avatar" class="server-icon">
+                <h2 id="bot-name">Overseer</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#activity" class="nav-item active" data-page="activity"><i data-feather="activity"></i><span>ボットアクティビティ</span></a>
+                <a href="#announcements" class="nav-item" data-page="announcements"><i data-feather="send"></i><span>お知らせ管理</span></a>
+                <a href="#status" class="nav-item" data-page="status"><i data-feather="zap"></i><span>ステータス管理</span></a>
+                </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn btn-secondary"><i data-feather="log-out"></i><span>ログアウト</span></button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="main-header">
+                <button id="menu-toggle" class="menu-toggle-btn"><i data-feather="menu"></i></button>
+                <h1 id="page-title">ボットアクティビティ</h1>
+            </header>
+            <div id="page-content-wrapper">
+                <div id="page-content" class="page-content">
+                    </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/admin.js"></script>
+</body>
+</html>
