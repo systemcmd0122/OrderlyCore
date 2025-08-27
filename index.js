@@ -64,11 +64,9 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const rtdb = getDatabase(firebaseApp);
 
-// --- Google Gemini API設定 ---
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-// --- Discordクライアント設定 ---
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -87,13 +85,11 @@ client.commands = new Collection();
 client.geminiModel = geminiModel;
 
 // --- グローバル変数 ---
-let dynamicStatuses = []; // ステータスを保持するグローバル変数
-let statusInterval = null; // ステータス更新用のインターバルID
-let statusMode = 'custom'; // 'custom' or 'ai'
+let dynamicStatuses = [];
+let statusInterval = null;
+let statusMode = 'ai';
 
-// --- Webダッシュボード用ミドルウェアとAPI ---
 
-// 認証チェックミドルウェア
 const isAuthenticated = (req, res, next) => {
     if (req.session.userId && req.session.guildId) {
         return next();
@@ -101,7 +97,6 @@ const isAuthenticated = (req, res, next) => {
     res.status(401).json({ error: 'Unauthorized. Please login again.' });
 };
 
-// サーバー管理者チェックミドルウェア
 const isGuildAdmin = async (req, res, next) => {
     try {
         const guild = await client.guilds.fetch(req.session.guildId);
@@ -116,7 +111,6 @@ const isGuildAdmin = async (req, res, next) => {
     }
 };
 
-// 管理者認証チェックミドルウェア
 const isAdminAuthenticated = (req, res, next) => {
     if (req.session.isAdmin) {
         return next();
@@ -124,7 +118,6 @@ const isAdminAuthenticated = (req, res, next) => {
     res.status(401).json({ error: 'Administrator access required.' });
 };
 
-// --- ヘルスチェック用エンドポイント ---
 app.get('/ping', (req, res) => {
     res.status(200).json({
         status: 'ok',
@@ -142,7 +135,6 @@ app.get('/health', (req, res) => {
     res.status(client.isReady() ? 200 : 503).json(health);
 });
 
-// --- Keep-alive機能 ---
 function keepAlive() {
     const PING_INTERVAL = 2 * 60 * 1000;
     const appUrl = process.env.APP_URL;
@@ -176,7 +168,6 @@ function keepAlive() {
     }, PING_INTERVAL);
 }
 
-// API: 認証トークンの検証
 app.post('/api/verify', async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ error: 'Token is required.' });
@@ -204,7 +195,6 @@ app.post('/api/verify', async (req, res) => {
     }
 });
 
-// API: ログアウト
 app.post('/api/logout', (req, res) => {
     req.session.destroy(err => {
         if (err) {
@@ -215,12 +205,11 @@ app.post('/api/logout', (req, res) => {
     });
 });
 
-// API: サーバーの基本情報を取得
 app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guild = await client.guilds.fetch(req.session.guildId);
         const channels = guild.channels.cache
-            .filter(c => c.type === 0 || c.type === 2) // Text and Voice
+            .filter(c => c.type === 0 || c.type === 2)
             .map(c => ({ id: c.id, name: c.name, type: c.type }))
             .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -248,13 +237,11 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
-// === ▼▼▼▼▼ ここからアナリティクスAPIを追加 ▼▼▼▼▼ ===
 app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guildId = req.session.guildId;
         const guild = await client.guilds.fetch(guildId);
 
-        // Firestoreからレベル情報を取得
         const levelsRef = collection(db, 'levels');
         const q = query(levelsRef, where('guildId', '==', guildId));
         const snapshot = await getDocs(q);
@@ -264,12 +251,10 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
             allUsersData.push(doc.data());
         });
 
-        // 1. メッセージ数ランキング上位5名
         const topUsers = allUsersData
             .sort((a, b) => (b.messageCount || 0) - (a.messageCount || 0))
             .slice(0, 5);
 
-        // Discordから最新のユーザー情報を取得
         const topUsersWithDetails = await Promise.all(topUsers.map(async (user) => {
             try {
                 const member = await guild.members.fetch(user.userId);
@@ -279,14 +264,12 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
             }
         }));
 
-        // 2. 時間帯別アクティビティ
         const activityByHour = Array(24).fill(0);
         allUsersData.forEach(user => {
             if (user.lastMessageTimestamp) {
-                // タイムゾーンをJST (+9)と仮定して計算
                 const date = new Date(user.lastMessageTimestamp);
-                const hour = date.getHours(); // UTCの時間を取得
-                activityByHour[hour] = (activityByHour[hour] || 0) + 1; // ここではメッセージ数ではなくアクティブユーザー数
+                const hour = date.getHours();
+                activityByHour[hour] = (activityByHour[hour] || 0) + 1;
             }
         });
 
@@ -305,10 +288,7 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
         res.status(500).json({ error: 'Failed to fetch analytics data.' });
     }
 });
-// === ▲▲▲▲▲ ここまでアナリティクスAPIを追加 ▲▲▲▲▲ ===
 
-// ★★★★★【ここから追加・変更】★★★★★
-// API: ウェルカムメッセージ設定の取得
 app.get('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const settingsRef = doc(db, 'guild_settings', req.session.guildId);
@@ -316,7 +296,6 @@ app.get('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (r
         if (docSnap.exists() && docSnap.data().welcomeMessage) {
             res.json(docSnap.data().welcomeMessage);
         } else {
-            // デフォルト値を返す
             res.json({
                 enabled: true,
                 type: 'default',
@@ -331,7 +310,6 @@ app.get('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (r
     }
 });
 
-// API: ウェルカムメッセージ設定の更新
 app.post('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const settingsRef = doc(db, 'guild_settings', req.session.guildId);
@@ -342,9 +320,7 @@ app.post('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (
         res.status(500).json({ error: 'Failed to update welcome message settings.' });
     }
 });
-// ★★★★★【ここまで追加・変更】★★★★★
 
-// API: サーバー設定の取得 (汎用)
 app.get('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { collection } = req.params;
@@ -364,7 +340,6 @@ app.get('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, 
     }
 });
 
-// API: サーバー設定の更新 (汎用)
 app.post('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { collection } = req.params;
@@ -380,7 +355,6 @@ app.post('/api/settings/:collection', isAuthenticated, isGuildAdmin, async (req,
     }
 });
 
-// === ロールボード専用API ===
 app.get('/api/roleboards', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const q = query(collection(db, 'roleboards'), where('guildId', '==', req.session.guildId));
@@ -459,9 +433,6 @@ app.delete('/api/roleboards/:id', isAuthenticated, isGuildAdmin, async (req, res
 });
 
 
-// === ▼▼▼▼▼ 管理者用API ▼▼▼▼▼ ===
-
-// API: 管理者ログイン
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
     if (password && password === process.env.ADMIN_PASSWORD) {
@@ -472,7 +443,6 @@ app.post('/api/admin/login', (req, res) => {
     }
 });
 
-// API: 管理者ログアウト
 app.post('/api/admin/logout', (req, res) => {
     req.session.destroy(err => {
         if (err) {
@@ -483,7 +453,6 @@ app.post('/api/admin/logout', (req, res) => {
     });
 });
 
-// API: ボットの統計情報を取得
 app.get('/api/admin/stats', isAdminAuthenticated, async (req, res) => {
     try {
         const guilds = await client.guilds.fetch();
@@ -516,7 +485,6 @@ app.get('/api/admin/stats', isAdminAuthenticated, async (req, res) => {
     }
 });
 
-// API: お知らせを全サーバーに送信
 app.post('/api/admin/announce', isAdminAuthenticated, async (req, res) => {
     const { title, description, color, url, footer } = req.body;
     if (!title || !description) {
@@ -568,19 +536,16 @@ app.post('/api/admin/announce', isAdminAuthenticated, async (req, res) => {
     }
 });
 
-// API: カスタムステータスの取得
 app.get('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
     const settingsRef = doc(db, 'bot_settings', 'statuses');
     const docSnap = await getDoc(settingsRef);
     if (docSnap.exists()) {
         res.json(docSnap.data());
     } else {
-        // デフォルト値を返す
         res.json({ list: [], mode: 'custom' });
     }
 });
 
-// API: カスタムステータスの更新
 app.post('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
     const { statuses, mode } = req.body;
     if (!['ai', 'custom'].includes(mode)) {
@@ -592,7 +557,6 @@ app.post('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
 
     try {
         const settingsRef = doc(db, 'bot_settings', 'statuses');
-        // AIモードに切り替える際も、既存のカスタムリストは保持する
         const currentSettings = (await getDoc(settingsRef)).data() || {};
         const newSettings = {
             mode: mode,
@@ -600,12 +564,11 @@ app.post('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
         };
         await setDoc(settingsRef, newSettings);
 
-        // グローバル変数を更新
         statusMode = mode;
         if (mode === 'custom') {
             dynamicStatuses = statuses;
         }
-        startStatusRotation(); // 新しい設定でローテーションを再開
+        startStatusRotation();
         res.status(200).json({ message: 'Statuses settings updated successfully.' });
     } catch (error) {
         console.error("Error updating statuses:", error);
@@ -613,17 +576,14 @@ app.post('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
     }
 });
 
-// ページルーティング (SPAなので、/dashboardへのアクセスはdashboard.htmlを返す)
 app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// 管理者用ページへのルーティング
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
-// その他のルートは、index.htmlにフォールバックさせる
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api/')) {
     const filePath = path.join(__dirname, 'public', req.path);
@@ -641,7 +601,6 @@ app.get('*', (req, res) => {
   }
 });
 
-// --- コマンド・イベントの読み込みとボット起動 ---
 const BotStatus = {
     INITIALIZING: '🔄 初期化中...',
     LOADING_COMMANDS: '📂 コマンド読み込み中...',
@@ -724,7 +683,6 @@ async function deployCommands() {
     }
 }
 
-// Gemini AIにステータスを生成させる関数
 async function generateAIStatus() {
     try {
         const userCount = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
@@ -751,7 +709,6 @@ async function generateAIStatus() {
     }
 }
 
-// ステータス設定をFirestoreから読み込む関数
 async function loadStatusSettings() {
     updateBotStatus(BotStatus.LOADING_STATUS_SETTINGS);
     try {
@@ -780,7 +737,6 @@ async function loadStatusSettings() {
     }
 }
 
-// ステータスローテーションを開始/再開する関数
 function startStatusRotation() {
     if (statusInterval) {
         clearInterval(statusInterval);
@@ -822,10 +778,9 @@ function startStatusRotation() {
     };
 
     updateStatus();
-    statusInterval = setInterval(updateStatus, 60000); // 1分ごとに更新
+    statusInterval = setInterval(updateStatus, 60000);
 }
 
-// ▼▼▼ ランキングボード更新機能 ▼▼▼
 const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
 
 async function updateRankboards(client) {
@@ -858,7 +813,6 @@ async function updateRankboards(client) {
             if (!guild) continue;
 
             try {
-                // 1. Firestoreから上位10ユーザーの累計レベル情報を取得
                 const levelsRef = collection(db, 'levels');
                 const levelQuery = query(
                     levelsRef,
@@ -878,24 +832,21 @@ async function updateRankboards(client) {
                     });
                 });
 
-                // 2. Realtime DBから現在オンラインのユーザー全員のセッション情報を取得
                 const allSessionsRef = ref(rtdb, `voiceSessions/${guild.id}`);
                 const allSessionsSnapshot = await get(allSessionsRef);
                 const onlineUsers = allSessionsSnapshot.exists() ? allSessionsSnapshot.val() : {};
 
-                // 3. 累計XPと現在のVCセッションXPを合算して最終的なXPを計算
                 const finalStats = userStats.map(stat => {
                     let currentXp = stat.xp;
                     if (onlineUsers[stat.userId]) {
                         const sessionDurationMs = Date.now() - onlineUsers[stat.userId].joinedAt;
                         const minutesStayed = Math.floor(sessionDurationMs / 60000);
-                        const vcXpGained = minutesStayed * 5; // vcStateLog.jsと同じレート
+                        const vcXpGained = minutesStayed * 5;
                         currentXp += vcXpGained;
                     }
                     return { ...stat, finalXp: currentXp };
                 });
 
-                // 4. 再度ソートして最終ランキングを作成
                 finalStats.sort((a, b) => {
                     if (b.level !== a.level) {
                         return b.level - a.level;
@@ -903,7 +854,6 @@ async function updateRankboards(client) {
                     return b.finalXp - a.finalXp;
                 });
 
-                // 5. Embedを作成
                 const rankEmbed = new EmbedBuilder()
                     .setColor(0x00FFFF)
                     .setTitle(`🏆 ${guild.name} リアルタイムランキング`)
@@ -926,7 +876,6 @@ async function updateRankboards(client) {
                     rankEmbed.setDescription(rankStrings.join('\n\n'));
                 }
 
-                // 6. メッセージを更新
                 const channel = await client.channels.fetch(rankBoardConfig.channelId).catch(() => null);
                 if (channel) {
                     const message = await channel.messages.fetch(rankBoardConfig.messageId).catch(() => null);
@@ -943,7 +892,6 @@ async function updateRankboards(client) {
         console.error(chalk.red('[Rankboard] Failed to query for guild settings:'), error);
     }
 }
-// ▲▲▲ ランキングボード更新機能 ▲▲▲
 
 client.once('ready', async () => {
     console.log(chalk.bold.greenBright(`🚀 ${client.user.tag} が起動しました！`));
@@ -953,13 +901,10 @@ client.once('ready', async () => {
 
     keepAlive();
 
-    // ▼▼▼ ランキングボードの定期更新を開始 ▼▼▼
-    // 起動10秒後に初回更新、その後5分ごとに更新
+
     setTimeout(() => updateRankboards(client), 10000);
     setInterval(() => updateRankboards(client), 5 * 60 * 1000);
-    // ▲▲▲ ここまで追加 ▲▲▲
 
-    // ステータスを読み込んでローテーションを開始
     dynamicStatuses = await loadStatusSettings();
     startStatusRotation();
 });
