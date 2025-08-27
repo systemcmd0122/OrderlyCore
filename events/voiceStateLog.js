@@ -1,5 +1,5 @@
-// systemcmd0122/overseer/overseer-af267ce1d661f675c497b5c195d79df6613865e9/events/voiceStateLog.js
-const { Events, EmbedBuilder, PermissionsBitField } = require('discord.js'); // PermissionsBitField を追加
+// systemcmd0122/overseer/overseer-edf92c132aa35d74ac5604639bc1887818817546/events/voiceStateLog.js
+const { Events, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const chalk = require('chalk');
 const { getFirestore, doc, getDoc, setDoc, updateDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const { getDatabase, ref, set, remove, get } = require('firebase/database');
@@ -34,26 +34,32 @@ const deleteManager = new MessageDeleteManager();
 
 const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
 
+// Gemini AIにレベルアップコメントを生成させる関数 (修正済み)
 async function generateLevelUpComment(client, user, newLevel, serverName) {
     try {
-        const prompt = `あなたはDiscordサーバーの優秀なアシスタントAIです。ユーザーのレベルアップを、その人の功績を称え、今後の活躍を期待するような、ユニークでクリエイティブなメッセージで祝福してください。
+        const prompt = `あなたはDiscordサーバーの優秀なアシスタントです。以下の指示に従って、ユーザーのレベルアップを祝福するメッセージを**一行で**生成してください。
 
-# 指示
-- 非常にポジティブで、少しだけ壮大な雰囲気の文章を生成してください。
-- 以下の情報を文章に必ず含めてください。
-  - ユーザー名: ${user.displayName}
-  - 新しいレベル: ${newLevel}
-  - サーバー名: ${serverName}
-- 生成する文章は必ず一行で、80文字以内に収めてください。
-- 毎回必ず違うパターンの文章を生成してください。
+### 指示
+* **役割**: ユーザーの功績を称え、今後の活躍を期待させるような、ユニークでクリエイティブなメッセージを作成します。
+* **トーン**: 非常にポジティブで、少し壮大な雰囲気にしてください。
+* **必須要素**:
+    * ユーザー名: ${user.displayName}
+    * 新しいレベル: ${newLevel}
+    * サーバー名: ${serverName}
+* **厳格な制約**:
+    * 生成する文章は**必ず一行**にしてください。
+    * **80文字以内**に収めてください。
+    * 毎回必ず違うパターンの文章を生成してください。
+    * **回答には祝福メッセージのみを含め、それ以外の前置き、解説、リスト、引用符（「」）は絶対に含めないでください。**
 
-# 生成例
-- 「${serverName}の歴史に名を刻む時が来た！${user.displayName}よ、レベル${newLevel}への到達、誠におめでとう！」
-- 「天晴れ！${user.displayName}の活躍により${serverName}は新たな時代へ。伝説はレベル${newLevel}から始まる！」
-- 「${serverName}に新たな光が灯った！${user.displayName}、レベル${newLevel}への昇格、心より祝福する。」`;
+### 生成例
+* ${serverName}の歴史に名を刻む時が来た！${user.displayName}よ、レベル${newLevel}への到達、誠におめでとう！
+* 天晴れ！${user.displayName}の活躍により${serverName}は新たな時代へ。伝説はレベル${newLevel}から始まる！
+* ${serverName}に新たな光が灯った！${user.displayName}、レベル${newLevel}への昇格、心より祝福する。`;
 
         const result = await client.geminiModel.generateContent(prompt);
-        const text = result.response.text().trim().replace(/\n/g, '');
+        // 不要な文字を除去する処理を強化
+        const text = result.response.text().trim().replace(/[\n*「」]/g, '').split('。')[0];
         console.log(chalk.magenta(`[Gemini] Generated comment for VC Level Up: ${text}`));
         return text;
     } catch (error) {
@@ -73,7 +79,6 @@ async function getLevelData(db, guildId, userId) {
     return { guildId, userId, xp: 0, level: 0, messageCount: 0, lastMessageTimestamp: 0 };
 }
 
-// ★★★★★【ここから追加】★★★★★
 // levelingSystem.js と同じロール報酬処理関数
 async function handleRoleRewards(member, oldLevel, newLevel, settings) {
     const levelingSettings = settings.leveling || {};
@@ -114,7 +119,6 @@ async function handleRoleRewards(member, oldLevel, newLevel, settings) {
     }
     return awardedRoles;
 }
-// ★★★★★【ここまで追加】★★★★★
 
 async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
     if (!guildId || !voiceChannelId) return null;
@@ -170,10 +174,7 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
         const settingsSnap = await getDoc(settingsRef);
         const settings = settingsSnap.exists() ? settingsSnap.data() : {};
 
-        // ★★★★★【ここから変更】★★★★★
-        // ロール報酬処理
         const awardedRoles = await handleRoleRewards(member, oldLevel, userData.level, settings);
-        // ★★★★★【ここまで変更】★★★★★
 
         if (settings.levelUpChannel) {
             const targetChannel = await client.channels.fetch(settings.levelUpChannel).catch(() => null);
@@ -214,7 +215,6 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                     .setFooter({ text: `ボイスチャンネルでの活動、お疲れ様です！ | ${guild.name}`, iconURL: guild.iconURL() })
                     .setTimestamp();
                 
-                // ★★★★★【ここから追加】★★★★★
                 if (awardedRoles && awardedRoles.length > 0) {
                     levelUpEmbed.addFields({
                         name: '🏆 獲得したロール報酬',
@@ -222,7 +222,6 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                         inline: false
                     });
                 }
-                // ★★★★★【ここまで追加】★★★★★
 
                 try {
                     await targetChannel.send({ embeds: [levelUpEmbed] });
