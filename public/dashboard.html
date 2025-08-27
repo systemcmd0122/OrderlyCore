@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overseer - ダッシュボード</title>
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body>
     <div id="loader" class="loader-container">
@@ -23,33 +25,37 @@
                 <h2 id="server-name">サーバー名</h2>
             </div>
             <nav class="sidebar-nav">
-                <a href="#dashboard" class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> ダッシュボード</a>
-                <a href="#analytics" class="nav-item" data-page="analytics"><span class="nav-icon">📈</span> アナリティクス</a>
-                <a href="#welcome" class="nav-item" data-page="welcome"><span class="nav-icon">👋</span> 参加・退出設定</a>
-                <a href="#welcome-message" class="nav-item" data-page="welcome-message"><span class="nav-icon">💌</span> ウェルカムメッセージ</a>
-                <a href="#roleboard" class="nav-item" data-page="roleboard"><span class="nav-icon">🎭</span> ロールボード</a>
-                <a href="#autorole" class="nav-item" data-page="autorole"><span class="nav-icon">🤖</span> Bot 自動ロール</a>
-                <a href="#automod" class="nav-item" data-page="automod"><span class="nav-icon">🛡️</span> オートモッド</a>
-                <a href="#logging" class="nav-item" data-page="logging"><span class="nav-icon">✍️</span> ログ設定</a>
-                <a href="#leveling" class="nav-item" data-page="leveling"><span class="nav-icon">📈</span> レベリング</a>
-                <a href="#ai" class="nav-item" data-page="ai"><span class="nav-icon">🧠</span> AI設定</a>
+                <a href="#dashboard" class="nav-item active" data-page="dashboard"><i data-feather="grid"></i><span>ダッシュボード</span></a>
+                <a href="#analytics" class="nav-item" data-page="analytics"><i data-feather="bar-chart-2"></i><span>アナリティクス</span></a>
+                <a href="#welcome" class="nav-item" data-page="welcome"><i data-feather="user-plus"></i><span>参加・退出設定</span></a>
+                <a href="#welcome-message" class="nav-item" data-page="welcome-message"><i data-feather="mail"></i><span>ウェルカムメッセージ</span></a>
+                <a href="#roleboard" class="nav-item" data-page="roleboard"><i data-feather="trello"></i><span>ロールボード</span></a>
+                <a href="#autorole" class="nav-item" data-page="autorole"><i data-feather="user-check"></i><span>Bot 自動ロール</span></a>
+                <a href="#automod" class="nav-item" data-page="automod"><i data-feather="shield"></i><span>オートモッド</span></a>
+                <a href="#logging" class="nav-item" data-page="logging"><i data-feather="edit-3"></i><span>ログ設定</span></a>
+                <a href="#leveling" class="nav-item" data-page="leveling"><i data-feather="trending-up"></i><span>レベリング</span></a>
+                <a href="#ai" class="nav-item" data-page="ai"><i data-feather="cpu"></i><span>AI設定</span></a>
             </nav>
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-secondary">ログアウト</button>
+                <button id="logout-btn" class="btn btn-secondary"><i data-feather="log-out"></i><span>ログアウト</span></button>
             </div>
         </aside>
         
         <main class="main-content">
             <header class="main-header">
+                <button id="menu-toggle" class="menu-toggle-btn"><i data-feather="menu"></i></button>
                 <h1 id="page-title">ダッシュボード</h1>
             </header>
-            <div id="page-content" class="page-content">
-                </div>
+            <div id="page-content-wrapper">
+                <div id="page-content" class="page-content">
+                    </div>
+            </div>
         </main>
     </div>
 
     <div id="modal-container"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script src="/client.js"></script>
 </body>
 </html>
