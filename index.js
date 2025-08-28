@@ -1,6 +1,6 @@
 // systemcmd0122/overseer/overseer-73bfc1e5f235bcccdbf7f2400b84767315a3e964/index.js
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js'); // EmbedBuilderを追加
+const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
@@ -10,33 +10,30 @@ const cors = require('cors');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-// limit, startAfter, endBefore, getCountFromServer を getDocs の隣に追加
 const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, Timestamp, orderBy, limit, startAfter, endBefore, getCountFromServer } = require('firebase/firestore');
 const { getDatabase, ref, set, get, remove } = require('firebase/database');
-const os = require('os'); // osモジュールを追加
+const os = require('os');
 
 // --- Express アプリケーション設定 ---
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// CORS設定: Koyeb環境では、異なるサブドメイン間で通信することがあるため設定を推奨
 app.use(cors({
-    origin: process.env.APP_URL || `http://localhost:${PORT}`, // フロントエンドのURL
+    origin: process.env.APP_URL || `http://localhost:${PORT}`,
     credentials: true
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-// 'public'ディレクトリの前にセッションミドルウェアを配置
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your_very_secret_key_that_is_long_and_random',
     resave: false,
     saveUninitialized: true,
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // 'production'モードではtrueに
-        httpOnly: true, // セキュリティ向上のため
-        maxAge: 24 * 60 * 60 * 1000 // 24時間
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -84,7 +81,6 @@ client.rtdb = rtdb;
 client.commands = new Collection();
 client.geminiModel = geminiModel;
 
-// --- グローバル変数 ---
 let dynamicStatuses = [];
 let statusInterval = null;
 let statusMode = 'ai';
@@ -237,15 +233,12 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
-// ★★★★★【ここから変更】★★★★★
-// メンバー管理テーブル用APIエンドポイント
 app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guild = await client.guilds.fetch(req.session.guildId);
-        await guild.members.fetch(); //
+        await guild.members.fetch(); 
         const members = guild.members.cache;
 
-        // Firestoreから全メンバーの追加データを取得
         const levelsRef = collection(db, 'levels');
         const levelsQuery = query(levelsRef, where('guildId', '==', req.session.guildId));
         const levelsSnapshot = await getDocs(levelsQuery);
@@ -281,7 +274,6 @@ app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
-// メンバー管理アクション用APIエンドポイント
 app.post('/api/members/:memberId/kick', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guild = await client.guilds.fetch(req.session.guildId);
@@ -318,7 +310,7 @@ app.put('/api/members/:memberId/roles', isAuthenticated, isGuildAdmin, async (re
     }
 });
 
-// 監査ログビューア用APIエンドポイント
+// ★★★★★【ここから変更】★★★★★
 app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { eventType, user, page = 1, limit: pageLimit = 15 } = req.query;
@@ -328,13 +320,8 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
         if (eventType) {
             q = query(q, where('eventType', '==', eventType));
         }
-        if (user) {
-            // Firestore does not support OR queries on different fields in this way.
-            // We fetch and filter in the backend, which is less efficient but works for moderate scale.
-            // For larger scale, consider denormalizing data (e.g., an array of involved user IDs).
-        }
-
-        const countQuery = query(q); // Create a separate query for counting
+        
+        const countQuery = query(q);
         const totalSnapshot = await getCountFromServer(countQuery);
         const totalLogs = totalSnapshot.data().count;
 
@@ -354,7 +341,6 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
         const snapshot = await getDocs(q);
         let logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // Manual filter for user if provided
         if (user) {
             logs = logs.filter(log => log.executorTag?.includes(user) || log.targetTag?.includes(user));
         }
@@ -368,11 +354,20 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching audit logs:', error);
+        if (error.code === 'failed-precondition') {
+            const firestoreUrl = `https://console.firebase.google.com/project/${process.env.FIREBASE_PROJECT_ID}/firestore/indexes`;
+            return res.status(500).json({ 
+                error: 'データベースインデックスが必要です。',
+                errorCode: 'INDEX_REQUIRED',
+                // FirebaseコンソールのURLを直接生成するのはセキュリティ上好ましくないため、一般的なURLを案内
+                fixUrl: firestoreUrl, 
+                message: '監査ログ機能を利用するには、Firestoreの複合インデックスが必要です。エラーログに記載されているURLにアクセスしてインデックスを作成してください。'
+            });
+        }
         res.status(500).json({ error: 'Failed to fetch audit logs.' });
     }
 });
 // ★★★★★【ここまで変更】★★★★★
-
 
 app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
@@ -1042,11 +1037,9 @@ client.once('ready', async () => {
 
     keepAlive();
 
-    // ランキングボードの初回更新を少し遅らせて、他の処理が完了するのを待つ
     setTimeout(() => updateRankboards(client), 10000);
     setInterval(() => updateRankboards(client), 5 * 60 * 1000);
 
-    // ステータス設定の読み込みとローテーション開始
     dynamicStatuses = await loadStatusSettings();
     startStatusRotation();
 
