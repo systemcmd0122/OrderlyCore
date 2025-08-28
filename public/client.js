@@ -169,6 +169,165 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>`;
         },
 
+        // ★★★★★【ここから変更】★★★★★
+        members: async () => {
+            pageTitle.textContent = 'メンバー管理';
+            pageContent.innerHTML = `
+                <div class="card">
+                    <div class="card-header"><h3>メンバー一覧</h3></div>
+                    <div class="filter-bar">
+                        <div class="form-group">
+                            <input type="text" id="member-search" placeholder="ユーザー名で検索...">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>ユーザー</th>
+                                    <th>ロール</th>
+                                    <th>参加日</th>
+                                    <th>統計</th>
+                                    <th>アクション</th>
+                                </tr>
+                            </thead>
+                            <tbody id="members-table-body">
+                                <tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+
+            const members = await api.get('/api/members');
+            const tableBody = document.getElementById('members-table-body');
+            
+            const renderTable = (filteredMembers) => {
+                if (filteredMembers.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">メンバーが見つかりません。</td></tr>';
+                    return;
+                }
+                tableBody.innerHTML = filteredMembers.map(member => `
+                    <tr data-member-id="${member.id}">
+                        <td>
+                            <div class="user-cell">
+                                <img src="${member.avatar}" alt="avatar">
+                                <div class="user-details">
+                                    <span class="display-name">${member.displayName}</span>
+                                    <span class="username">${member.username}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('')}</td>
+                        <td>${new Date(member.joinedAt).toLocaleDateString()}</td>
+                        <td>
+                            <div><i data-feather="message-square" style="width:1em;height:1em;"></i> ${member.messageCount.toLocaleString()}</div>
+                            <div><i data-feather="alert-triangle" style="width:1em;height:1em;"></i> ${member.warnCount}</div>
+                        </td>
+                        <td class="actions-cell">
+                            <button class="btn btn-secondary btn-small manage-roles-btn"><i data-feather="shield"></i></button>
+                            <button class="btn btn-danger btn-small kick-btn"><i data-feather="user-x"></i></button>
+                            <button class="btn btn-danger btn-small ban-btn"><i data-feather="x-octagon"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+                feather.replace();
+                addMemberActionListeners();
+            };
+
+            document.getElementById('member-search').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filtered = members.filter(m => 
+                    m.displayName.toLowerCase().includes(searchTerm) || 
+                    m.username.toLowerCase().includes(searchTerm)
+                );
+                renderTable(filtered);
+            });
+
+            renderTable(members);
+        },
+
+        auditLog: async () => {
+            pageTitle.textContent = '監査ログ';
+            pageContent.innerHTML = `
+                <div class="card">
+                    <div class="card-header"><h3>監査ログビューア</h3></div>
+                    <div class="filter-bar">
+                         <div class="form-group">
+                            <input type="text" id="log-user-search" placeholder="ユーザー名/タグで検索...">
+                        </div>
+                        <div class="form-group">
+                            <select id="log-type-filter">
+                                <option value="">すべてのアクション</option>
+                                <option value="MessageDelete">メッセージ削除</option>
+                                <option value="MessageUpdate">メッセージ編集</option>
+                                <option value="NicknameUpdate">ニックネーム変更</option>
+                                <option value="RoleAdd">ロール付与</option>
+                                <option value="RoleRemove">ロール剥奪</option>
+                            </select>
+                        </div>
+                    </div>
+                     <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>日時</th>
+                                    <th>アクション</th>
+                                    <th>実行者</th>
+                                    <th>対象</th>
+                                    <th>詳細</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-controls">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                        <span id="page-info" class="page-info"></span>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
+                    </div>
+                </div>
+            `;
+            initializeTomSelect('#log-type-filter');
+            
+            let currentPage = 1;
+            const fetchAndRenderLogs = async () => {
+                const user = document.getElementById('log-user-search').value;
+                const eventType = document.getElementById('log-type-filter').value;
+                document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>';
+                
+                const data = await api.get(`/api/audit-logs?page=${currentPage}&user=${user}&eventType=${eventType}`);
+                const { logs, totalPages } = data;
+                
+                const tableBody = document.getElementById('logs-table-body');
+                if(logs.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">ログが見つかりません。</td></tr>';
+                } else {
+                    tableBody.innerHTML = logs.map(log => `
+                        <tr>
+                            <td>${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
+                            <td>${log.eventType}</td>
+                            <td>${log.executorTag || 'N/A'}</td>
+                            <td>${log.targetTag || 'N/A'}</td>
+                            <td><pre>${JSON.stringify(log.details, null, 2)}</pre></td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+                document.getElementById('prev-page').disabled = currentPage <= 1;
+                document.getElementById('next-page').disabled = currentPage >= totalPages;
+            };
+
+            document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; fetchAndRenderLogs(); }};
+            document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderLogs(); };
+            document.getElementById('log-user-search').onchange = () => { currentPage = 1; fetchAndRenderLogs(); };
+            document.getElementById('log-type-filter').onchange = () => { currentPage = 1; fetchAndRenderLogs(); };
+
+            fetchAndRenderLogs();
+        },
+        // ★★★★★【ここまで変更】★★★★★
+
         analytics: async () => {
             pageTitle.textContent = 'アナリティクス';
             pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
@@ -970,6 +1129,90 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         // ★ 変更点：ここまで
     };
+
+    // ★★★★★【ここから変更】★★★★★
+    // --- Member Actions ---
+    const addMemberActionListeners = () => {
+        document.querySelectorAll('.manage-roles-btn').forEach(btn => btn.onclick = handleManageRoles);
+        document.querySelectorAll('.kick-btn').forEach(btn => btn.onclick = handleKickMember);
+        document.querySelectorAll('.ban-btn').forEach(btn => btn.onclick = handleBanMember);
+    };
+
+    const handleManageRoles = async (e) => {
+        const memberId = e.target.closest('tr').dataset.memberId;
+        const members = await api.get('/api/members');
+        const member = members.find(m => m.id === memberId);
+        
+        const modal = createModal(`ロール管理: ${member.displayName}`, `
+            <p><strong>現在のロール:</strong></p>
+            <div>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('') || 'なし'}</div>
+            <hr style="border-color: var(--border-color); margin: 20px 0;">
+            <div class="form-group">
+                <label>ロールを編集</label>
+                <select id="roles-select" multiple placeholder="ロールを選択...">
+                    ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                </select>
+            </div>`,
+            [{ id: 'save-roles', text: '保存', class: 'btn'}]
+        );
+        const select = initializeTomSelect('#roles-select', {
+            items: member.roles.map(r => r.id)
+        });
+        
+        document.getElementById('save-roles').onclick = async () => {
+            const selectedRoles = document.getElementById('roles-select').tomselect.getValue();
+            try {
+                await api.put(`/api/members/${memberId}/roles`, { roles: selectedRoles });
+                showMessage('ロールを更新しました。');
+                closeModal();
+                renderers.members(); // テーブルを再描画
+            } catch(error) {
+                showMessage('ロールの更新に失敗しました。', 'error');
+            }
+        };
+    };
+
+    const handleKickMember = (e) => {
+        const memberId = e.target.closest('tr').dataset.memberId;
+        createModal('メンバーをキック', `
+            <p>本当にこのメンバーをキックしますか？</p>
+            <div class="form-group" style="margin-top:15px;"><label>理由 (任意)</label><input type="text" id="kick-reason"></div>`,
+            [{ id: 'confirm-kick', text: 'キック', class: 'btn-danger'}]
+        );
+        document.getElementById('confirm-kick').onclick = async () => {
+            const reason = document.getElementById('kick-reason').value;
+            try {
+                await api.post(`/api/members/${memberId}/kick`, { reason });
+                showMessage('メンバーをキックしました。');
+                closeModal();
+                renderers.members();
+            } catch(error) {
+                showMessage('キックに失敗しました。', 'error');
+            }
+        };
+    };
+
+    const handleBanMember = (e) => {
+        const memberId = e.target.closest('tr').dataset.memberId;
+        createModal('メンバーをBAN', `
+            <p>本当にこのメンバーをサーバーからBANしますか？この操作は取り消せません。</p>
+            <div class="form-group" style="margin-top:15px;"><label>理由 (任意)</label><input type="text" id="ban-reason"></div>`,
+            [{ id: 'confirm-ban', text: 'BAN', class: 'btn-danger'}]
+        );
+        document.getElementById('confirm-ban').onclick = async () => {
+            const reason = document.getElementById('ban-reason').value;
+            try {
+                await api.post(`/api/members/${memberId}/ban`, { reason });
+                showMessage('メンバーをBANしました。');
+                closeModal();
+                renderers.members();
+            } catch(error) {
+                showMessage('BANに失敗しました。', 'error');
+            }
+        };
+    };
+    // ★★★★★【ここまで変更】★★★★★
+
 
     // --- Initialization ---
     const init = async () => {

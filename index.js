@@ -10,8 +10,8 @@ const cors = require('cors');
 const chalk = require('chalk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { initializeApp } = require('firebase/app');
-// limit を getDocs の隣に追加
-const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, Timestamp, orderBy, limit } = require('firebase/firestore');
+// limit, startAfter, endBefore, getCountFromServer を getDocs の隣に追加
+const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, Timestamp, orderBy, limit, startAfter, endBefore, getCountFromServer } = require('firebase/firestore');
 const { getDatabase, ref, set, get, remove } = require('firebase/database');
 const os = require('os'); // osモジュールを追加
 
@@ -236,6 +236,143 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
         res.status(404).json({ error: 'Guild not found or failed to fetch details.' });
     }
 });
+
+// ★★★★★【ここから変更】★★★★★
+// メンバー管理テーブル用APIエンドポイント
+app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guild = await client.guilds.fetch(req.session.guildId);
+        await guild.members.fetch(); //
+        const members = guild.members.cache;
+
+        // Firestoreから全メンバーの追加データを取得
+        const levelsRef = collection(db, 'levels');
+        const levelsQuery = query(levelsRef, where('guildId', '==', req.session.guildId));
+        const levelsSnapshot = await getDocs(levelsQuery);
+        const levelsData = new Map(levelsSnapshot.docs.map(doc => [doc.data().userId, doc.data()]));
+
+        const warningsRef = collection(db, 'warnings');
+        const warningsQuery = query(warningsRef, where('guildId', '==', req.session.guildId));
+        const warningsSnapshot = await getDocs(warningsQuery);
+        const warningsData = new Map();
+        warningsSnapshot.forEach(doc => {
+            const userId = doc.data().userId;
+            warningsData.set(userId, (warningsData.get(userId) || 0) + 1);
+        });
+
+        const memberList = members.map(member => {
+            const levelInfo = levelsData.get(member.id) || { messageCount: 0 };
+            return {
+                id: member.id,
+                avatar: member.user.displayAvatarURL(),
+                username: member.user.username,
+                displayName: member.displayName,
+                roles: member.roles.cache.filter(r => r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor })),
+                joinedAt: member.joinedTimestamp,
+                messageCount: levelInfo.messageCount,
+                warnCount: warningsData.get(member.id) || 0
+            };
+        });
+
+        res.json(memberList);
+    } catch (error) {
+        console.error('Error fetching member list:', error);
+        res.status(500).json({ error: 'Failed to fetch member list.' });
+    }
+});
+
+// メンバー管理アクション用APIエンドポイント
+app.post('/api/members/:memberId/kick', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guild = await client.guilds.fetch(req.session.guildId);
+        const member = await guild.members.fetch(req.params.memberId);
+        await member.kick(req.body.reason || '理由なし');
+        res.status(200).json({ message: 'Member kicked.' });
+    } catch (error) {
+        console.error('Error kicking member:', error);
+        res.status(500).json({ error: 'Failed to kick member.' });
+    }
+});
+
+app.post('/api/members/:memberId/ban', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guild = await client.guilds.fetch(req.session.guildId);
+        const member = await guild.members.fetch(req.params.memberId);
+        await member.ban({ reason: req.body.reason || '理由なし' });
+        res.status(200).json({ message: 'Member banned.' });
+    } catch (error) {
+        console.error('Error banning member:', error);
+        res.status(500).json({ error: 'Failed to ban member.' });
+    }
+});
+
+app.put('/api/members/:memberId/roles', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guild = await client.guilds.fetch(req.session.guildId);
+        const member = await guild.members.fetch(req.params.memberId);
+        await member.roles.set(req.body.roles);
+        res.status(200).json({ message: 'Roles updated.' });
+    } catch (error) {
+        console.error('Error updating roles:', error);
+        res.status(500).json({ error: 'Failed to update roles.' });
+    }
+});
+
+// 監査ログビューア用APIエンドポイント
+app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { eventType, user, page = 1, limit: pageLimit = 15 } = req.query;
+        const logsRef = collection(db, 'audit_logs');
+        let q = query(logsRef, where('guildId', '==', req.session.guildId));
+
+        if (eventType) {
+            q = query(q, where('eventType', '==', eventType));
+        }
+        if (user) {
+            // Firestore does not support OR queries on different fields in this way.
+            // We fetch and filter in the backend, which is less efficient but works for moderate scale.
+            // For larger scale, consider denormalizing data (e.g., an array of involved user IDs).
+        }
+
+        const countQuery = query(q); // Create a separate query for counting
+        const totalSnapshot = await getCountFromServer(countQuery);
+        const totalLogs = totalSnapshot.data().count;
+
+        q = query(q, orderBy('timestamp', 'desc'));
+
+        if (page > 1) {
+            const lastVisibleDocQuery = query(q, limit(pageLimit * (page - 1)));
+            const lastVisibleSnapshot = await getDocs(lastVisibleDocQuery);
+            const lastVisible = lastVisibleSnapshot.docs[lastVisibleSnapshot.docs.length - 1];
+            if (lastVisible) {
+                q = query(q, startAfter(lastVisible));
+            }
+        }
+        
+        q = query(q, limit(parseInt(pageLimit)));
+
+        const snapshot = await getDocs(q);
+        let logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Manual filter for user if provided
+        if (user) {
+            logs = logs.filter(log => log.executorTag?.includes(user) || log.targetTag?.includes(user));
+        }
+
+        res.json({
+            logs,
+            totalPages: Math.ceil(totalLogs / pageLimit),
+            currentPage: parseInt(page),
+            totalLogs
+        });
+
+    } catch (error) {
+        console.error('Error fetching audit logs:', error);
+        res.status(500).json({ error: 'Failed to fetch audit logs.' });
+    }
+});
+// ★★★★★【ここまで変更】★★★★★
+
 
 app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
