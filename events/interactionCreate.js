@@ -5,10 +5,18 @@ module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
         // 対応するインタラクションタイプでなければ早期リターン
-        if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isButton()) return;
+        // ★ 変更点: Buttonの処理を一旦削除（ticketSystem.jsに集約するため）
+        if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isModalSubmit() && !interaction.isButton()) return;
+
 
         // --- 1. スラッシュコマンドの処理 ---
         if (interaction.isChatInputCommand()) {
+            // ★ 変更点: feedbackコマンドはモーダルを出すため、ここの処理から除外
+            if (interaction.commandName === 'feedback') {
+                 const command = client.commands.get(interaction.commandName);
+                 if (command) await command.execute(interaction);
+                 return;
+            }
             const command = client.commands.get(interaction.commandName);
             if (!command) {
                 console.error(`❌ 未知のコマンド: ${interaction.commandName}`);
@@ -16,7 +24,7 @@ module.exports = {
                     await interaction.reply({
                         content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
                         ephemeral: true
-                    }).catch(() => {}); // エラー時は握りつぶす
+                    }).catch(() => {});
                 }
                 return;
             }
@@ -52,29 +60,28 @@ module.exports = {
             return;
         }
 
-        // --- 3. ボタンインタラクションの処理 ---
-        if (interaction.isButton()) {
-            // 先に応答を保留し、タイムアウト(Unknown Interaction)を防ぐ
-            await interaction.deferReply({ ephemeral: true });
-
-            try {
-                // ロールパネル用のボタンか判定
-                if (interaction.customId.startsWith('role_')) {
-                    await handleRoleButton(interaction, client);
-                }
-                // (他のボタン処理はここに 'else if' を追加)
-
-            } catch (error) {
-                console.error('❌ ボタンインタラクション処理中の包括的なエラー:', error);
-                const errorEmbed = new EmbedBuilder()
-                    .setColor(0xff0000)
-                    .setTitle('❌ システムエラー')
-                    .setDescription('予期しないエラーが発生しました。しばらく時間をおいてから再度お試しください。')
-                    .addFields({ name: 'エラーコード', value: error.code || 'N/A' });
-                
-                // deferReply後なので、必ずeditReplyで応答
-                await interaction.editReply({ embeds: [errorEmbed], ephemeral: true }).catch(console.error);
+        // --- 3. モーダル送信の処理 (フィードバック用) ---
+        if (interaction.isModalSubmit()) {
+            if (interaction.customId === 'feedback_modal') {
+                 const command = client.commands.get('feedback');
+                 if(command) await command.execute(interaction);
             }
+            return;
+        }
+
+        // --- 4. ボタンインタラクションの処理 (ロールパネル用) ---
+        if (interaction.isButton()) {
+            // ★ 変更点: チケット関連はticketSystem.jsに任せ、ここではロールパネルのみを処理
+            if (interaction.customId.startsWith('role_')) {
+                await interaction.deferReply({ ephemeral: true });
+                try {
+                    await handleRoleButton(interaction, client);
+                } catch (error) {
+                     console.error('❌ ロールボタン処理エラー:', error);
+                     await interaction.editReply({ content: '❌ ロール操作中にエラーが発生しました。', ephemeral: true }).catch(console.error);
+                }
+            }
+            // 他のボタン（チケットなど）はそれぞれの専用ハンドラで処理される
         }
     }
 };
@@ -86,9 +93,8 @@ module.exports = {
  */
 async function handleRoleButton(interaction, client) {
     const roleId = interaction.customId.split('_')[1];
-    const { guild, member, user } = interaction;
+    const { guild, member } = interaction;
 
-    // --- 安全性チェック ---
     const role = guild.roles.cache.get(roleId);
     if (!role) {
         return await interaction.editReply({ content: '❌ このロールはサーバーに存在しないため、操作できません。' });
@@ -96,14 +102,13 @@ async function handleRoleButton(interaction, client) {
 
     const botMember = guild.members.me;
     if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        return await interaction.editReply({ content: '❌ ボットにロールを管理する権限がありません。サーバー管理者にご連絡ください。' });
+        return await interaction.editReply({ content: '❌ ボットにロールを管理する権限がありません。' });
     }
 
     if (role.position >= botMember.roles.highest.position) {
         return await interaction.editReply({ content: '❌ このロールはボットより上位のため、操作できません。' });
     }
 
-    // --- ロール付与・削除処理 ---
     const hasRole = member.roles.cache.has(roleId);
     let embed;
 
@@ -113,25 +118,16 @@ async function handleRoleButton(interaction, client) {
             .setColor(0xff6b6b)
             .setTitle('🗑️ ロールを削除しました')
             .setDescription(`**${role.name}** ロールをあなたから削除しました。`);
-        console.log(`🔄 ロール削除: ${member.user.tag} から ${role.name} を削除`);
     } else {
         await member.roles.add(role);
         embed = new EmbedBuilder()
             .setColor(0x4caf50)
             .setTitle('✅ ロールを付与しました')
             .setDescription(`**${role.name}** ロールをあなたに付与しました。`);
-        console.log(`🔄 ロール付与: ${member.user.tag} に ${role.name} を付与`);
     }
     
-    // 現在のロール数を表示
     const userRoleCount = member.roles.cache.filter(r => r.id !== guild.id).size;
-    embed.addFields([
-        {
-            name: '📊 現在の状況',
-            value: `あなたが持っているロール数: **${userRoleCount}個**`,
-            inline: false
-        }
-    ]);
+    embed.addFields({ name: '📊 現在のロール数', value: `**${userRoleCount}個**` });
 
     await interaction.editReply({ embeds: [embed] });
 }
