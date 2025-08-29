@@ -280,3 +280,11 @@ input:checked + .slider:before { background-color: white; transform: translateX(
     .add-role-grid .add-role-btn-wrapper { grid-column: 1; }
     .add-role-grid .btn { width: 100%; }
 }
+
+/* --- Persona Templates --- */
+.persona-templates-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}

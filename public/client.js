@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-cf1a61a3cde5488b9069c3d045c3c65a4f6f98bc/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM elements
     const loader = document.getElementById('loader');
@@ -703,6 +704,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             const settings = await api.get('/api/settings/guild_settings');
             settingsCache['guild_settings'] = settings;
             const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
+            // ペルソナテンプレートの定義
+            const personaTemplates = [
+                {
+                    name: '🐱 猫アシスタント',
+                    prompt: 'あなたは「Overseer」という名前の、猫になりきっているアシスタントAIです。\n' +
+                            '# あなたの役割\n' +
+                            '- 語尾には必ず「にゃん」や「にゃ」をつけてください。\n' +
+                            '- 一人称は「吾輩」です。\n' +
+                            '- ユーザーのことは「ご主人様」と呼んでください。\n' +
+                            '- 少し気まぐれですが、親切に回答してください。'
+                },
+                {
+                    name: '🤖 執事AI',
+                    prompt: 'あなたは「Overseer」という名前の、非常に丁寧で有能な執事AIです。\n' +
+                            '# あなたの役割\n' +
+                            '- 常に敬語を使い、丁寧な言葉遣いを徹底してください。\n' +
+                            '- 一人称は「私（わたくし）」です。\n' +
+                            '- ユーザーのことは「様」付けで呼んでください。（例: 〇〇様）\n' +
+                            '- どんな質問にも冷静沈着かつ的確に答えてください。'
+                },
+                {
+                    name: '⚔️ 武士',
+                    prompt: 'あなたは「Overseer」という名前の、古風な武士のようなAIです。\n' +
+                            '# あなたの役割\n' +
+                            '- 語尾は「～でござる」「～せぬか？」など、武士のような口調にしてください。\n' +
+                            '- 一人称は「拙者」です。\n' +
+                            '- ユーザーのことは「殿」と呼んでください。\n' +
+                            '- 義理堅く、誠実に回答してください。'
+                },
+                {
+                    name: '🤪 陽気な相棒',
+                    prompt: 'あなたは「Overseer」という名前の、非常に陽気でフレンドリーなAIです。\n' +
+                            '# あなたの役割\n' +
+                            '- 明るく、タメ口のような親しみやすい口調で話してください。\n' +
+                            '- 一人称は「オレ」です。\n' +
+                            '- ユーザーのことは呼び捨てか「相棒」と呼んでください。\n' +
+                            '- 時々ジョークを交えながら、楽しく会話を盛り上げてください。'
+                }
+            ];
+
             pageContent.innerHTML = `
                 <form id="ai-form">
                     <div class="card">
@@ -723,11 +764,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <textarea id="aiPersonalityPrompt" rows="8" placeholder="例：あなたは猫のキャラクターです。語尾に「にゃん」を付けてください。">${aiConfig.aiPersonalityPrompt || ''}</textarea>
                             <p class="form-hint">AIの性格や口調を指定できます。空欄の場合はフレンドリーなアシスタントになります。</p>
                         </div>
+                        
+                        <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
+                            <label>ペルソナ設定アシスタント</label>
+                            <p class="form-hint">クリックすると、テンプレートを上のテキストエリアに挿入します。</p>
+                            <div id="persona-templates" class="persona-templates-container">
+                                ${personaTemplates.map(template => `<button type="button" class="btn btn-secondary btn-small" data-prompt="${template.prompt.replace(/"/g, '&quot;')}">${template.name}</button>`).join('')}
+                            </div>
+                        </div>
+
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
+
+            // ペルソナテンプレートボタンにイベントリスナーを追加
+            document.querySelectorAll('#persona-templates button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const prompt = button.getAttribute('data-prompt');
+                    const textarea = document.getElementById('aiPersonalityPrompt');
+                    textarea.value = prompt;
+                    // 変更を検知させるためのイベントを発火
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
             document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#ai-form'); // ★ 変更点
+            trackChanges('#ai-form');
         },
     };
 
