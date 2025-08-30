@@ -610,6 +610,100 @@ document.addEventListener('DOMContentLoaded', async () => {
             trackChanges('#logging-form'); // ★ 変更点
         },
 
+        'vc-log': async () => {
+            pageTitle.textContent = 'VCログ設定';
+            const settings = await api.get('/api/settings/guild_settings');
+            settingsCache['guild_settings'] = settings;
+            let mappings = settings.voiceChannelMappings || {};
+
+            const renderMappings = () => {
+                const listEl = document.getElementById('vc-log-mapping-list');
+                if (Object.keys(mappings).length === 0) {
+                    listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">まだVCログ設定がありません。</p>';
+                    return;
+                }
+                listEl.innerHTML = Object.entries(mappings).map(([vcId, tcId]) => {
+                    const vc = guildInfo.channels.find(c => c.id === vcId);
+                    const tc = guildInfo.channels.find(c => c.id === tcId);
+                    if (!vc || !tc) return ''; // チャンネルが存在しない場合は表示しない
+                    return `
+                        <div class="vc-log-mapping-item" data-vc-id="${vcId}">
+                            <div class="vc-log-mapping-channels">
+                                <div class="channel-name"><i data-feather="mic"></i><span>${vc.name}</span></div>
+                                <i data-feather="arrow-right"></i>
+                                <div class="channel-name"><i data-feather="message-square"></i><span>${tc.name}</span></div>
+                            </div>
+                            <button class="btn btn-danger btn-small remove-mapping-btn">&times;</button>
+                        </div>
+                    `;
+                }).join('');
+                feather.replace();
+                listEl.querySelectorAll('.remove-mapping-btn').forEach(btn => {
+                    btn.onclick = (e) => {
+                        const vcId = e.target.closest('.vc-log-mapping-item').dataset.vcId;
+                        delete mappings[vcId];
+                        renderMappings();
+                        isDirty = true;
+                    };
+                });
+            };
+
+            pageContent.innerHTML = `
+                <form id="vc-log-form">
+                    <div class="card">
+                        <div class="card-header"><h3>現在の設定</h3></div>
+                        <div id="vc-log-mapping-list" class="vc-log-mapping-list"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>新しい設定を追加</h3></div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="voice-channel-select">ボイスチャンネル</label>
+                                <select id="voice-channel-select" placeholder="VCを選択..."></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="text-channel-select">ログ送信先チャンネル</label>
+                                <select id="text-channel-select" placeholder="TCを選択..."></select>
+                            </div>
+                        </div>
+                        <button type="button" id="add-mapping-btn" class="btn btn-secondary">マッピングを追加</button>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>`;
+
+            const voiceChannels = guildInfo.channels.filter(c => c.type === 2);
+            const textChannels = guildInfo.channels.filter(c => c.type === 0);
+            
+            initializeTomSelect('#voice-channel-select', { options: voiceChannels.map(c => ({ value: c.id, text: c.name })) });
+            initializeTomSelect('#text-channel-select', { options: textChannels.map(c => ({ value: c.id, text: c.name })) });
+            
+            renderMappings();
+
+            document.getElementById('add-mapping-btn').onclick = () => {
+                const vcSelect = document.getElementById('voice-channel-select').tomselect;
+                const tcSelect = document.getElementById('text-channel-select').tomselect;
+                const vcId = vcSelect.getValue();
+                const tcId = tcSelect.getValue();
+
+                if (!vcId || !tcId) {
+                    showMessage('両方のチャンネルを選択してください。', 'error');
+                    return;
+                }
+                mappings[vcId] = tcId;
+                renderMappings();
+                vcSelect.clear();
+                tcSelect.clear();
+                isDirty = true;
+            };
+
+            document.getElementById('vc-log-form').addEventListener('submit', (e) => {
+                 e.preventDefault();
+                 handleFormSubmit(e, { voiceChannelMappings: mappings });
+            });
+            trackChanges('#vc-log-form');
+        },
+
+
         leveling: async () => {
             pageTitle.textContent = 'レベリング設定';
             const settings = await api.get('/api/settings/guild_settings');

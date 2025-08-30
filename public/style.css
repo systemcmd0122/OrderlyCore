@@ -77,6 +77,15 @@ body {
 .server-icon { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--border-color); margin-bottom: 10px; }
 .server-info h2 { font-size: 1.2em; font-weight: 500; }
 .sidebar-nav { flex-grow: 1; overflow-y: auto; }
+.nav-category {
+    font-family: var(--font-mono);
+    color: var(--text-muted-color);
+    font-size: 0.8em;
+    padding: 15px 15px 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+}
 .nav-item { display: flex; align-items: center; padding: 12px 15px; color: var(--text-muted-color); text-decoration: none; border-radius: 6px; margin-bottom: 5px; transition: all var(--transition-speed) ease; border-left: 3px solid transparent; }
 .nav-item i { width: 20px; height: 20px; margin-right: 15px; }
 .nav-item:hover { background-color: var(--surface-color); color: var(--text-color); }
@@ -287,4 +296,33 @@ input:checked + .slider:before { background-color: white; transform: translateX(
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 10px;
+}
+
+/* VC Log Settings Specific Styles */
+.vc-log-mapping-list {
+    display: grid;
+    gap: 15px;
+}
+
+.vc-log-mapping-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--surface-light-color);
+    padding: 15px 20px;
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--primary-color);
+}
+
+.vc-log-mapping-channels {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-family: var(--font-mono);
+}
+
+.vc-log-mapping-channels .channel-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
