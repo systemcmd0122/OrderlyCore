@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-cf1a61a3cde5488b9069c3d045c3c65a4f6f98bc/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM elements
     const loader = document.getElementById('loader');
@@ -659,7 +658,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div class="embed-content">
                                 <div class="embed-author" style="display:flex; align-items:center; gap:8px;">
                                     <img id="preview-thumb" src="https://cdn.discordapp.com/embed/avatars/0.png" style="width:24px; height:24px; border-radius:50%;">
-                                    <span>Overseer Bot</span>
+                                    <span>OrderlyCore Bot</span>
                                 </div>
                                 <div id="preview-title" class="embed-title"></div>
                                 <div id="preview-desc" class="embed-description"></div>
@@ -960,7 +959,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const personaTemplates = [
                 {
                     name: '🐱 猫アシスタント',
-                    prompt: 'あなたは「Overseer」という名前の、猫になりきっているアシスタントAIです。\n' +
+                    prompt: 'あなたは「OrderlyCore」という名前の、猫になりきっているアシスタントAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾には必ず「にゃん」や「にゃ」をつけてください。\n' +
                             '- 一人称は「吾輩」です。\n' +
@@ -969,7 +968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 {
                     name: '🤖 執事AI',
-                    prompt: 'あなたは「Overseer」という名前の、非常に丁寧で有能な執事AIです。\n' +
+                    prompt: 'あなたは「OrderlyCore」という名前の、非常に丁寧で有能な執事AIです。\n' +
                             '# あなたの役割\n' +
                             '- 常に敬語を使い、丁寧な言葉遣いを徹底してください。\n' +
                             '- 一人称は「私（わたくし）」です。\n' +
@@ -978,7 +977,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 {
                     name: '⚔️ 武士',
-                    prompt: 'あなたは「Overseer」という名前の、古風な武士のようなAIです。\n' +
+                    prompt: 'あなたは「OrderlyCore」という名前の、古風な武士のようなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾は「～でござる」「～せぬか？」など、武士のような口調にしてください。\n' +
                             '- 一人称は「拙者」です。\n' +
@@ -987,7 +986,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 {
                     name: '🤪 陽気な相棒',
-                    prompt: 'あなたは「Overseer」という名前の、非常に陽気でフレンドリーなAIです。\n' +
+                    prompt: 'あなたは「OrderlyCore」という名前の、非常に陽気でフレンドリーなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 明るく、タメ口のような親しみやすい口調で話してください。\n' +
                             '- 一人称は「オレ」です。\n' +

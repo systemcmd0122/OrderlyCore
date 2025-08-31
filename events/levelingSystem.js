@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-edf92c132aa35d74ac5604639bc1887818817546/events/levelingSystem.js
 const { Events, EmbedBuilder, PermissionsBitField } = require('discord.js');
 const { doc, getDoc, setDoc, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');

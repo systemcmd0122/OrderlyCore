@@ -5,7 +5,7 @@ const chalk = require('chalk');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('feedback')
-        .setDescription('Overseerに関するフィードバックや不具合報告を開発者に送信します。'),
+        .setDescription('OrderlyCoreに関するフィードバックや不具合報告を開発者に送信します。'),
 
     async execute(interaction) {
         const modal = new ModalBuilder()

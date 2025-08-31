@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-0bf111bc7d4cbe93c0063e5af9df0630e3d9374e/index.js
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const fs = require('node:fs');
@@ -148,7 +147,7 @@ function keepAlive() {
 
             const response = await fetch(url, {
                 signal: controller.signal,
-                headers: { 'User-Agent': `Overseer-Bot/${require('./package.json').version}` }
+                headers: { 'User-Agent': `OrderlyCore-Bot/${require('./package.json').version}` }
             });
 
             clearTimeout(timeout);
@@ -875,7 +874,7 @@ async function deployCommands() {
 async function generateAIStatus() {
     try {
         const userCount = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
-        const prompt = `あなたは「Overseer」という名前のDiscordボットです。あなたの現在のユニークで面白いステータスを生成してください。
+        const prompt = `あなたは「OrderlyCore」という名前のDiscordボットです。あなたの現在のユニークで面白いステータスを生成してください。
 
 # 指示
 - サーバー数 (${client.guilds.cache.size}個) や、総ユーザー数 (${userCount}人) などの動的な情報を含めることができます。

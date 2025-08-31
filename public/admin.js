@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                            <div class="form-group"><label for="color">色 (16進数)</label><input type="text" id="color" value="#3498db"></div>
                            <div class="form-group"><label for="url">URL</label><input type="text" id="url" placeholder="https://..."></div>
                         </div>
-                        <div class="form-group"><label for="footer">フッター</label><input type="text" id="footer" value="Overseerからのお知らせ"></div>
+                        <div class="form-group"><label for="footer">フッター</label><input type="text" id="footer" value="OrderlyCoreからのお知らせ"></div>
                     </div>
                     <button type="submit" class="btn">プレビューして送信確認</button>
                 </form>

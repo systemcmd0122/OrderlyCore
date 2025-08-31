@@ -19,7 +19,7 @@ async function generateChatResponse(client, message, aiConfig) {
             return 'こんにちは！何か御用でしょうか？';
         }
 
-        const personalityPrompt = aiConfig.aiPersonalityPrompt || `あなたは「Overseer」という名前の、親しみやすく有能なDiscordアシスタントAIです。ユーザーとの自然な対話をしてください。
+        const personalityPrompt = aiConfig.aiPersonalityPrompt || `あなたは「OrderlyCore」という名前の、親しみやすく有能なDiscordアシスタントAIです。ユーザーとの自然な対話をしてください。
 
 # あなたの役割
 - ユーザーの発言に対して、フレンドリーかつ的確に返答してください。
@@ -33,7 +33,7 @@ async function generateChatResponse(client, message, aiConfig) {
 ${personalityPrompt}
 
 ### 厳格なルール
-- あなた自身の名前は「Overseer」です。一人称はペルソナ設定に従ってください。
+- あなた自身の名前は「OrderlyCore」です。一人称はペルソナ設定に従ってください。
 - 回答は自然な日本語の会話口調で、親しみやすくしてください。
 - ユーザーへの敬称は「さん」付けを基本としますが、ペルソナ設定に別指示があればそちらを優先してください。
 - 回答は**200文字以内**の簡潔な文章にまとめてください。

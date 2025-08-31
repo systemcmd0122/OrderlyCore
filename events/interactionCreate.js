@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-0bf111bc7d4cbe93c0063e5af9df0630e3d9374e/events/interactionCreate.js
 const { InteractionResponseFlags } = require('discord.js');
 
 module.exports = {

@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-394ca3129fcc24030a0ae314b6b57cd13daba62c/commands/rank.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, getDoc } = require('firebase/firestore');
 

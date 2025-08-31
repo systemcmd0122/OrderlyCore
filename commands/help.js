@@ -51,7 +51,7 @@ module.exports = {
 
         const helpEmbed = new EmbedBuilder()
             .setColor(0x5865F2)
-            .setTitle('🤖 Overseer コマンドヘルプ')
+            .setTitle('🤖 OrderlyCore コマンドヘルプ')
             .setDescription('`/` を入力すると、各コマンドの詳細な説明が表示されます。')
             .setThumbnail(interaction.client.user.displayAvatarURL())
             .addFields(
