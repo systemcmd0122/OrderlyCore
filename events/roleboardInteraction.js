@@ -1,5 +1,4 @@
-// systemcmd0122/overseer/overseer-0bf111bc7d4cbe93c0063e5af9df0630e3d9374e/events/roleboardInteraction.js
-const { Events, EmbedBuilder, PermissionFlagsBits, InteractionResponseFlags } = require('discord.js');
+const { Events, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
 /**
  * ロールパネルのボタンが押された際の処理
@@ -11,8 +10,7 @@ async function handleRoleButton(interaction, client) {
     const { guild, member } = interaction;
 
     try {
-        // Ephemeral（一時的）な応答を保留する
-        await interaction.deferReply({ flags: InteractionResponseFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
 
         const role = await guild.roles.fetch(roleId);
         if (!role) {
