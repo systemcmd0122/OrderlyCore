@@ -193,7 +193,6 @@ input:checked + .slider:before { background-color: white; transform: translateX(
     grid-column: 2; /* Place button in the second column */
 }
 
-/* ★★★★★【ここから変更】★★★★★ */
 /* --- Members Page & Audit Log Styles --- */
 .table-container {
     overflow-x: auto;
@@ -210,6 +209,20 @@ input:checked + .slider:before { background-color: white; transform: translateX(
 .styled-table th, .styled-table td {
     padding: 12px 15px;
     border-bottom: 1px solid var(--border-color);
+}
+.styled-table th {
+    cursor: pointer;
+    position: relative;
+}
+.styled-table th:hover {
+    background-color: var(--surface-light-color);
+}
+.styled-table th .sort-indicator {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.5;
 }
 .styled-table tbody tr {
     transition: background-color var(--transition-speed) ease;
@@ -250,14 +263,13 @@ input:checked + .slider:before { background-color: white; transform: translateX(
     margin-right: 5px;
 }
 .filter-bar {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 15px;
     margin-bottom: 20px;
 }
 .filter-bar .form-group {
     margin-bottom: 0;
-    flex-grow: 1;
 }
 .pagination-controls {
     display: flex;
@@ -269,7 +281,70 @@ input:checked + .slider:before { background-color: white; transform: translateX(
 .pagination-controls .page-info {
     font-family: var(--font-mono);
 }
-/* ★★★★★【ここまで変更】★★★★★ */
+.log-details {
+    font-size: 0.9em;
+    color: var(--text-muted-color);
+}
+.log-details strong {
+    color: var(--text-color);
+}
+.log-details .log-content {
+    background-color: #010409;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 5px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* --- Analytics Page Styles --- */
+.chart-container {
+    position: relative;
+    height: 400px;
+    width: 100%;
+}
+
+/* --- Welcome Message Preview --- */
+.welcome-message-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+.discord-embed-preview {
+    background-color: #2b2d31;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #dbdee1;
+}
+.discord-embed-preview .embed-sidebar {
+    width: 4px;
+    background-color: var(--primary-color);
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.discord-embed-preview .embed-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.discord-embed-preview .embed-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: white;
+}
+.discord-embed-preview .embed-description {
+    white-space: pre-wrap;
+}
+.discord-embed-preview .embed-thumbnail {
+    margin-top: 10px;
+    max-width: 80px;
+    max-height: 80px;
+    border-radius: 6px;
+}
 
 /* Responsive Design */
 .menu-toggle-btn { display: none; background: none; border: none; color: var(--text-color); cursor: pointer; padding: 5px; }
@@ -288,6 +363,7 @@ input:checked + .slider:before { background-color: white; transform: translateX(
     .add-role-grid { grid-template-columns: 1fr; }
     .add-role-grid .add-role-btn-wrapper { grid-column: 1; }
     .add-role-grid .btn { width: 100%; }
+    .welcome-message-layout { grid-template-columns: 1fr; }
 }
 
 /* --- Persona Templates --- */

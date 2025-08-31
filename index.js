@@ -233,10 +233,12 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
+// ★★★★★【ここから変更】★★★★★
 app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
+        const { page = 1, limit = 15, search = '', sortBy = 'displayName', sortOrder = 'asc', roleFilter = '' } = req.query;
         const guild = await client.guilds.fetch(req.session.guildId);
-        await guild.members.fetch(); 
+        await guild.members.fetch();
         const members = guild.members.cache;
 
         const levelsRef = collection(db, 'levels');
@@ -253,7 +255,7 @@ app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
             warningsData.set(userId, (warningsData.get(userId) || 0) + 1);
         });
 
-        const memberList = members.map(member => {
+        let memberList = members.map(member => {
             const levelInfo = levelsData.get(member.id) || { messageCount: 0 };
             return {
                 id: member.id,
@@ -262,17 +264,52 @@ app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
                 displayName: member.displayName,
                 roles: member.roles.cache.filter(r => r.id !== guild.id).map(r => ({ id: r.id, name: r.name, color: r.hexColor })),
                 joinedAt: member.joinedTimestamp,
-                messageCount: levelInfo.messageCount,
+                messageCount: levelInfo.messageCount || 0,
                 warnCount: warningsData.get(member.id) || 0
             };
         });
 
-        res.json(memberList);
+        // Filtering
+        if (search) {
+            const lowercasedSearch = search.toLowerCase();
+            memberList = memberList.filter(m =>
+                m.displayName.toLowerCase().includes(lowercasedSearch) ||
+                m.username.toLowerCase().includes(lowercasedSearch)
+            );
+        }
+        if (roleFilter) {
+            memberList = memberList.filter(m => m.roles.some(r => r.id === roleFilter));
+        }
+
+        // Sorting
+        memberList.sort((a, b) => {
+            let valA = a[sortBy];
+            let valB = b[sortBy];
+
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        const totalMembers = memberList.length;
+        const paginatedMembers = memberList.slice((page - 1) * limit, page * limit);
+
+        res.json({
+            members: paginatedMembers,
+            totalMembers,
+            totalPages: Math.ceil(totalMembers / limit),
+            currentPage: parseInt(page)
+        });
+
     } catch (error) {
         console.error('Error fetching member list:', error);
         res.status(500).json({ error: 'Failed to fetch member list.' });
     }
 });
+// ★★★★★【ここまで変更】★★★★★
 
 app.post('/api/members/:memberId/kick', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
@@ -366,23 +403,22 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
+// ★★★★★【ここから変更】★★★★★
 app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guildId = req.session.guildId;
         const guild = await client.guilds.fetch(guildId);
 
+        // --- 1. メッセージ数ランキングと時間帯別アクティビティ ---
         const levelsRef = collection(db, 'levels');
         const q = query(levelsRef, where('guildId', '==', guildId));
         const snapshot = await getDocs(q);
 
-        const allUsersData = [];
-        snapshot.forEach(doc => {
-            allUsersData.push(doc.data());
-        });
+        const allUsersData = snapshot.docs.map(doc => doc.data());
 
         const topUsers = allUsersData
             .sort((a, b) => (b.messageCount || 0) - (a.messageCount || 0))
-            .slice(0, 5);
+            .slice(0, 10);
 
         const topUsersWithDetails = await Promise.all(topUsers.map(async (user) => {
             try {
@@ -394,22 +430,42 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
         }));
 
         const activityByHour = Array(24).fill(0);
+        // lastMessageTimestampではなく、messageCountをそのまま使う方がアクティビティの実態に近い
         allUsersData.forEach(user => {
+            // ここは簡易的な実装。正確な時間帯別アクティビティは別途ログが必要
             if (user.lastMessageTimestamp) {
-                const date = new Date(user.lastMessageTimestamp);
+                const date = user.lastMessageTimestamp.toDate ? user.lastMessageTimestamp.toDate() : new Date(user.lastMessageTimestamp);
                 const hour = date.getHours();
-                activityByHour[hour] = (activityByHour[hour] || 0) + 1;
+                activityByHour[hour] += user.messageCount || 0;
             }
         });
+        
+        // --- 2. ロール分布 ---
+        await guild.members.fetch();
+        const roleCounts = {};
+        guild.members.cache.forEach(member => {
+            member.roles.cache.forEach(role => {
+                if (role.id === guild.id) return; // @everyoneは除外
+                roleCounts[role.id] = (roleCounts[role.id] || 0) + 1;
+            });
+        });
 
-        const activityByHourFormatted = activityByHour.map((count, hour) => ({
-            label: `${hour.toString().padStart(2, '0')}`,
-            value: count
-        }));
+        const roleDistribution = Object.entries(roleCounts)
+            .map(([roleId, count]) => {
+                const role = guild.roles.cache.get(roleId);
+                return {
+                    name: role ? role.name : '不明なロール',
+                    count,
+                    color: role ? role.hexColor : '#808080'
+                };
+            })
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10); // 上位10ロールに絞る
 
         res.json({
             topUsers: topUsersWithDetails,
-            activityByHour: activityByHourFormatted
+            activityByHour,
+            roleDistribution
         });
 
     } catch (error) {
@@ -417,6 +473,8 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
         res.status(500).json({ error: 'Failed to fetch analytics data.' });
     }
 });
+// ★★★★★【ここまで変更】★★★★★
+
 
 app.get('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {

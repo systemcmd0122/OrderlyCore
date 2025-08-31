@@ -12,7 +12,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let guildInfo = null;
     let settingsCache = {};
-    let isDirty = false; // ★ 変更点：未保存の変更を追跡するフラグ
+    let isDirty = false;
+    let currentChart = null; // To hold the Chart.js instance
 
     // --- Utility Functions ---
 
@@ -63,7 +64,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Modal creation function
     const createModal = (title, content, footerButtons) => {
-        // 既存のモーダルを削除
         closeModal();
         document.querySelector('#modal-container').innerHTML = `
             <div class="modal-backdrop">
@@ -114,7 +114,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
     
-    // ★ 変更点：変更を追跡する関数
     const trackChanges = (formSelector) => {
         const form = document.querySelector(formSelector);
         if (form) {
@@ -123,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log('Changes detected, isDirty set to true.');
             };
             form.addEventListener('input', setDirty);
-            form.addEventListener('change', setDirty); // for selects, checkboxes
+            form.addEventListener('change', setDirty);
         }
     };
 
@@ -178,81 +177,136 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <div class="card-header"><h3>メンバー一覧</h3></div>
                     <div class="filter-bar">
                         <div class="form-group">
-                            <input type="text" id="member-search" placeholder="ユーザー名で検索...">
+                             <label for="member-search">ユーザー検索</label>
+                            <input type="text" id="member-search" placeholder="名前で検索...">
+                        </div>
+                        <div class="form-group">
+                             <label for="role-filter">ロールで絞り込み</label>
+                            <select id="role-filter" placeholder="ロールを選択...">
+                                <option value="">すべてのロール</option>
+                                ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                            </select>
                         </div>
                     </div>
                     <div class="table-container">
                         <table class="styled-table">
                             <thead>
                                 <tr>
-                                    <th>ユーザー</th>
+                                    <th data-sort="displayName">ユーザー <span class="sort-indicator"></span></th>
                                     <th>ロール</th>
-                                    <th>参加日</th>
-                                    <th>統計</th>
+                                    <th data-sort="joinedAt">参加日 <span class="sort-indicator"></span></th>
+                                    <th data-sort="messageCount">統計 <span class="sort-indicator"></span></th>
                                     <th>アクション</th>
                                 </tr>
                             </thead>
-                            <tbody id="members-table-body">
-                                <tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>
-                            </tbody>
+                            <tbody id="members-table-body"></tbody>
                         </table>
                     </div>
+                    <div class="pagination-controls">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                        <span id="page-info" class="page-info"></span>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
+                    </div>
                 </div>`;
+            initializeTomSelect('#role-filter');
 
-            const members = await api.get('/api/members');
-            const tableBody = document.getElementById('members-table-body');
+            let currentPage = 1;
+            let currentSort = { by: 'displayName', order: 'asc' };
             
-            const renderTable = (filteredMembers) => {
-                if (filteredMembers.length === 0) {
+            const fetchAndRenderMembers = async () => {
+                const search = document.getElementById('member-search').value;
+                const roleFilter = document.getElementById('role-filter').value;
+                document.getElementById('members-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>';
+
+                const data = await api.get(`/api/members?page=${currentPage}&search=${search}&sortBy=${currentSort.by}&sortOrder=${currentSort.order}&roleFilter=${roleFilter}`);
+                const { members, totalPages } = data;
+                
+                const tableBody = document.getElementById('members-table-body');
+                if (members.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">メンバーが見つかりません。</td></tr>';
-                    return;
-                }
-                tableBody.innerHTML = filteredMembers.map(member => `
-                    <tr data-member-id="${member.id}">
-                        <td>
-                            <div class="user-cell">
-                                <img src="${member.avatar}" alt="avatar">
-                                <div class="user-details">
-                                    <span class="display-name">${member.displayName}</span>
-                                    <span class="username">${member.username}</span>
+                } else {
+                    tableBody.innerHTML = members.map(member => `
+                        <tr data-member-id="${member.id}">
+                            <td>
+                                <div class="user-cell">
+                                    <img src="${member.avatar}" alt="avatar">
+                                    <div class="user-details">
+                                        <span class="display-name">${member.displayName}</span>
+                                        <span class="username">${member.username}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </td>
-                        <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('')}</td>
-                        <td>${new Date(member.joinedAt).toLocaleDateString()}</td>
-                        <td>
-                            <div><i data-feather="message-square" style="width:1em;height:1em;"></i> ${member.messageCount.toLocaleString()}</div>
-                            <div><i data-feather="alert-triangle" style="width:1em;height:1em;"></i> ${member.warnCount}</div>
-                        </td>
-                        <td class="actions-cell">
-                            <button class="btn btn-secondary btn-small manage-roles-btn"><i data-feather="shield"></i></button>
-                            <button class="btn btn-danger btn-small kick-btn"><i data-feather="user-x"></i></button>
-                            <button class="btn btn-danger btn-small ban-btn"><i data-feather="x-octagon"></i></button>
-                        </td>
-                    </tr>
-                `).join('');
+                            </td>
+                            <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('')}</td>
+                            <td>${new Date(member.joinedAt).toLocaleDateString()}</td>
+                            <td>
+                                <div><i data-feather="message-square" style="width:1em;height:1em;"></i> ${member.messageCount.toLocaleString()}</div>
+                                <div><i data-feather="alert-triangle" style="width:1em;height:1em;"></i> ${member.warnCount}</div>
+                            </td>
+                            <td class="actions-cell">
+                                <button class="btn btn-secondary btn-small manage-roles-btn"><i data-feather="shield"></i></button>
+                                <button class="btn btn-danger btn-small kick-btn"><i data-feather="user-x"></i></button>
+                                <button class="btn btn-danger btn-small ban-btn"><i data-feather="x-octagon"></i></button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
                 feather.replace();
                 addMemberActionListeners();
+
+                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+                document.getElementById('prev-page').disabled = currentPage <= 1;
+                document.getElementById('next-page').disabled = currentPage >= totalPages;
             };
 
-            document.getElementById('member-search').addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                const filtered = members.filter(m => 
-                    m.displayName.toLowerCase().includes(searchTerm) || 
-                    m.username.toLowerCase().includes(searchTerm)
-                );
-                renderTable(filtered);
+            document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; fetchAndRenderMembers(); }};
+            document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderMembers(); };
+            document.getElementById('member-search').oninput = () => { currentPage = 1; fetchAndRenderMembers(); };
+            document.getElementById('role-filter').onchange = () => { currentPage = 1; fetchAndRenderMembers(); };
+            
+            document.querySelectorAll('.styled-table thead th[data-sort]').forEach(th => {
+                th.onclick = () => {
+                    const sortBy = th.dataset.sort;
+                    if (currentSort.by === sortBy) {
+                        currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.by = sortBy;
+                        currentSort.order = 'asc';
+                    }
+                    fetchAndRenderMembers();
+                };
             });
-
-            renderTable(members);
+            fetchAndRenderMembers();
         },
 
         auditLog: async () => {
             pageTitle.textContent = '監査ログ';
+            const formatLogDetails = (log) => {
+                const { eventType, details } = log;
+                let content = '';
+                switch(eventType) {
+                    case 'MessageDelete':
+                        content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<div class="log-content">${details.content}</div>`;
+                        break;
+                    case 'MessageUpdate':
+                        content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<strong>変更前:</strong><div class="log-content">${details.before}</div><strong>変更後:</strong><div class="log-content">${details.after}</div>`;
+                        break;
+                    case 'NicknameUpdate':
+                        content = `<strong>変更前:</strong> ${details.before}\n<strong>変更後:</strong> ${details.after}`;
+                        break;
+                    case 'RoleAdd':
+                    case 'RoleRemove':
+                        content = `<strong>ロール:</strong> ${details.roleName}`;
+                        break;
+                    default:
+                        content = `<pre>${JSON.stringify(details, null, 2)}</pre>`;
+                }
+                return `<div class="log-details">${content}</div>`;
+            };
+
             pageContent.innerHTML = `
                 <div class="card">
                     <div class="card-header"><h3>監査ログビューア</h3></div>
-                    <div class="filter-bar">
+                     <div class="filter-bar">
                          <div class="form-group">
                             <input type="text" id="log-user-search" placeholder="ユーザー名/タグで検索...">
                         </div>
@@ -278,8 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <th>詳細</th>
                                 </tr>
                             </thead>
-                            <tbody id="logs-table-body">
-                            </tbody>
+                            <tbody id="logs-table-body"></tbody>
                         </table>
                     </div>
                     <div class="pagination-controls">
@@ -287,8 +340,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <span id="page-info" class="page-info"></span>
                         <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
                     </div>
-                </div>
-            `;
+                </div>`;
             initializeTomSelect('#log-type-filter');
             
             let currentPage = 1;
@@ -310,11 +362,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <td>${log.eventType}</td>
                             <td>${log.executorTag || 'N/A'}</td>
                             <td>${log.targetTag || 'N/A'}</td>
-                            <td><pre>${JSON.stringify(log.details, null, 2)}</pre></td>
+                            <td>${formatLogDetails(log)}</td>
                         </tr>
                     `).join('');
                 }
-
                 document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
                 document.getElementById('prev-page').disabled = currentPage <= 1;
                 document.getElementById('next-page').disabled = currentPage >= totalPages;
@@ -322,28 +373,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; fetchAndRenderLogs(); }};
             document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderLogs(); };
-            document.getElementById('log-user-search').onchange = () => { currentPage = 1; fetchAndRenderLogs(); };
+            document.getElementById('log-user-search').oninput = () => { currentPage = 1; fetchAndRenderLogs(); };
             document.getElementById('log-type-filter').onchange = () => { currentPage = 1; fetchAndRenderLogs(); };
-
             fetchAndRenderLogs();
         },
-        // ★★★★★【ここまで変更】★★★★★
 
         analytics: async () => {
             pageTitle.textContent = 'アナリティクス';
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
-            const data = await api.get('/api/analytics/activity');
-
             pageContent.innerHTML = `
-                <div class="card">
-                    <div class="card-header">
-                        <h3>メッセージ数ランキング</h3>
+                <div class="grid-container" style="grid-template-columns: 2fr 1fr; gap: 30px;">
+                    <div class="card">
+                        <div class="card-header"><h3>時間帯別アクティビティ</h3></div>
+                        <div class="chart-container"><canvas id="activityChart"></canvas></div>
                     </div>
+                     <div class="card">
+                        <div class="card-header"><h3>ロール分布</h3></div>
+                        <div class="chart-container"><canvas id="roleChart"></canvas></div>
+                    </div>
+                </div>
+                 <div class="card">
+                    <div class="card-header"><h3>メッセージ数ランキング (TOP 10)</h3></div>
                     <ol id="leaderboard-list" class="leaderboard"></ol>
                 </div>`;
 
+            if (currentChart) currentChart.destroy();
+            const data = await api.get('/api/analytics/activity');
+            
+            // Leaderboard
             const listEl = document.getElementById('leaderboard-list');
-            if (data.topUsers.length === 0) {
+             if (data.topUsers.length === 0) {
                 listEl.innerHTML = `<p style="text-align:center; color: var(--text-muted-color);">まだランキングデータがありません。</p>`;
             } else {
                 listEl.innerHTML = data.topUsers.map((user, i) => `
@@ -353,10 +411,44 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div class="user-name">${user.displayName || user.username}</div>
                             <div class="user-id">${user.userId}</div>
                         </div>
-                        <span class="stat">${user.messageCount.toLocaleString()}</span>
+                        <span class="stat">${user.messageCount.toLocaleString()} メッセージ</span>
                     </li>`).join('');
             }
+            
+            // Activity Chart
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            new Chart(activityCtx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'メッセージ数',
+                        data: data.activityByHour,
+                        backgroundColor: 'rgba(0, 229, 255, 0.6)',
+                        borderColor: 'rgba(0, 229, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+
+            // Role Chart
+            const roleCtx = document.getElementById('roleChart').getContext('2d');
+            new Chart(roleCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.roleDistribution.map(r => r.name),
+                    datasets: [{
+                        label: 'メンバー数',
+                        data: data.roleDistribution.map(r => r.count),
+                        backgroundColor: data.roleDistribution.map(r => r.color),
+                        borderWidth: 1
+                    }]
+                },
+                options: { maintainAspectRatio: false }
+            });
         },
+        // ★★★★★【ここまで変更】★★★★★
 
         roleboard: async () => {
             pageTitle.textContent = 'ロールボード管理';
@@ -401,7 +493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             initializeTomSelect('#announcementChannelId', { items: [settings.announcementChannelId] });
             document.getElementById('announcements-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#announcements-form'); // ★ 変更点
+            trackChanges('#announcements-form');
         },
 
         welcome: async () => {
@@ -468,70 +560,137 @@ document.addEventListener('DOMContentLoaded', async () => {
                 initializeTomSelect(`#${id}`, { items: [settings[id]] })
             );
             document.getElementById('welcome-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#welcome-form'); // ★ 変更点
+            trackChanges('#welcome-form');
         },
-
+        
+        // ★★★★★【ここから変更】★★★★★
         'welcome-message': async () => {
             pageTitle.textContent = 'ウェルカムメッセージ設定';
             const settings = await api.get('/api/settings/welcome-message');
             settingsCache['welcome-message'] = settings;
+
+            const updatePreview = () => {
+                const type = document.getElementById('welcome-type').value;
+                const title = document.getElementById('welcome-title').value;
+                const desc = document.getElementById('welcome-description').value;
+                const imageUrl = document.getElementById('welcome-imageUrl').value;
+                const color = document.getElementById('welcome-color-picker').value;
+
+                const previewTitle = document.getElementById('preview-title');
+                const previewDesc = document.getElementById('preview-desc');
+                const previewThumb = document.getElementById('preview-thumb');
+                const previewImage = document.getElementById('preview-image');
+                const previewSidebar = document.querySelector('.discord-embed-preview .embed-sidebar');
+
+                const dummyData = {
+                    'user.name': 'TestUser',
+                    'user.displayName': 'テストユーザー',
+                    'user.mention': '@テストユーザー',
+                    'server.name': guildInfo.name,
+                    'server.memberCount': guildInfo.memberCount.toLocaleString(),
+                    'rulesChannel': '#rules'
+                };
+                
+                const replaceVars = (text) => text.replace(/{(\w+\.\w+)}/g, (match, key) => dummyData[key] || match);
+
+                if (type === 'gemini') {
+                    previewTitle.textContent = '🎉 AIによる自動生成';
+                    previewDesc.textContent = 'AIがサーバー名やユーザー名を使って、ユニークな歓迎メッセージを自動で作成します。';
+                    previewImage.style.display = 'none';
+                } else {
+                    previewTitle.textContent = replaceVars(title);
+                    previewDesc.textContent = replaceVars(desc);
+                    previewImage.src = imageUrl;
+                    previewImage.style.display = imageUrl ? 'block' : 'none';
+                }
+                previewSidebar.style.backgroundColor = color;
+            };
+
             pageContent.innerHTML = `
-                <form id="welcome-message-form">
+                <div class="welcome-message-layout">
+                    <form id="welcome-message-form">
+                        <div class="card">
+                            <div class="card-header"><h3>メッセージ設定</h3></div>
+                            <div class="form-group">
+                                <label>カスタムウェルカムメッセージを有効化</label>
+                                <label class="switch"><input type="checkbox" id="welcome-enabled" ${settings.enabled ? 'checked' : ''}><span class="slider"></span></label>
+                            </div>
+                            <div class="form-group">
+                                <label for="welcome-type">メッセージタイプ</label>
+                                <select id="welcome-type">
+                                    <option value="default" ${settings.type === 'default' ? 'selected' : ''}>カスタム</option>
+                                    <option value="gemini" ${settings.type === 'gemini' ? 'selected' : ''}>AI (Gemini) 生成</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="default-settings">
+                            <div class="card">
+                                <div class="card-header"><h3>メッセージ内容</h3></div>
+                                <div class="form-group">
+                                    <label for="welcome-title">タイトル</label>
+                                    <input type="text" id="welcome-title" value="${settings.title || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="welcome-description">説明文</label>
+                                    <textarea id="welcome-description" rows="6">${settings.description || ''}</textarea>
+                                    <p class="form-hint"><b>変数:</b> <code>{user.displayName}</code>, <code>{user.mention}</code>, <code>{server.name}</code>, <code>{server.memberCount}</code>, <code>{rulesChannel}</code></p>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="welcome-imageUrl">画像URL</label>
+                                        <input type="text" id="welcome-imageUrl" placeholder="https://..." value="${settings.imageUrl || ''}">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="modal-color">埋め込みの色</label>
+                                        <div class="color-input-wrapper">
+                                            <input type="color" id="welcome-color-picker" value="${settings.color || '#00FF00'}">
+                                            <input type="text" id="welcome-color-text" value="${settings.color || '#00FF00'}">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn">設定を保存</button>
+                    </form>
                     <div class="card">
-                        <div class="card-header"><h3>メッセージ設定</h3></div>
-                        <div class="form-group">
-                            <label>カスタムウェルカムメッセージを有効化</label>
-                            <label class="switch">
-                                <input type="checkbox" id="welcome-enabled" ${settings.enabled ? 'checked' : ''}>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label for="welcome-type">メッセージタイプ</label>
-                            <select id="welcome-type">
-                                <option value="default" ${settings.type === 'default' ? 'selected' : ''}>カスタム</option>
-                                <option value="gemini" ${settings.type === 'gemini' ? 'selected' : ''}>AI (Gemini) 生成</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id="default-settings" style="display: ${settings.type === 'default' ? 'block' : 'none'};">
-                        <div class="card">
-                            <div class="card-header"><h3>メッセージ内容</h3></div>
-                            <div class="form-group">
-                                <label for="welcome-title">タイトル</label>
-                                <input type="text" id="welcome-title" value="${settings.title || ''}">
+                         <div class="card-header"><h3>リアルタイムプレビュー</h3></div>
+                         <div class="discord-embed-preview">
+                            <div class="embed-sidebar"></div>
+                            <div class="embed-content">
+                                <div class="embed-author" style="display:flex; align-items:center; gap:8px;">
+                                    <img id="preview-thumb" src="https://cdn.discordapp.com/embed/avatars/0.png" style="width:24px; height:24px; border-radius:50%;">
+                                    <span>Overseer Bot</span>
+                                </div>
+                                <div id="preview-title" class="embed-title"></div>
+                                <div id="preview-desc" class="embed-description"></div>
+                                <img id="preview-image" src="" class="embed-thumbnail" style="display:none; max-width:100%; border-radius:6px;">
                             </div>
-                            <div class="form-group">
-                                <label for="welcome-description">説明文</label>
-                                <textarea id="welcome-description" rows="8">${settings.description || ''}</textarea>
-                                <p class="form-hint">
-                                    <b>変数:</b> <code>{user.name}</code>, <code>{user.displayName}</code>, <code>{user.mention}</code>, <code>{server.name}</code>, <code>{server.memberCount}</code>, <code>{rulesChannel}</code>
-                                </p>
-                            </div>
-                            <div class="form-group">
-                                <label for="welcome-imageUrl">画像URL</label>
-                                <input type="text" id="welcome-imageUrl" placeholder="https://..." value="${settings.imageUrl || ''}">
-                            </div>
-                        </div>
+                         </div>
                     </div>
-                    <div id="gemini-settings" style="display: ${settings.type === 'gemini' ? 'block' : 'none'};">
-                        <div class="card">
-                            <div class="card-header"><h3>AIによるメッセージ生成</h3></div>
-                            <p>AIがサーバー名、参加ユーザー名、総メンバー数に基づきユニークな歓迎メッセージを自動生成します。</p>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn">設定を保存</button>
-                </form>`;
+                </div>`;
 
             initializeTomSelect('#welcome-type');
 
-            document.getElementById('welcome-type').addEventListener('change', (e) => {
-                document.getElementById('default-settings').style.display = e.target.value === 'default' ? 'block' : 'none';
-                document.getElementById('gemini-settings').style.display = e.target.value === 'gemini' ? 'block' : 'none';
-            });
+            const form = document.getElementById('welcome-message-form');
+            const toggleSettingsVisibility = () => {
+                document.getElementById('default-settings').style.display = document.getElementById('welcome-type').value === 'default' ? 'block' : 'none';
+                updatePreview();
+            };
+            
+            form.addEventListener('input', updatePreview);
+            form.addEventListener('change', toggleSettingsVisibility);
+
+            const colorPicker = form.querySelector('#welcome-color-picker');
+            const colorText = form.querySelector('#welcome-color-text');
+            colorPicker.oninput = () => { colorText.value = colorPicker.value.toUpperCase(); updatePreview(); };
+            colorText.oninput = () => { if (/^#[0-9A-F]{6}$/i.test(colorText.value)) { colorPicker.value = colorText.value; updatePreview(); } };
+            
+            toggleSettingsVisibility();
             document.getElementById('welcome-message-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#welcome-message-form'); // ★ 変更点
+            trackChanges('#welcome-message-form');
         },
+        // ★★★★★【ここまで変更】★★★★★
+
 
         autorole: async () => {
             pageTitle.textContent = 'Bot 自動ロール設定';
@@ -554,7 +713,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </form>`;
             initializeTomSelect('#botAutoroleId', { items: [settings.botAutoroleId] });
             document.getElementById('autorole-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#autorole-form'); // ★ 変更点
+            trackChanges('#autorole-form');
         },
 
         automod: async () => {
@@ -584,7 +743,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
             document.getElementById('automod-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#automod-form'); // ★ 変更点
+            trackChanges('#automod-form');
         },
 
         logging: async () => {
@@ -607,7 +766,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </form>`;
             initializeTomSelect('#auditLogChannel', { items: [settings.auditLogChannel] });
             document.getElementById('logging-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#logging-form'); // ★ 変更点
+            trackChanges('#logging-form');
         },
 
         'vc-log': async () => {
@@ -761,7 +920,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     btn.onclick = (e) => {
                         levelingSettings.roleRewards.splice(parseInt(e.target.closest('.role-item').dataset.index, 10), 1);
                         renderRoleRewards();
-                        isDirty = true; // ★ 変更点
+                        isDirty = true;
                     };
                 });
             };
@@ -780,7 +939,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderRoleRewards();
                 document.getElementById('reward-level').value = '';
                 document.getElementById('reward-role-id').tomselect.clear();
-                isDirty = true; // ★ 変更点
+                isDirty = true;
             };
 
             document.getElementById('leveling-form').addEventListener('submit', (e) => {
@@ -790,7 +949,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     leveling: levelingSettings
                 });
             });
-            trackChanges('#leveling-form'); // ★ 変更点
+            trackChanges('#leveling-form');
         },
 
         ai: async () => {
@@ -798,7 +957,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const settings = await api.get('/api/settings/guild_settings');
             settingsCache['guild_settings'] = settings;
             const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
-            // ペルソナテンプレートの定義
             const personaTemplates = [
                 {
                     name: '🐱 猫アシスタント',
@@ -871,13 +1029,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
 
-            // ペルソナテンプレートボタンにイベントリスナーを追加
             document.querySelectorAll('#persona-templates button').forEach(button => {
                 button.addEventListener('click', () => {
                     const prompt = button.getAttribute('data-prompt');
                     const textarea = document.getElementById('aiPersonalityPrompt');
                     textarea.value = prompt;
-                    // 変更を検知させるためのイベントを発火
                     textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 });
             });
@@ -1172,10 +1328,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                             type: form.querySelector('#welcome-type').value,
                             title: form.querySelector('#welcome-title').value,
                             description: form.querySelector('#welcome-description').value,
-                            imageUrl: form.querySelector('#welcome-imageUrl').value
+                            imageUrl: form.querySelector('#welcome-imageUrl').value,
+                            color: form.querySelector('#welcome-color-text').value,
                         });
                         showMessage('設定を保存しました。');
-                        resetDirtyState(); // ★ 変更点
+                        resetDirtyState();
                         btn.disabled = false;
                         btn.textContent = btnText;
                         return;
@@ -1223,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             await api.post(`/api/settings/${collection}`, settings);
             showMessage('設定を保存しました。');
-            resetDirtyState(); // ★ 変更点
+            resetDirtyState();
         } catch (error) {
             showMessage(`保存エラー: ${error.message}`, 'error');
         } finally {
@@ -1234,9 +1391,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Navigation ---
     const navigate = async (event) => {
-        // ★ 変更点：event引数を追加
         const proceed = async () => {
-            resetDirtyState(); // ★ 変更点
+            resetDirtyState();
             if (window.innerWidth <= 768) {
                 sidebar.classList.remove('is-open');
             }
@@ -1258,12 +1414,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             feather.replace();
         };
         
-        // ★ 変更点：ここから変更
         if (isDirty) {
              if (event && event.type === 'hashchange') {
                 event.preventDefault();
                 const oldHash = event.oldURL.split('#')[1] || 'dashboard';
-                // URLを元に戻す
                 history.pushState(null, null, `#${oldHash}`);
             }
 
@@ -1277,15 +1431,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('cancel-nav').onclick = closeModal;
             document.getElementById('confirm-nav').onclick = () => {
                 closeModal();
+                if (event) {
+                    const newHash = new URL(event.newURL).hash;
+                    window.location.hash = newHash;
+                }
                 proceed();
             };
         } else {
             proceed();
         }
-        // ★ 変更点：ここまで
     };
 
-    // ★★★★★【ここから変更】★★★★★
     // --- Member Actions ---
     const addMemberActionListeners = () => {
         document.querySelectorAll('.manage-roles-btn').forEach(btn => btn.onclick = handleManageRoles);
@@ -1295,13 +1451,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handleManageRoles = async (e) => {
         const memberId = e.target.closest('tr').dataset.memberId;
-        const members = await api.get('/api/members');
-        const member = members.find(m => m.id === memberId);
-        
-        const modal = createModal(`ロール管理: ${member.displayName}`, `
-            <p><strong>現在のロール:</strong></p>
-            <div>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('') || 'なし'}</div>
-            <hr style="border-color: var(--border-color); margin: 20px 0;">
+        // APIから再取得する代わりにキャッシュを利用する（ただし、大規模な変更がある場合は再取得が望ましい）
+        // For simplicity, we assume the initial fetch is recent enough.
+        // const members = await api.get('/api/members');
+        // const member = members.find(m => m.id === memberId);
+        const memberRow = document.querySelector(`tr[data-member-id="${memberId}"]`);
+        const memberName = memberRow.querySelector('.display-name').textContent;
+        const currentRoles = Array.from(memberRow.querySelectorAll('.role-tag')).map(tag => {
+            const role = guildInfo.roles.find(r => r.name === tag.textContent);
+            return role ? role.id : null;
+        }).filter(Boolean);
+
+
+        const modal = createModal(`ロール管理: ${memberName}`, `
             <div class="form-group">
                 <label>ロールを編集</label>
                 <select id="roles-select" multiple placeholder="ロールを選択...">
@@ -1310,8 +1472,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>`,
             [{ id: 'save-roles', text: '保存', class: 'btn'}]
         );
-        const select = initializeTomSelect('#roles-select', {
-            items: member.roles.map(r => r.id)
+        initializeTomSelect('#roles-select', {
+            items: currentRoles
         });
         
         document.getElementById('save-roles').onclick = async () => {
@@ -1320,7 +1482,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.put(`/api/members/${memberId}/roles`, { roles: selectedRoles });
                 showMessage('ロールを更新しました。');
                 closeModal();
-                renderers.members(); // テーブルを再描画
+                // テーブル全体ではなく、該当行だけ更新することも可能だが、再描画が確実
+                document.querySelector(`.nav-item[data-page="members"]`).click();
             } catch(error) {
                 showMessage('ロールの更新に失敗しました。', 'error');
             }
@@ -1340,7 +1503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.post(`/api/members/${memberId}/kick`, { reason });
                 showMessage('メンバーをキックしました。');
                 closeModal();
-                renderers.members();
+                document.querySelector(`.nav-item[data-page="members"]`).click();
             } catch(error) {
                 showMessage('キックに失敗しました。', 'error');
             }
@@ -1360,13 +1523,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.post(`/api/members/${memberId}/ban`, { reason });
                 showMessage('メンバーをBANしました。');
                 closeModal();
-                renderers.members();
+                document.querySelector(`.nav-item[data-page="members"]`).click();
             } catch(error) {
                 showMessage('BANに失敗しました。', 'error');
             }
         };
     };
-    // ★★★★★【ここまで変更】★★★★★
 
 
     // --- Initialization ---
@@ -1378,12 +1540,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             loader.style.display = 'none';
             dashboardWrapper.style.display = 'flex';
-
-            // ★ 変更点：ハッシュ変更のハンドリングを更新
+            
             window.addEventListener('hashchange', navigate, false);
-            await navigate(); // 初期表示
+            await navigate();
 
-            // ★ 変更点：ログアウト処理を更新
             logoutBtn.addEventListener('click', () => {
                 createModal('ログアウトの確認',
                     '<p>本当にログアウトしますか？</p>',
@@ -1395,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 document.getElementById('cancel-logout').onclick = closeModal;
                 document.getElementById('confirm-logout').onclick = async () => {
                     try {
-                        isDirty = false; // ログアウト時は変更を破棄
+                        isDirty = false;
                         await api.post('/api/logout');
                         window.location.href = '/login';
                     } catch (err) {
@@ -1408,12 +1568,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sidebar.classList.toggle('is-open');
             });
 
-            // ★ 変更点：ページを離れる際の警告
             window.addEventListener('beforeunload', (e) => {
                 if (isDirty) {
                     e.preventDefault();
-                    e.returnValue = ''; // 標準的なブラウザで警告を出すために必要
-                    return ''; // 一部の古いブラウザ用
+                    e.returnValue = '';
+                    return '';
                 }
             });
 
