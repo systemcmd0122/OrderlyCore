@@ -1,4 +1,4 @@
-// systemcmd0122/overseer/overseer-73bfc1e5f235bcccdbf7f2400b84767315a3e964/index.js
+// systemcmd0122/overseer/overseer-0bf111bc7d4cbe93c0063e5af9df0630e3d9374e/index.js
 require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const fs = require('node:fs');
@@ -310,7 +310,6 @@ app.put('/api/members/:memberId/roles', isAuthenticated, isGuildAdmin, async (re
     }
 });
 
-// ★★★★★【ここから変更】★★★★★
 app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { eventType, user, page = 1, limit: pageLimit = 15 } = req.query;
@@ -359,7 +358,6 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
             return res.status(500).json({ 
                 error: 'データベースインデックスが必要です。',
                 errorCode: 'INDEX_REQUIRED',
-                // FirebaseコンソールのURLを直接生成するのはセキュリティ上好ましくないため、一般的なURLを案内
                 fixUrl: firestoreUrl, 
                 message: '監査ログ機能を利用するには、Firestoreの複合インデックスが必要です。エラーログに記載されているURLにアクセスしてインデックスを作成してください。'
             });
@@ -367,7 +365,6 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch audit logs.' });
     }
 });
-// ★★★★★【ここまで変更】★★★★★
 
 app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
@@ -770,6 +767,7 @@ for (const file of commandFiles) {
     }
 }
 
+// ★★★★★【ここから変更】★★★★★
 updateBotStatus(BotStatus.LOADING_EVENTS);
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
@@ -778,21 +776,28 @@ if (fs.existsSync(eventsPath)) {
         try {
             const filePath = path.join(eventsPath, file);
             delete require.cache[require.resolve(filePath)];
-            const event = require(filePath);
-            if (event.once) {
-                client.once(event.name, (...args) => event.execute(...args, client));
-            } else {
-                client.on(event.name, (...args) => event.execute(...args, client));
+            const eventHandler = require(filePath);
+
+            // パターン1: { name, execute } オブジェクトをエクスポートするイベント
+            if (eventHandler.name && typeof eventHandler.execute === 'function') {
+                if (eventHandler.once) {
+                    client.once(eventHandler.name, (...args) => eventHandler.execute(...args, client));
+                } else {
+                    client.on(eventHandler.name, (...args) => eventHandler.execute(...args, client));
+                }
+                console.log(chalk.blueBright(`[Event] Loaded: ${eventHandler.name} (${file})`));
+            } 
+            // パターン2: (client) => { ... } 関数をエクスポートするイベント
+            else if (typeof eventHandler === 'function') {
+                eventHandler(client);
+                console.log(chalk.blueBright(`[Event] Loaded modular handler: ${file}`));
             }
         } catch (error) {
             console.error(chalk.red(`❌ イベント読み込みエラー (${file}):`), error);
         }
     }
 }
-require('./events/auditLog')(client);
-require('./events/automodListener')(client);
-require('./events/levelingSystem')(client);
-require('./events/mentionReply')(client);
+// ★★★★★【ここまで変更】★★★★★
 
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
