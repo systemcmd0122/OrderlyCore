@@ -26,17 +26,16 @@ async function getLevelData(db, guildId, userId) {
 }
 
 // ★★★★★【ここから修正】★★★★★
-// 価格設定を調整
+// 価格設定を大幅に調整
 const BOOST_OPTIONS = {
-    '1_2': { name: '1日間 (2x XP)', duration: 1, multiplier: 2, cost: 1000 },
-    '7_2': { name: '7日間 (2x XP)', duration: 7, multiplier: 2, cost: 6000 },
-    '1_5': { name: '1日間 (5x XP)', duration: 1, multiplier: 5, cost: 4000 },
-    '7_5': { name: '7日間 (5x XP)', duration: 7, multiplier: 5, cost: 25000 },
-    '1_10': { name: '1日間 (10x XP)', duration: 1, multiplier: 10, cost: 10000 },
-    '7_10': { name: '7日間 (10x XP)', duration: 7, multiplier: 10, cost: 60000 },
+    '1_2': { name: '1日間 (2x XP)', duration: 1, multiplier: 2, cost: 250 },
+    '7_2': { name: '7日間 (2x XP)', duration: 7, multiplier: 2, cost: 1500 },
+    '1_5': { name: '1日間 (5x XP)', duration: 1, multiplier: 5, cost: 800 },
+    '7_5': { name: '7日間 (5x XP)', duration: 7, multiplier: 5, cost: 5000 },
+    '1_10': { name: '1日間 (10x XP)', duration: 1, multiplier: 10, cost: 2000 },
+    '7_10': { name: '7日間 (10x XP)', duration: 7, multiplier: 10, cost: 12000 },
 };
 // ★★★★★【ここまで修正】★★★★★
-
 
 module.exports = {
     data: new SlashCommandBuilder()
