@@ -1450,10 +1450,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handleManageRoles = async (e) => {
         const memberId = e.target.closest('tr').dataset.memberId;
-        // APIから再取得する代わりにキャッシュを利用する（ただし、大規模な変更がある場合は再取得が望ましい）
-        // For simplicity, we assume the initial fetch is recent enough.
-        // const members = await api.get('/api/members');
-        // const member = members.find(m => m.id === memberId);
         const memberRow = document.querySelector(`tr[data-member-id="${memberId}"]`);
         const memberName = memberRow.querySelector('.display-name').textContent;
         const currentRoles = Array.from(memberRow.querySelectorAll('.role-tag')).map(tag => {
@@ -1481,7 +1477,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.put(`/api/members/${memberId}/roles`, { roles: selectedRoles });
                 showMessage('ロールを更新しました。');
                 closeModal();
-                // テーブル全体ではなく、該当行だけ更新することも可能だが、再描画が確実
                 document.querySelector(`.nav-item[data-page="members"]`).click();
             } catch(error) {
                 showMessage('ロールの更新に失敗しました。', 'error');

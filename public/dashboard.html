@@ -77,20 +77,11 @@
     <div id="modal-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-    <script src="/client.js"></script>
+    <script src="/js/main.js" type="module"></script>
     
     <script>
         // Initial call to render icons
         feather.replace();
-
-        // Error handling
-        window.addEventListener('error', (e) => {
-            console.error('Global error:', e.error);
-        });
-        
-        window.addEventListener('unhandledrejection', (e) => {
-            console.error('Unhandled promise rejection:', e.reason);
-        });
     </script>
 </body>
 </html>

@@ -61,7 +61,7 @@ const db = getFirestore(firebaseApp);
 const rtdb = getDatabase(firebaseApp);
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 const client = new Client({
     intents: [
