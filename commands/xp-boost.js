@@ -10,7 +10,7 @@ async function getLevelData(db, guildId, userId) {
         const data = docSnap.data();
         return {
             xp: data.xp || 0,
-            boost: data.boost || { active: false, expiresAt: null },
+            boost: data.boost || { active: false, expiresAt: null, multiplier: 1 },
             ...data
         };
     }
@@ -21,9 +21,20 @@ async function getLevelData(db, guildId, userId) {
         level: 0,
         messageCount: 0,
         lastMessageTimestamp: 0,
-        boost: { active: false, expiresAt: null }
+        boost: { active: false, expiresAt: null, multiplier: 1 }
     };
 }
+
+// 価格設定
+const BOOST_OPTIONS = {
+    '1_2': { name: '1日間 (2x XP)', duration: 1, multiplier: 2, cost: 5000 },
+    '7_2': { name: '7日間 (2x XP)', duration: 7, multiplier: 2, cost: 30000 },
+    '1_5': { name: '1日間 (5x XP)', duration: 1, multiplier: 5, cost: 20000 },
+    '7_5': { name: '7日間 (5x XP)', duration: 7, multiplier: 5, cost: 120000 },
+    '1_10': { name: '1日間 (10x XP)', duration: 1, multiplier: 10, cost: 50000 },
+    '7_10': { name: '7日間 (10x XP)', duration: 7, multiplier: 10, cost: 300000 },
+};
+
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -39,13 +50,14 @@ module.exports = {
                 .setName('buy')
                 .setDescription('XPブーストを購入します。')
                 .addStringOption(option =>
-                    option.setName('duration')
-                        .setDescription('購入するブーストの期間')
+                    option.setName('item')
+                        .setDescription('購入するブーストアイテム')
                         .setRequired(true)
                         .addChoices(
-                            { name: '1日間 (2.0x XP)', value: '1' },
-                            { name: '7日間 (2.0x XP)', value: '7' },
-                            { name: '30日間 (2.0x XP)', value: '30' }
+                            ...Object.entries(BOOST_OPTIONS).map(([key, value]) => ({
+                                name: `${value.name} - ${value.cost.toLocaleString()} XP`,
+                                value: key
+                            }))
                         )
                 )
         )
@@ -72,10 +84,7 @@ module.exports = {
         if (!settings.roleId) {
             return interaction.editReply({ content: '❌ XPブースト用のロールが設定されていません。サーバー管理者に連絡してください。' });
         }
-        if (!settings.costs) {
-            return interaction.editReply({ content: '❌ XPブーストの価格が設定されていません。サーバー管理者に連絡してください。' });
-        }
-
+        
         const boostRole = await guild.roles.fetch(settings.roleId);
         if (!boostRole) {
             return interaction.editReply({ content: '❌ XPブースト用のロールが見つかりませんでした。サーバー管理者に連絡してください。' });
@@ -84,22 +93,38 @@ module.exports = {
         const userData = await getLevelData(db, guild.id, user.id);
 
         if (subcommand === 'shop') {
+            // ★★★★★【ここから修正】★★★★★
+            // エラーの原因だった settings.costs を BOOST_OPTIONS に修正
             const shopEmbed = new EmbedBuilder()
                 .setTitle('🚀 XPブーストストア')
-                .setDescription('XPを消費して、期間限定でXP獲得量を**2倍**にするブーストを購入できます。')
+                .setDescription('XPを消費して、期間限定でXP獲得量を増加させるブーストを購入できます。')
                 .setColor(0x5865F2)
                 .addFields(
-                    { name: 'ブースト (1日間)', value: `**${settings.costs['1'].toLocaleString()}** XP`, inline: true },
-                    { name: 'ブースト (7日間)', value: `**${settings.costs['7'].toLocaleString()}** XP`, inline: true },
-                    { name: 'ブースト (30日間)', value: `**${settings.costs['30'].toLocaleString()}** XP`, inline: true },
-                    { name: 'あなたの所持XP', value: `**${Math.floor(userData.xp).toLocaleString()}** XP` }
+                    { name: '🔥 ブーストアイテム一覧 🔥', value: '----------------------------------------' },
+                    { name: 'ブースト (1日間 | 2倍)', value: `**${BOOST_OPTIONS['1_2'].cost.toLocaleString()}** XP`, inline: true },
+                    { name: 'ブースト (7日間 | 2倍)', value: `**${BOOST_OPTIONS['7_2'].cost.toLocaleString()}** XP`, inline: true },
+                    { name: '\u200B', value: '\u200B', inline: true },
+                    { name: 'ブースト (1日間 | 5倍)', value: `**${BOOST_OPTIONS['1_5'].cost.toLocaleString()}** XP`, inline: true },
+                    { name: 'ブースト (7日間 | 5倍)', value: `**${BOOST_OPTIONS['7_5'].cost.toLocaleString()}** XP`, inline: true },
+                    { name: '\u200B', value: '\u200B', inline: true },
+                    { name: 'ブースト (1日間 | 10倍)', value: `**${BOOST_OPTIONS['1_10'].cost.toLocaleString()}** XP`, inline: true },
+                    { name: 'ブースト (7日間 | 10倍)', value: `**${BOOST_OPTIONS['7_10'].cost.toLocaleString()}** XP`, inline: true },
+                    { name: '\u200B', value: '\u200B', inline: true },
+                    { name: '💰 あなたの所持XP', value: `**${Math.floor(userData.xp).toLocaleString()}** XP` }
                 )
                 .setFooter({ text: '`/xp-boost buy` で購入できます。' });
             await interaction.editReply({ embeds: [shopEmbed] });
+            // ★★★★★【ここまで修正】★★★★★
 
         } else if (subcommand === 'buy') {
-            const duration = interaction.options.getString('duration');
-            const cost = settings.costs[duration];
+            const itemKey = interaction.options.getString('item');
+            const selectedBoost = BOOST_OPTIONS[itemKey];
+
+            if (!selectedBoost) {
+                 return interaction.editReply({ content: '❌ 無効なアイテムが選択されました。' });
+            }
+
+            const cost = selectedBoost.cost;
 
             if (userData.boost && userData.boost.active && userData.boost.expiresAt > Date.now()) {
                 return interaction.editReply({ content: '❌ 既に有効なブーストがあります。期間が終了してから再度購入してください。' });
@@ -109,7 +134,7 @@ module.exports = {
             }
 
             const newXp = userData.xp - cost;
-            const expiresAt = Date.now() + (parseInt(duration) * 24 * 60 * 60 * 1000);
+            const expiresAt = Date.now() + (selectedBoost.duration * 24 * 60 * 60 * 1000);
 
             try {
                 const userRef = doc(db, 'levels', `${guild.id}_${user.id}`);
@@ -117,7 +142,8 @@ module.exports = {
                     xp: newXp,
                     boost: {
                         active: true,
-                        expiresAt: expiresAt
+                        expiresAt: expiresAt,
+                        multiplier: selectedBoost.multiplier
                     }
                 });
 
@@ -125,15 +151,16 @@ module.exports = {
 
                 const embed = new EmbedBuilder()
                     .setTitle('✅ ブースト購入完了！')
-                    .setDescription(`**${duration}日間**のXPブーストを購入しました！`)
+                    .setDescription(`**${selectedBoost.name}** を購入しました！`)
                     .setColor(0x00ff00)
                     .addFields(
                         { name: '消費XP', value: cost.toLocaleString(), inline: true },
                         { name: '残りXP', value: Math.floor(newXp).toLocaleString(), inline: true },
+                        { name: 'ブースト倍率', value: `**${selectedBoost.multiplier}倍**`, inline: true},
                         { name: '有効期限', value: `<t:${Math.floor(expiresAt / 1000)}:F>` }
                     );
                 await interaction.editReply({ embeds: [embed] });
-                console.log(chalk.green(`[XP Boost] ${user.tag} purchased a ${duration}-day boost in ${guild.name}.`));
+                console.log(chalk.green(`[XP Boost] ${user.tag} purchased a ${selectedBoost.name} boost in ${guild.name}.`));
 
             } catch (error) {
                 console.error('XPブースト購入エラー:', error);
@@ -147,7 +174,8 @@ module.exports = {
                     .setColor(0x00ff00)
                     .setDescription('現在、XPブーストが有効です！')
                     .addFields(
-                        { name: '有効期限', value: `<t:${Math.floor(userData.boost.expiresAt / 1000)}:R>` }
+                        { name: 'ブースト倍率', value: `**${userData.boost.multiplier}倍**`, inline: true },
+                        { name: '有効期限', value: `<t:${Math.floor(userData.boost.expiresAt / 1000)}:R>`, inline: true }
                     );
                 await interaction.editReply({ embeds: [embed] });
             } else {

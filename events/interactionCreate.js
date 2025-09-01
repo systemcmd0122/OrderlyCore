@@ -1,15 +1,11 @@
-const { InteractionResponseFlags } = require('discord.js');
-
+// systemcmd0122/orderlycore/OrderlyCore-0952a29494b13fadb3d53fc470ecdb1ede3f7840/events/interactionCreate.js
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
-        // ボタンインタラクションは専用ハンドラに任せるため、ここでは処理しない
         if (interaction.isButton()) return;
         
-        // 対応するインタラクションタイプでなければ早期リターン
         if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isModalSubmit()) return;
 
-        // --- 1. スラッシュコマンドの処理 ---
         if (interaction.isChatInputCommand()) {
             const command = client.commands.get(interaction.commandName);
             if (!command) {
@@ -17,7 +13,7 @@ module.exports = {
                 if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({
                         content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
-                        flags: InteractionResponseFlags.Ephemeral
+                        ephemeral: true
                     }).catch(() => {});
                 }
                 return;
@@ -28,10 +24,13 @@ module.exports = {
                 await command.execute(interaction);
             } catch (error) {
                 console.error(`❌ コマンド実行エラー (${interaction.commandName}):`, error);
+                // ★★★★★【ここから修正】★★★★★
+                // ephemeralメッセージの送信方法を修正
                 const errorMessage = {
                     content: '⚠️ コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。',
-                    flags: InteractionResponseFlags.Ephemeral
+                    ephemeral: true
                 };
+                // ★★★★★【ここまで修正】★★★★★
                 try {
                     if (interaction.replied || interaction.deferred) {
                         await interaction.followUp(errorMessage);
@@ -45,7 +44,6 @@ module.exports = {
             return;
         }
 
-        // --- 2. オートコンプリートの処理 ---
         if (interaction.isAutocomplete()) {
             const command = client.commands.get(interaction.commandName);
             if (!command || !command.autocomplete) return;
@@ -58,9 +56,7 @@ module.exports = {
             return;
         }
 
-        // --- 3. モーダル送信の処理 ---
         if (interaction.isModalSubmit()) {
-            // feedbackモーダルはコマンド側で処理(awaitModalSubmit)されるため、ここでは何もしない
             // 他のモーダル処理が必要な場合はここに追加
         }
     }

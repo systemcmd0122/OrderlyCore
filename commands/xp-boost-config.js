@@ -14,7 +14,7 @@ module.exports = {
         .addRoleOption(option =>
             option.setName('boost_role')
                 .setDescription('XPブースト用のロール (指定しない場合は自動生成/検索)')
-                .setRequired(false)), // ★★★★★ 必須ではなくなりました ★★★★★
+                .setRequired(false)),
 
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
@@ -25,17 +25,13 @@ module.exports = {
         const isEnabled = interaction.options.getBoolean('enabled');
 
         try {
-            // ★★★★★【ここから変更】★★★★★
-            // ロールが指定されなかった場合の自動処理
             if (!boostRole) {
-                // サーバー内に "XP Boost" ロールが既に存在するか検索
                 const existingRole = guild.roles.cache.find(role => role.name === 'XP Boost');
                 
                 if (existingRole) {
                     boostRole = existingRole;
                     console.log(chalk.blue(`[XP Boost Config] Found existing 'XP Boost' role in ${guild.name}.`));
                 } else {
-                    // 存在しない場合は自動生成
                     if (!guild.members.me.permissions.has(PermissionFlagsBits.ManageRoles)) {
                         return interaction.editReply({
                             content: '❌ ボットに「ロールの管理」権限がないため、ブーストロールを自動生成できません。先に権限を付与するか、手動でロールを作成して指定してください。'
@@ -43,16 +39,14 @@ module.exports = {
                     }
                     boostRole = await guild.roles.create({
                         name: 'XP Boost',
-                        color: '#FFD700', // Gold color
+                        color: '#FFD700',
                         reason: 'Role for XP Boost feature automatically created by OrderlyCore.',
-                        hoist: true // メンバーリストで分離して表示
+                        hoist: true
                     });
                     console.log(chalk.green(`[XP Boost Config] Automatically created 'XP Boost' role in ${guild.name}.`));
                 }
             }
-            // ★★★★★【ここまで変更】★★★★★
 
-            // ボットがロールを管理できるかチェック
             if (boostRole.position >= interaction.guild.members.me.roles.highest.position) {
                 return interaction.editReply({
                     content: `❌ ロール「${boostRole.name}」はボットより上位のため、管理できません。`
@@ -64,7 +58,7 @@ module.exports = {
                 xpBoost: {
                     enabled: isEnabled,
                     roleId: boostRole.id,
-                    costs: { // デフォルトのコスト設定
+                    costs: {
                         '1_2': 5000,
                         '7_2': 30000,
                         '1_5': 20000,
