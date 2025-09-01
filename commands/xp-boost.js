@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { doc, getDoc, updateDoc } = require('firebase/firestore');
 const chalk = require('chalk');
 
 // ユーザーデータを取得または新規作成する関数
@@ -25,15 +25,17 @@ async function getLevelData(db, guildId, userId) {
     };
 }
 
-// 価格設定
+// ★★★★★【ここから修正】★★★★★
+// 価格設定を調整
 const BOOST_OPTIONS = {
-    '1_2': { name: '1日間 (2x XP)', duration: 1, multiplier: 2, cost: 5000 },
-    '7_2': { name: '7日間 (2x XP)', duration: 7, multiplier: 2, cost: 30000 },
-    '1_5': { name: '1日間 (5x XP)', duration: 1, multiplier: 5, cost: 20000 },
-    '7_5': { name: '7日間 (5x XP)', duration: 7, multiplier: 5, cost: 120000 },
-    '1_10': { name: '1日間 (10x XP)', duration: 1, multiplier: 10, cost: 50000 },
-    '7_10': { name: '7日間 (10x XP)', duration: 7, multiplier: 10, cost: 300000 },
+    '1_2': { name: '1日間 (2x XP)', duration: 1, multiplier: 2, cost: 1000 },
+    '7_2': { name: '7日間 (2x XP)', duration: 7, multiplier: 2, cost: 6000 },
+    '1_5': { name: '1日間 (5x XP)', duration: 1, multiplier: 5, cost: 4000 },
+    '7_5': { name: '7日間 (5x XP)', duration: 7, multiplier: 5, cost: 25000 },
+    '1_10': { name: '1日間 (10x XP)', duration: 1, multiplier: 10, cost: 10000 },
+    '7_10': { name: '7日間 (10x XP)', duration: 7, multiplier: 10, cost: 60000 },
 };
+// ★★★★★【ここまで修正】★★★★★
 
 
 module.exports = {
@@ -93,8 +95,6 @@ module.exports = {
         const userData = await getLevelData(db, guild.id, user.id);
 
         if (subcommand === 'shop') {
-            // ★★★★★【ここから修正】★★★★★
-            // エラーの原因だった settings.costs を BOOST_OPTIONS に修正
             const shopEmbed = new EmbedBuilder()
                 .setTitle('🚀 XPブーストストア')
                 .setDescription('XPを消費して、期間限定でXP獲得量を増加させるブーストを購入できます。')
@@ -114,7 +114,6 @@ module.exports = {
                 )
                 .setFooter({ text: '`/xp-boost buy` で購入できます。' });
             await interaction.editReply({ embeds: [shopEmbed] });
-            // ★★★★★【ここまで修正】★★★★★
 
         } else if (subcommand === 'buy') {
             const itemKey = interaction.options.getString('item');
