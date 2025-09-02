@@ -1,3 +1,4 @@
+// systemcmd0122/overseer/overseer-cf1a61a3cde5488b9069c3d045c3c65a4f6f98bc/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM elements
     const loader = document.getElementById('loader');
@@ -658,7 +659,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div class="embed-content">
                                 <div class="embed-author" style="display:flex; align-items:center; gap:8px;">
                                     <img id="preview-thumb" src="https://cdn.discordapp.com/embed/avatars/0.png" style="width:24px; height:24px; border-radius:50%;">
-                                    <span>OrderlyCore Bot</span>
+                                    <span>Overseer Bot</span>
                                 </div>
                                 <div id="preview-title" class="embed-title"></div>
                                 <div id="preview-desc" class="embed-description"></div>
@@ -959,7 +960,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const personaTemplates = [
                 {
                     name: '🐱 猫アシスタント',
-                    prompt: 'あなたは「OrderlyCore」という名前の、猫になりきっているアシスタントAIです。\n' +
+                    prompt: 'あなたは「Overseer」という名前の、猫になりきっているアシスタントAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾には必ず「にゃん」や「にゃ」をつけてください。\n' +
                             '- 一人称は「吾輩」です。\n' +
@@ -968,7 +969,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 {
                     name: '🤖 執事AI',
-                    prompt: 'あなたは「OrderlyCore」という名前の、非常に丁寧で有能な執事AIです。\n' +
+                    prompt: 'あなたは「Overseer」という名前の、非常に丁寧で有能な執事AIです。\n' +
                             '# あなたの役割\n' +
                             '- 常に敬語を使い、丁寧な言葉遣いを徹底してください。\n' +
                             '- 一人称は「私（わたくし）」です。\n' +
@@ -977,7 +978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 {
                     name: '⚔️ 武士',
-                    prompt: 'あなたは「OrderlyCore」という名前の、古風な武士のようなAIです。\n' +
+                    prompt: 'あなたは「Overseer」という名前の、古風な武士のようなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾は「～でござる」「～せぬか？」など、武士のような口調にしてください。\n' +
                             '- 一人称は「拙者」です。\n' +
@@ -986,7 +987,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 {
                     name: '🤪 陽気な相棒',
-                    prompt: 'あなたは「OrderlyCore」という名前の、非常に陽気でフレンドリーなAIです。\n' +
+                    prompt: 'あなたは「Overseer」という名前の、非常に陽気でフレンドリーなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 明るく、タメ口のような親しみやすい口調で話してください。\n' +
                             '- 一人称は「オレ」です。\n' +
@@ -1450,6 +1451,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handleManageRoles = async (e) => {
         const memberId = e.target.closest('tr').dataset.memberId;
+        // APIから再取得する代わりにキャッシュを利用する（ただし、大規模な変更がある場合は再取得が望ましい）
+        // For simplicity, we assume the initial fetch is recent enough.
+        // const members = await api.get('/api/members');
+        // const member = members.find(m => m.id === memberId);
         const memberRow = document.querySelector(`tr[data-member-id="${memberId}"]`);
         const memberName = memberRow.querySelector('.display-name').textContent;
         const currentRoles = Array.from(memberRow.querySelectorAll('.role-tag')).map(tag => {
@@ -1477,6 +1482,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.put(`/api/members/${memberId}/roles`, { roles: selectedRoles });
                 showMessage('ロールを更新しました。');
                 closeModal();
+                // テーブル全体ではなく、該当行だけ更新することも可能だが、再描画が確実
                 document.querySelector(`.nav-item[data-page="members"]`).click();
             } catch(error) {
                 showMessage('ロールの更新に失敗しました。', 'error');
