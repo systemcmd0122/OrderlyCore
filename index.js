@@ -61,7 +61,7 @@ const db = getFirestore(firebaseApp);
 const rtdb = getDatabase(firebaseApp);
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const client = new Client({
     intents: [
@@ -161,56 +161,6 @@ function keepAlive() {
             console.error(chalk.red(`[Keep-Alive] Error pinging ${appUrl}:`, error.message));
         }
     }, PING_INTERVAL);
-}
-
-async function checkExpiredBoosts(client) {
-    console.log(chalk.cyan('[Boost Checker] Checking for expired XP boosts...'));
-    const db = client.db;
-    const now = Date.now();
-
-    const boostsRef = collection(db, 'levels');
-    const q = query(boostsRef, where('boost.active', '==', true), where('boost.expiresAt', '<=', now));
-
-    try {
-        const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-            console.log(chalk.gray('[Boost Checker] No expired boosts found.'));
-            return;
-        }
-
-        for (const userDoc of snapshot.docs) {
-            const userData = userDoc.data();
-            const { guildId, userId } = userData;
-            
-            console.log(chalk.yellow(`[Boost Checker] Found expired boost for user ${userId} in guild ${guildId}.`));
-
-            const guild = await client.guilds.fetch(guildId).catch(() => null);
-            if (!guild) continue;
-
-            const member = await guild.members.fetch(userId).catch(() => null);
-            if (!member) continue;
-
-            const settingsRef = doc(db, 'guild_settings', guildId);
-            const settingsSnap = await getDoc(settingsRef);
-            const boostRoleId = settingsSnap.exists() ? settingsSnap.data().xpBoost?.roleId : null;
-
-            if (boostRoleId) {
-                const role = await guild.roles.fetch(boostRoleId).catch(() => null);
-                if (role && member.roles.cache.has(role.id)) {
-                    await member.roles.remove(role);
-                    console.log(chalk.yellow(`[Boost Checker] Removed boost role from ${member.user.tag}.`));
-                }
-            }
-
-            // Firestoreのデータを更新
-            await updateDoc(userDoc.ref, {
-                'boost.active': false,
-                'boost.multiplier': 1
-            });
-        }
-    } catch (error) {
-        console.error(chalk.red('[Boost Checker] Error while checking for expired boosts:'), error);
-    }
 }
 
 app.post('/api/verify', async (req, res) => {
@@ -1151,10 +1101,6 @@ client.once('ready', async () => {
 
     setTimeout(() => updateRankboards(client), 10000);
     setInterval(() => updateRankboards(client), 5 * 60 * 1000);
-    
-    // 期限切れブーストのチェックを5分ごとに実行
-    setInterval(() => checkExpiredBoosts(client), 5 * 60 * 1000);
-
 
     dynamicStatuses = await loadStatusSettings();
     startStatusRotation();
