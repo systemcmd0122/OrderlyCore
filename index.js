@@ -17,8 +17,9 @@ const os = require('os');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
+// CORS設定: Next.js開発サーバー(通常は3001番ポート)と本番環境のフロントエンドURLからのアクセスを許可
 app.use(cors({
-    origin: process.env.APP_URL || `http://localhost:${PORT}`,
+    origin: [process.env.FRONTEND_URL, 'http://localhost:3000'].filter(Boolean),
     credentials: true
 }));
 
@@ -61,7 +62,7 @@ const db = getFirestore(firebaseApp);
 const rtdb = getDatabase(firebaseApp);
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const client = new Client({
     intents: [
@@ -232,7 +233,6 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
-// ★★★★★【ここから変更】★★★★★
 app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { page = 1, limit = 15, search = '', sortBy = 'displayName', sortOrder = 'asc', roleFilter = '' } = req.query;
@@ -308,7 +308,6 @@ app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch member list.' });
     }
 });
-// ★★★★★【ここまで変更】★★★★★
 
 app.post('/api/members/:memberId/kick', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
@@ -402,7 +401,6 @@ app.get('/api/audit-logs', isAuthenticated, isGuildAdmin, async (req, res) => {
     }
 });
 
-// ★★★★★【ここから変更】★★★★★
 app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guildId = req.session.guildId;
@@ -430,8 +428,8 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
 
         const activityByHour = Array(24).fill(0);
         // lastMessageTimestampではなく、messageCountをそのまま使う方がアクティビティの実態に近い
+        // 正確な時間帯別アクティビティは別途ログが必要なため、これは簡易的な実装
         allUsersData.forEach(user => {
-            // ここは簡易的な実装。正確な時間帯別アクティビティは別途ログが必要
             if (user.lastMessageTimestamp) {
                 const date = user.lastMessageTimestamp.toDate ? user.lastMessageTimestamp.toDate() : new Date(user.lastMessageTimestamp);
                 const hour = date.getHours();
@@ -472,8 +470,6 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
         res.status(500).json({ error: 'Failed to fetch analytics data.' });
     }
 });
-// ★★★★★【ここまで変更】★★★★★
-
 
 app.get('/api/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
@@ -617,7 +613,6 @@ app.delete('/api/roleboards/:id', isAuthenticated, isGuildAdmin, async (req, res
         res.status(500).json({ error: 'Failed to delete roleboard.' });
     }
 });
-
 
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
@@ -824,7 +819,6 @@ for (const file of commandFiles) {
     }
 }
 
-// ★★★★★【ここから変更】★★★★★
 updateBotStatus(BotStatus.LOADING_EVENTS);
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
@@ -835,7 +829,6 @@ if (fs.existsSync(eventsPath)) {
             delete require.cache[require.resolve(filePath)];
             const eventHandler = require(filePath);
 
-            // パターン1: { name, execute } オブジェクトをエクスポートするイベント
             if (eventHandler.name && typeof eventHandler.execute === 'function') {
                 if (eventHandler.once) {
                     client.once(eventHandler.name, (...args) => eventHandler.execute(...args, client));
@@ -844,7 +837,6 @@ if (fs.existsSync(eventsPath)) {
                 }
                 console.log(chalk.blueBright(`[Event] Loaded: ${eventHandler.name} (${file})`));
             } 
-            // パターン2: (client) => { ... } 関数をエクスポートするイベント
             else if (typeof eventHandler === 'function') {
                 eventHandler(client);
                 console.log(chalk.blueBright(`[Event] Loaded modular handler: ${file}`));
@@ -854,8 +846,6 @@ if (fs.existsSync(eventsPath)) {
         }
     }
 }
-// ★★★★★【ここまで変更】★★★★★
-
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 async function deployCommands() {
