@@ -1,40 +1,42 @@
-if (typeof fetch !== "function") {
-  globalThis.fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
-}
-
 const { Events } = require('discord.js');
 const chalk = require('chalk');
 const { doc, getDoc } = require('firebase/firestore');
-const fetch = require('node-fetch');
+const { chromium } = require('playwright');
 
 /**
- * 🔍 無料のDuckDuckGo検索APIで最新情報を取得
+ * 🔍 PlaywrightでDuckDuckGoを検索し、上位3件を取得
  * @param {string} query - 検索クエリ
- * @returns {Promise<string>} - 検索結果のサマリー
+ * @returns {Promise<string>} - 検索結果のタイトル＋要約まとめ
  */
 async function performWebSearch(query) {
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+
     try {
-        const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`;
-        const res = await fetch(url);
-        const data = await res.json();
+        await page.goto('https://duckduckgo.com/', { waitUntil: 'domcontentloaded' });
 
-        // 直接の要約があればそれを使う
-        if (data.AbstractText) {
-            return data.AbstractText;
-        }
+        // 検索入力して送信
+        await page.fill('input[name="q"]', query);
+        await page.keyboard.press('Enter');
 
-        // 関連トピックから抜粋を作る
-        if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-            const summaries = data.RelatedTopics.slice(0, 3)
-                .map((t, i) => `${i + 1}. ${t.Text}`)
-                .join('\n');
-            return summaries || '（検索結果なし）';
-        }
+        await page.waitForSelector('.react-results--main', { timeout: 10000 });
 
-        return '（該当する情報が見つかりませんでした）';
+        // 上位3件の結果を取得
+        const results = await page.$$eval('.react-results--main .result__body', (items) =>
+            items.slice(0, 3).map((el) => {
+                const title = el.querySelector('.result__title')?.innerText?.trim() || 'タイトル不明';
+                const snippet = el.querySelector('.result__snippet')?.innerText?.trim() || '';
+                return `${title} - ${snippet}`;
+            })
+        );
+
+        await browser.close();
+        if (results.length === 0) return '（検索結果が見つかりませんでした）';
+        return results.join('\n');
     } catch (err) {
-        console.error(chalk.red('❌ DuckDuckGo検索エラー:'), err);
-        return '（検索エラーが発生しました）';
+        console.error(chalk.red('❌ Playwright検索エラー:'), err);
+        await browser.close();
+        return '（検索中にエラーが発生しました）';
     }
 }
 
@@ -54,28 +56,31 @@ async function generateChatResponse(client, message, aiConfig) {
             return 'こんにちは！何か御用でしょうか？';
         }
 
-        // 🔎 無料Web検索
+        // 🔎 PlaywrightでWeb検索
         const webResults = await performWebSearch(userMessage);
 
-        const personalityPrompt = aiConfig.aiPersonalityPrompt || `あなたは「OrderlyCore」という名前の、親しみやすく有能なDiscordアシスタントAIです。`;
+        const personalityPrompt =
+            aiConfig.aiPersonalityPrompt ||
+            `あなたは「OrderlyCore」という名前の、親しみやすく有能なDiscordアシスタントAIです。`;
 
         const prompt = `あなたはDiscordサーバーで活動するAI「OrderlyCore」です。
-以下の設定と最新情報を参考に、自然で簡潔な返答を生成してください。
+以下の設定と最新の検索情報を参考に、自然で親しみやすい返答を生成してください。
 
 ### ペルソナ
 ${personalityPrompt}
 
-### ルール
-- 会話は親しみやすく200文字以内。
-- 余計な記号や説明文は不要。
-- 回答はユーザーへの返答のみ。
+### 応答ルール
+- 会話は自然でフレンドリーに。
+- 200文字以内に収めてください。
+- 不要な記号や前置きは不要です。
+- 返答はメッセージ本文のみ。
 
-### 会話コンテキスト
+### 会話情報
 - サーバー名: ${server}
 - 発言者: ${user}
 - ユーザーのメッセージ: "${userMessage}"
 
-### DuckDuckGoから取得した最新情報
+### 最新のウェブ検索結果
 ${webResults}
 
 ### あなたの応答:`;
