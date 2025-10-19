@@ -1,13 +1,44 @@
 const { Events } = require('discord.js');
 const chalk = require('chalk');
 const { doc, getDoc } = require('firebase/firestore');
+const fetch = require('node-fetch');
 
 /**
- * Gemini AIにチャット応答を生成させる関数
- * @param {import('discord.js').Client} client - Discordクライアント
- * @param {import('discord.js').Message} message - ユーザーからのメッセージ
- * @param {object} aiConfig - AI設定オブジェクト
- * @returns {Promise<string>} - 生成された応答テキスト
+ * 🔍 無料のDuckDuckGo検索APIで最新情報を取得
+ * @param {string} query - 検索クエリ
+ * @returns {Promise<string>} - 検索結果のサマリー
+ */
+async function performWebSearch(query) {
+    try {
+        const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // 直接の要約があればそれを使う
+        if (data.AbstractText) {
+            return data.AbstractText;
+        }
+
+        // 関連トピックから抜粋を作る
+        if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+            const summaries = data.RelatedTopics.slice(0, 3)
+                .map((t, i) => `${i + 1}. ${t.Text}`)
+                .join('\n');
+            return summaries || '（検索結果なし）';
+        }
+
+        return '（該当する情報が見つかりませんでした）';
+    } catch (err) {
+        console.error(chalk.red('❌ DuckDuckGo検索エラー:'), err);
+        return '（検索エラーが発生しました）';
+    }
+}
+
+/**
+ * 💬 Gemini AI にチャット応答を生成させる関数
+ * @param {import('discord.js').Client} client
+ * @param {import('discord.js').Message} message
+ * @param {object} aiConfig
  */
 async function generateChatResponse(client, message, aiConfig) {
     try {
@@ -19,30 +50,29 @@ async function generateChatResponse(client, message, aiConfig) {
             return 'こんにちは！何か御用でしょうか？';
         }
 
-        const personalityPrompt = aiConfig.aiPersonalityPrompt || `あなたは「OrderlyCore」という名前の、親しみやすく有能なDiscordアシスタントAIです。ユーザーとの自然な対話をしてください。
+        // 🔎 無料Web検索
+        const webResults = await performWebSearch(userMessage);
 
-# あなたの役割
-- ユーザーの発言に対して、フレンドリーかつ的確に返答してください。
-- 簡潔で分かりやすい文章を心がけてください。
-- ユーザーを助け、サーバーでの体験がより良くなるような応答を目指してください。
-- ユーモアを交えた返答も歓迎されます。`;
+        const personalityPrompt = aiConfig.aiPersonalityPrompt || `あなたは「OrderlyCore」という名前の、親しみやすく有能なDiscordアシスタントAIです。`;
 
-        const prompt = `あなたはDiscordサーバーで活動するAIです。以下の【ペルソナ設定】と【厳格なルール】に完璧に従って、ユーザーのメッセージに応答してください。
+        const prompt = `あなたはDiscordサーバーで活動するAI「OrderlyCore」です。
+以下の設定と最新情報を参考に、自然で簡潔な返答を生成してください。
 
-### ペルソナ設定
+### ペルソナ
 ${personalityPrompt}
 
-### 厳格なルール
-- あなた自身の名前は「OrderlyCore」です。一人称はペルソナ設定に従ってください。
-- 回答は自然な日本語の会話口調で、親しみやすくしてください。
-- ユーザーへの敬称は「さん」付けを基本としますが、ペルソナ設定に別指示があればそちらを優先してください。
-- 回答は**200文字以内**の簡潔な文章にまとめてください。
-- **回答には、あなたの応答メッセージのみを含めてください。** 前置きや解説、余計な記号（例: 「」、「」, *）は絶対に使用しないでください。
+### ルール
+- 会話は親しみやすく200文字以内。
+- 余計な記号や説明文は不要。
+- 回答はユーザーへの返答のみ。
 
-### 対話のコンテキスト
+### 会話コンテキスト
 - サーバー名: ${server}
 - 発言者: ${user}
-- ユーザーからのメッセージ: "${userMessage}"
+- ユーザーのメッセージ: "${userMessage}"
+
+### DuckDuckGoから取得した最新情報
+${webResults}
 
 ### あなたの応答:`;
 
@@ -52,26 +82,20 @@ ${personalityPrompt}
         console.log(chalk.magenta(`[Gemini Chat] User: ${userMessage} | AI: ${text}`));
         return text;
     } catch (error) {
-        console.error(chalk.red('❌ Gemini APIでのチャット応答生成に失敗:'), error.message);
+        console.error(chalk.red('❌ Gemini APIでの応答生成失敗:'), error);
         return 'うーん、ちょっと考えがまとまらないみたいです…。もう一度話しかけてもらえますか？';
     }
 }
 
 /**
- * メンションを処理するメイン関数
+ * 👋 メンション応答メイン関数
  * @param {import('discord.js').Message} message
  * @param {import('discord.js').Client} client
  */
 async function handleMention(message, client) {
     if (!message.guild || message.author.bot) return;
-
-    if (message.mentions.everyone) {
-        return;
-    }
-
-    if (!message.mentions.has(client.user.id)) {
-        return;
-    }
+    if (message.mentions.everyone) return;
+    if (!message.mentions.has(client.user.id)) return;
 
     try {
         const settingsRef = doc(client.db, 'guild_settings', message.guild.id);
@@ -79,30 +103,24 @@ async function handleMention(message, client) {
         const settings = docSnap.exists() ? docSnap.data() : {};
         const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
 
-        if (aiConfig.mentionReplyEnabled === false) {
-            return;
-        }
+        if (aiConfig.mentionReplyEnabled === false) return;
 
         await message.channel.sendTyping();
-
         const replyText = await generateChatResponse(client, message, aiConfig);
 
         await message.reply({
             content: replyText,
-            allowedMentions: {
-                repliedUser: false
-            }
+            allowedMentions: { repliedUser: false }
         });
-
     } catch (error) {
-        console.error(chalk.red('❌ メンション応答処理中にエラーが発生しました:'), error);
+        console.error(chalk.red('❌ メンション応答処理中にエラー:'), error);
         try {
             await message.reply({
-                content: 'ごめんなさい、応答中に予期せぬエラーが発生してしまいました。',
+                content: 'ごめんなさい、応答中にエラーが発生してしまいました。',
                 allowedMentions: { repliedUser: false }
             });
         } catch (replyError) {
-            console.error(chalk.red('❌ エラーメッセージの送信にも失敗しました:'), replyError);
+            console.error(chalk.red('❌ エラーメッセージ送信にも失敗:'), replyError);
         }
     }
 }
