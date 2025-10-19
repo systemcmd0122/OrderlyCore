@@ -1,3 +1,7 @@
+if (typeof fetch !== "function") {
+  globalThis.fetch = (...args) => import("node-fetch").then(({ default: fetch }) => fetch(...args));
+}
+
 const { Events } = require('discord.js');
 const chalk = require('chalk');
 const { doc, getDoc } = require('firebase/firestore');
