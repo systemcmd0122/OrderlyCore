@@ -104,11 +104,65 @@ document.addEventListener('DOMContentLoaded', async () => {
                 el.tomselect.destroy();
             }
             if (el) {
-                new TomSelect(el, {
+                const select = new TomSelect(el, {
                     create: false,
                     allowEmptyOption: true,
                     placeholder: el.getAttribute('placeholder') || 'Select...',
+                    dropdownParent: 'body',
+                    onDropdownOpen: function($dropdown) {
+                        const control = this.control;
+                        const controlRect = control.getBoundingClientRect();
+                        
+                        // ドロップダウンをbodyに直接配置
+                        $dropdown.style.position = 'fixed';
+                        $dropdown.style.zIndex = '9999';
+                        
+                        // コントロールの幅に合わせる（最小幅は200px）
+                        const width = controlRect.width;
+                        $dropdown.style.width = width + 'px';
+                        $dropdown.style.minWidth = '200px';
+                        $dropdown.style.maxWidth = width + 'px';
+                        
+                        // 縦位置の計算
+                        const dropdownHeight = Math.min($dropdown.scrollHeight, 300);
+                        const spaceBelow = window.innerHeight - controlRect.bottom;
+                        const spaceAbove = controlRect.top;
+                        
+                        if (spaceBelow >= dropdownHeight + 4) {
+                            // 下に表示
+                            $dropdown.style.top = (controlRect.bottom + 4) + 'px';
+                            $dropdown.style.bottom = 'auto';
+                            $dropdown.style.maxHeight = Math.min(300, spaceBelow - 8) + 'px';
+                        } else if (spaceAbove >= dropdownHeight + 4) {
+                            // 上に表示
+                            $dropdown.style.bottom = (window.innerHeight - controlRect.top + 4) + 'px';
+                            $dropdown.style.top = 'auto';
+                            $dropdown.style.maxHeight = Math.min(300, spaceAbove - 8) + 'px';
+                        } else {
+                            // スペースが足りない場合は下に表示して高さを調整
+                            $dropdown.style.top = (controlRect.bottom + 4) + 'px';
+                            $dropdown.style.bottom = 'auto';
+                            $dropdown.style.maxHeight = (spaceBelow - 8) + 'px';
+                        }
+                        
+                        // 横位置の調整（左端に合わせる）
+                        $dropdown.style.left = controlRect.left + 'px';
+                        
+                        // 右端がはみ出す場合の調整
+                        const rightEdge = controlRect.left + width;
+                        if (rightEdge > window.innerWidth - 8) {
+                            $dropdown.style.left = (window.innerWidth - width - 8) + 'px';
+                        }
+                    },
                     ...options
+                });
+                
+                // グローバルクリックイベントの設定
+                document.addEventListener('click', (e) => {
+                    const dropdown = select.dropdown;
+                    if (dropdown && !select.control.contains(e.target) && !dropdown.contains(e.target)) {
+                        select.close();
+                    }
                 });
             }
         });
