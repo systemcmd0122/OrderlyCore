@@ -56,8 +56,7 @@ async function getLevelData(db, guildId, userId) {
         xp: 0,
         level: 0,
         messageCount: 0,
-        lastMessageTimestamp: 0,
-        boost: { active: false, expiresAt: null, multiplier: 1 } // ブースト情報を追加
+        lastMessageTimestamp: 0
     };
 }
 
@@ -123,21 +122,13 @@ async function handleMessage(message, client) {
         return;
     }
 
-    let xpGained = Math.floor(Math.random() * 11) + 15;
-
-    // ブーストチェック
-    const isBoostActive = userData.boost && userData.boost.active && userData.boost.expiresAt > now;
-    let boostMultiplier = 1;
-    if (isBoostActive) {
-        boostMultiplier = userData.boost.multiplier || 1;
-        xpGained *= boostMultiplier;
-    }
+    const xpGained = Math.floor(Math.random() * 11) + 15;
 
     userData.xp += xpGained;
     userData.messageCount += 1;
     userData.lastMessageTimestamp = now;
 
-    console.log(chalk.cyan(`[XP] ${author.tag} gained ${xpGained} XP ${isBoostActive ? `(Boosted x${boostMultiplier}!)` : ''}. New Total: ${Math.floor(userData.xp)}`));
+    console.log(chalk.cyan(`[XP] ${author.tag} gained ${xpGained} XP. New Total: ${Math.floor(userData.xp)}`));
 
     let leveledUp = false;
     const oldLevel = userData.level;

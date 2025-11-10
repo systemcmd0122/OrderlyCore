@@ -1,4 +1,3 @@
-// systemcmd0122/overseer/overseer-cf1a61a3cde5488b9069c3d045c3c65a4f6f98bc/public/client.js
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM elements
     const loader = document.getElementById('loader');
@@ -13,11 +12,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let guildInfo = null;
     let settingsCache = {};
     let isDirty = false;
-    let currentChart = null; // To hold the Chart.js instance
+    let currentChart = null;
 
-    // --- Utility Functions ---
-
-    // Unified API request handler
     const api = {
         _request: async (endpoint, options = {}) => {
             try {
@@ -49,7 +45,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         delete: (endpoint) => api._request(endpoint, { method: 'DELETE' })
     };
 
-    // Toast notification function
     const showMessage = (text, type = 'success') => {
         const el = document.createElement('div');
         el.className = `message-toast ${type}`;

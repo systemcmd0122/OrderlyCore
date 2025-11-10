@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, ActivityType, Partials, PermissionsBitField, EmbedBuilder, PresenceUpdateStatus } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
@@ -13,11 +13,9 @@ const { getFirestore, doc, getDoc, setDoc, collection, query, where, getDocs, up
 const { getDatabase, ref, set, get, remove } = require('firebase/database');
 const os = require('os');
 
-// --- Express アプリケーション設定 ---
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// CORS設定: Next.js開発サーバー(通常は3001番ポート)と本番環境のフロントエンドURLからのアクセスを許可
 app.use(cors({
     origin: [process.env.FRONTEND_URL, 'http://localhost:3000'].filter(Boolean),
     credentials: true
@@ -39,7 +37,7 @@ app.use(session({
 app.use(express.static(path.join(__dirname, 'public')));
 
 
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -114,13 +112,13 @@ const isAdminAuthenticated = (req, res, next) => {
     res.status(401).json({ error: 'Administrator access required.' });
 };
 
-app.get('/ping', (req, res) => {
+app.get('/ping', (_req, res) => {
     res.status(200).json({
         status: 'ok',
         timestamp: new Date().toISOString()
     });
 });
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
     const health = {
         status: client.isReady() ? 'ok' : 'degraded',
         timestamp: new Date().toISOString(),
@@ -214,9 +212,19 @@ app.get('/api/guild-info', isAuthenticated, isGuildAdmin, async (req, res) => {
             .map(r => ({ id: r.id, name: r.name, color: r.hexColor }))
             .sort((a,b) => a.name.localeCompare(b.name));
 
-        const members = await guild.members.fetch();
-        const memberCount = members.filter(member => !member.user.bot).size;
-        const botCount = members.size - memberCount;
+        // キャッシュされたメンバー情報を使用（タイムアウトを避けるため）
+        let memberCount = 0;
+        let botCount = 0;
+        
+        if (guild.members.cache.size > 0) {
+            // キャッシュがある場合はそれを使用
+            memberCount = guild.members.cache.filter(member => !member.user.bot).size;
+            botCount = guild.members.cache.size - memberCount;
+        } else {
+            // キャッシュがない場合はguild.memberCountを使用（概算）
+            memberCount = guild.memberCount || 0;
+            botCount = 0;
+        }
 
         res.json({
             id: guild.id,
@@ -237,7 +245,17 @@ app.get('/api/members', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { page = 1, limit = 15, search = '', sortBy = 'displayName', sortOrder = 'asc', roleFilter = '' } = req.query;
         const guild = await client.guilds.fetch(req.session.guildId);
-        await guild.members.fetch();
+        
+        // タイムアウトを設定してメンバーを取得（大規模サーバー対応）
+        try {
+            await Promise.race([
+                guild.members.fetch(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            ]);
+        } catch (fetchError) {
+            console.warn(`Member fetch timeout or error for guild ${guild.name}, using cache`);
+        }
+        
         const members = guild.members.cache;
 
         const levelsRef = collection(db, 'levels');
@@ -438,7 +456,16 @@ app.get('/api/analytics/activity', isAuthenticated, isGuildAdmin, async (req, re
         });
         
         // --- 2. ロール分布 ---
-        await guild.members.fetch();
+        // タイムアウトを設定してメンバーを取得
+        try {
+            await Promise.race([
+                guild.members.fetch(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            ]);
+        } catch (fetchError) {
+            console.warn(`Member fetch timeout for analytics in guild ${guild.name}, using cache`);
+        }
+        
         const roleCounts = {};
         guild.members.cache.forEach(member => {
             member.roles.cache.forEach(role => {
@@ -634,7 +661,7 @@ app.post('/api/admin/logout', (req, res) => {
     });
 });
 
-app.get('/api/admin/stats', isAdminAuthenticated, async (req, res) => {
+app.get('/api/admin/stats', isAdminAuthenticated, async (_req, res) => {
     try {
         const guilds = await client.guilds.fetch();
         const uptimeSeconds = process.uptime();
@@ -717,7 +744,7 @@ app.post('/api/admin/announce', isAdminAuthenticated, async (req, res) => {
     }
 });
 
-app.get('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
+app.get('/api/admin/statuses', isAdminAuthenticated, async (_req, res) => {
     const settingsRef = doc(db, 'bot_settings', 'statuses');
     const docSnap = await getDoc(settingsRef);
     if (docSnap.exists()) {
@@ -757,12 +784,130 @@ app.post('/api/admin/statuses', isAdminAuthenticated, async (req, res) => {
     }
 });
 
-app.get('/dashboard', (req, res) => {
+// データ管理API
+app.get('/api/data-manager/collections', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guildId = req.session.guildId;
+        const collections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        const result = {};
+
+        for (const collectionName of collections) {
+            const collectionRef = collection(db, collectionName);
+            const q = query(collectionRef, where('guildId', '==', guildId));
+            const snapshot = await getDocs(q);
+            result[collectionName] = snapshot.size;
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching collection counts:', error);
+        res.status(500).json({ error: 'Failed to fetch data.' });
+    }
+});
+
+app.get('/api/data-manager/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { collection: collectionName } = req.params;
+        const guildId = req.session.guildId;
+        const { page = 1, limit: pageLimit = 20 } = req.query;
+
+        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        if (!validCollections.includes(collectionName)) {
+            return res.status(400).json({ error: 'Invalid collection name.' });
+        }
+
+        const collectionRef = collection(db, collectionName);
+        const q = query(collectionRef, where('guildId', '==', guildId));
+        const snapshot = await getDocs(q);
+
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const totalItems = data.length;
+        const startIndex = (page - 1) * pageLimit;
+        const paginatedData = data.slice(startIndex, startIndex + parseInt(pageLimit));
+
+        res.json({
+            data: paginatedData,
+            totalItems,
+            totalPages: Math.ceil(totalItems / pageLimit),
+            currentPage: parseInt(page)
+        });
+    } catch (error) {
+        console.error(`Error fetching ${req.params.collection}:`, error);
+        res.status(500).json({ error: 'Failed to fetch data.' });
+    }
+});
+
+app.delete('/api/data-manager/:collection/:id', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { collection: collectionName, id } = req.params;
+        const guildId = req.session.guildId;
+
+        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        if (!validCollections.includes(collectionName)) {
+            return res.status(400).json({ error: 'Invalid collection name.' });
+        }
+
+        const docRef = doc(db, collectionName, id);
+        const docSnap = await getDoc(docRef);
+
+        if (!docSnap.exists() || docSnap.data().guildId !== guildId) {
+            return res.status(404).json({ error: 'Document not found or access denied.' });
+        }
+
+        await deleteDoc(docRef);
+        res.status(200).json({ message: 'Document deleted successfully.' });
+    } catch (error) {
+        console.error(`Error deleting document:`, error);
+        res.status(500).json({ error: 'Failed to delete document.' });
+    }
+});
+
+app.delete('/api/data-manager/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const { collection: collectionName } = req.params;
+        const guildId = req.session.guildId;
+
+        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        if (!validCollections.includes(collectionName)) {
+            return res.status(400).json({ error: 'Invalid collection name.' });
+        }
+
+        const collectionRef = collection(db, collectionName);
+        const q = query(collectionRef, where('guildId', '==', guildId));
+        const snapshot = await getDocs(q);
+
+        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+
+        res.status(200).json({ message: `Deleted ${snapshot.size} documents from ${collectionName}.`, count: snapshot.size });
+    } catch (error) {
+        console.error(`Error deleting collection:`, error);
+        res.status(500).json({ error: 'Failed to delete collection data.' });
+    }
+});
+
+app.get('/', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/dashboard', (_req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-app.get('/admin', (req, res) => {
+app.get('/data-manager', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'data-manager.html'));
+});
+
+app.get('/login', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/admin', (_req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/admin-login.html', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
 app.get('*', (req, res) => {
@@ -771,14 +916,7 @@ app.get('*', (req, res) => {
     if (fs.existsSync(filePath) && fs.lstatSync(filePath).isFile()) {
         return res.sendFile(filePath);
     }
-    if (req.path === '/login') {
-        return res.sendFile(path.join(__dirname, 'public', 'login.html'));
-    }
-    if (req.path === '/admin-login.html' || req.path === '/admin.html') {
-        const adminPage = req.path.substring(1);
-        return res.sendFile(path.join(__dirname, 'public', adminPage));
-    }
-    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    return res.redirect('/dashboard');
   }
 });
 

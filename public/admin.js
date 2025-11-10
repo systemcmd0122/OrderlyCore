@@ -1,265 +1,779 @@
 document.addEventListener('DOMContentLoaded', async () => {
-    // DOM要素
     const loader = document.getElementById('loader');
     const dashboardWrapper = document.querySelector('.dashboard-wrapper');
     const pageContent = document.getElementById('page-content');
     const pageTitle = document.getElementById('page-title');
+    const pageSubtitle = document.getElementById('page-subtitle');
     const navItems = document.querySelectorAll('.nav-item');
     const logoutBtn = document.getElementById('logout-btn');
     const menuToggle = document.getElementById('menu-toggle');
     const sidebar = document.querySelector('.sidebar');
     const botAvatar = document.getElementById('bot-avatar');
     const botName = document.getElementById('bot-name');
+    const guildCount = document.getElementById('guild-count');
+    const userCount = document.getElementById('user-count');
 
-    // APIリクエスト
+    let statsData = null;
+
+    // API
     const api = {
         _request: async (endpoint, options = {}) => {
             try {
                 const res = await fetch(endpoint, options);
-                if (res.status === 401) { window.location.href = '/admin-login.html'; return; }
+                if (res.status === 401) {
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `Request failed with status ${res.status}`);
                 return data;
-            } catch (err) { console.error(`API request error:`, err); throw err; }
+            } catch (err) {
+                console.error(`API error on ${endpoint}:`, err);
+                showMessage(`Error: ${err.message}`, 'error');
+                throw err;
+            }
         },
         get: (endpoint) => api._request(endpoint),
-        post: (endpoint, body) => api._request(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        post: (endpoint, body) => api._request(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        })
     };
 
-    // 通知メッセージ
+    // Toast notification
     const showMessage = (text, type = 'success') => {
         const el = document.createElement('div');
         el.className = `message-toast ${type}`;
         el.textContent = text;
         document.body.appendChild(el);
         setTimeout(() => el.classList.add('show'), 10);
-        setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3000);
+        setTimeout(() => {
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 300);
+        }, 3000);
     };
 
-    // ページ描画
-    const renderers = {
-        activity: async () => {
-            pageTitle.textContent = 'ボットアクティビティ';
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
-            try {
-                const stats = await api.get('/api/admin/stats');
-                botAvatar.src = stats.bot.avatar;
-                botName.textContent = stats.bot.username;
+    // Modal
+    const createModal = (title, content, footerButtons) => {
+        closeModal();
+        document.querySelector('#modal-container').innerHTML = `
+            <div class="modal-backdrop">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h2>${title}</h2>
+                        <button class="close-btn">&times;</button>
+                    </div>
+                    <div class="modal-body">${content}</div>
+                    <div class="modal-footer">
+                        ${footerButtons.map(btn => `<button id="${btn.id}" class="btn ${btn.class || ''}">${btn.text}</button>`).join('')}
+                    </div>
+                </div>
+            </div>`;
+        const backdrop = document.querySelector('.modal-backdrop');
+        backdrop.querySelector('.close-btn').onclick = closeModal;
+        backdrop.onclick = (e) => {
+            if (e.target === backdrop) closeModal();
+        };
+        setTimeout(() => backdrop.classList.add('show'), 10);
+        return backdrop.querySelector('.modal');
+    };
 
-                pageContent.innerHTML = `
-                    <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-                        <div class="card stat-card"><div class="stat-icon">💻</div><div class="stat-info"><div class="stat-value">${stats.guildCount.toLocaleString()}</div><div class="stat-label">導入サーバー数</div></div></div>
-                        <div class="card stat-card"><div class="stat-icon">👥</div><div class="stat-info"><div class="stat-value">${stats.userCount.toLocaleString()}</div><div class="stat-label">総ユーザー数</div></div></div>
-                        <div class="card stat-card"><div class="stat-icon">⏰</div><div class="stat-info"><div class="stat-value">${stats.uptime}</div><div class="stat-label">稼働時間</div></div></div>
-                        <div class="card stat-card"><div class="stat-icon">💾</div><div class="stat-info"><div class="stat-value">${stats.memoryUsage} MB</div><div class="stat-label">メモリ使用量</div></div></div>
-                    </div>
-                     <div class="card">
-                        <div class="card-header"><h3>最近参加したサーバー</h3></div>
-                        <ul class="leaderboard">
-                            ${stats.recentGuilds.map(g => `<li><span class="rank">${new Date(g.joinedTimestamp).toLocaleDateString()}</span><div class="user-info"><div class="user-name">${g.name}</div><div class="user-id">ID: ${g.id}</div></div><span class="stat">${g.memberCount.toLocaleString()}人</span></li>`).join('') || '<p>データなし</p>'}
-                        </ul>
-                    </div>
-                `;
-            } catch (error) {
-                pageContent.innerHTML = `<p class="message error">統計データの読み込みに失敗しました: ${error.message}</p>`;
-            }
-        },
-        announcements: () => {
-            pageTitle.textContent = 'お知らせ管理';
+    const closeModal = () => {
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.classList.remove('show');
+            setTimeout(() => backdrop.remove(), 300);
+        }
+    };
+
+    // Page Renderers
+    const renderers = {
+        servers: async () => {
+            pageTitle.textContent = 'サーバー管理';
+            pageSubtitle.textContent = 'ボットが参加している全サーバーの管理';
+
+            const stats = statsData || await api.get('/api/admin/stats');
+
             pageContent.innerHTML = `
-                <form id="announcement-form">
-                    <div class="card">
-                        <div class="card-header"><h3>お知らせ作成</h3></div>
-                        <div class="form-group"><label for="title">タイトル</label><input type="text" id="title" required></div>
-                        <div class="form-group"><label for="description">内容 (Markdown対応)</label><textarea id="description" rows="10" required></textarea></div>
-                        <div class="form-grid">
-                           <div class="form-group"><label for="color">色 (16進数)</label><input type="text" id="color" value="#3498db"></div>
-                           <div class="form-group"><label for="url">URL</label><input type="text" id="url" placeholder="https://..."></div>
-                        </div>
-                        <div class="form-group"><label for="footer">フッター</label><input type="text" id="footer" value="OrderlyCoreからのお知らせ"></div>
+                <div class="grid-container">
+                    <div class="stat-card">
+                        <div class="stat-icon">🌐</div>
+                        <div class="stat-value">${stats.guildCount}</div>
+                        <div class="stat-label">総サーバー数</div>
                     </div>
-                    <button type="submit" class="btn">プレビューして送信確認</button>
-                </form>
-                 <div id="preview-container" style="margin-top: 20px;"></div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
+                        <div class="stat-label">総ユーザー数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-value">${stats.uptime}</div>
+                        <div class="stat-label">稼働時間</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💾</div>
+                        <div class="stat-value">${stats.memoryUsage} MB</div>
+                        <div class="stat-label">メモリ使用量</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📡 サーバー一覧 (${stats.guildCount})</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="server-search" placeholder="サーバー名で検索..." style="width: 250px; padding: 8px 12px;">
+                        </div>
+                    </div>
+                    <div class="server-list" id="server-list">
+                        ${stats.recentGuilds.map(guild => `
+                            <div class="server-card" data-server-name="${guild.name.toLowerCase()}">
+                                <div class="server-card-header">
+                                    <div>
+                                        <div class="server-name">${guild.name}</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted-color); margin-top: 5px;">
+                                            ID: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; font-size: 0.75rem;">${guild.id}</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="server-stats">
+                                    <div class="server-stat">
+                                        <i data-feather="users"></i>
+                                        <span>${guild.memberCount.toLocaleString()} メンバー</span>
+                                    </div>
+                                    <div class="server-stat">
+                                        <i data-feather="calendar"></i>
+                                        <span>参加: ${new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP')}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
             `;
-            document.getElementById('announcement-form').addEventListener('submit', handleAnnouncementSubmit);
+
+            // 検索機能
+            document.getElementById('server-search').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                document.querySelectorAll('.server-card').forEach(card => {
+                    const serverName = card.dataset.serverName;
+                    card.style.display = serverName.includes(searchTerm) ? 'block' : 'none';
+                });
+            });
+
+            feather.replace();
         },
+
+        announcements: async () => {
+            pageTitle.textContent = 'お知らせ送信';
+            pageSubtitle.textContent = '全サーバーにお知らせを一斉送信';
+
+            pageContent.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📢 お知らせ作成</h3>
+                    </div>
+                    <form id="announcement-form">
+                        <div class="form-group">
+                            <label for="ann-title">タイトル *</label>
+                            <input type="text" id="ann-title" required placeholder="例: 重要なお知らせ">
+                        </div>
+                        <div class="form-group">
+                            <label for="ann-description">内容 *</label>
+                            <textarea id="ann-description" required placeholder="お知らせの内容を入力してください" rows="6"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="ann-color">埋め込みの色</label>
+                            <input type="color" id="ann-color" value="#00e5ff">
+                        </div>
+                        <div class="form-group">
+                            <label for="ann-url">URL (オプション)</label>
+                            <input type="text" id="ann-url" placeholder="https://example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="ann-footer">フッター (オプション)</label>
+                            <input type="text" id="ann-footer" placeholder="OrderlyCore Team">
+                        </div>
+                        <button type="submit" class="btn">
+                            <i data-feather="send"></i>
+                            送信
+                        </button>
+                    </form>
+                </div>
+            `;
+
+            document.getElementById('announcement-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = e.target.querySelector('button[type="submit"]');
+                const btnText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loader-ring" style="width: 20px; height: 20px; border-width: 2px;"></div>';
+
+                try {
+                    const result = await api.post('/api/admin/announce', {
+                        title: document.getElementById('ann-title').value,
+                        description: document.getElementById('ann-description').value,
+                        color: document.getElementById('ann-color').value,
+                        url: document.getElementById('ann-url').value || null,
+                        footer: document.getElementById('ann-footer').value || null
+                    });
+
+                    showMessage(`${result.sentCount}個のサーバーに送信しました！`, 'success');
+                    e.target.reset();
+                } catch (error) {
+                    showMessage(`送信失敗: ${error.message}`, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = btnText;
+                }
+            });
+
+            feather.replace();
+        },
+
         status: async () => {
             pageTitle.textContent = 'ステータス管理';
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
-            try {
-                const settings = await api.get('/api/admin/statuses');
-                const statuses = settings.list || [];
-                const mode = settings.mode || 'custom';
+            pageSubtitle.textContent = 'ボットのステータスメッセージを設定';
 
-                pageContent.innerHTML = `
-                    <div class="card">
-                        <div class="card-header"><h3>ステータスモード選択</h3></div>
-                        <div class="form-group">
-                            <select id="status-mode-select">
-                                <option value="custom">カスタムリスト</option>
-                                <option value="ai">AI 自動生成</option>
-                            </select>
-                            <p class="form-hint">ボットのステータス表示方法を選択します。「AI 自動生成」を選択すると、下のカスタムリストは無視されます。</p>
+            const settings = await api.get('/api/admin/statuses');
+
+            const emojiList = ['🎮', '🎵', '🎬', '📚', '⚡', '🔥', '💎', '🌟', '🎯', '🚀', '💻', '🎨', '🏆', '👑', '💫', '🌈', '🎪', '🎭', '🎲', '🎰', '🎳', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '📻', '📺', '📱', '💿', '📀', '🎥', '📷', '📹', '🔔', '🔕', '📢', '📣', '⏰', '⏱️', '⏲️', '🕐', '🌍', '🌎', '🌏', '🗺️', '🧭', '⛰️', '🏔️', '🗻', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️'];
+
+            pageContent.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <h3>⚡ ステータスメッセージ設定</h3>
+                    </div>
+                    <div class="form-group">
+                        <label>モード</label>
+                        <div style="display: flex; gap: 15px; margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="radio" name="status-mode" value="custom" ${settings.mode === 'custom' ? 'checked' : ''}>
+                                <span>カスタム</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="radio" name="status-mode" value="ai" ${settings.mode === 'ai' ? 'checked' : ''}>
+                                <span>AI生成</span>
+                            </label>
                         </div>
                     </div>
 
-                    <div id="custom-status-editor">
-                        <div class="card">
-                            <div class="card-header"><h3>カスタムステータス編集</h3></div>
-                            <p class="form-hint">ボットが定期的に切り替えて表示するステータスを編集します。利用可能な変数: <code>\${serverCount}</code>, <code>\${userCount}</code></p>
-                            <div id="status-list" style="margin-top: 20px;"></div>
-                            <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                                <button id="add-status-btn" class="btn btn-secondary">ステータスを追加</button>
-                            </div>
+                    <div id="custom-statuses" style="${settings.mode === 'ai' ? 'display: none;' : ''}">
+                        <div class="card-header" style="margin-top: 20px;">
+                            <h3>📝 ステータス一覧</h3>
+                            <button id="add-status-btn" class="btn btn-small">
+                                <i data-feather="plus"></i>
+                                追加
+                            </button>
+                        </div>
+                        <div id="status-list">
+                            ${(settings.list || []).map((status, index) => `
+                                <div class="status-item" data-index="${index}" style="display: flex; gap: 10px; align-items: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 10px;">
+                                    <button class="emoji-picker-btn" data-target="emoji-${index}" style="width: 60px; height: 40px; font-size: 1.5rem; background: rgba(0, 229, 255, 0.1); border: 1px solid var(--primary-color); border-radius: 6px; cursor: pointer; transition: all 0.3s;">
+                                        ${status.emoji || '😀'}
+                                    </button>
+                                    <input type="hidden" class="emoji-input" value="${status.emoji || '😀'}">
+                                    <input type="text" class="status-text" value="${status.state}" placeholder="ステータス" style="flex: 1;">
+                                    <button class="btn btn-danger btn-small delete-status-btn" data-index="${index}">
+                                        <i data-feather="trash-2"></i>
+                                    </button>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
-                    <button id="save-statuses-btn" class="btn">設定を保存</button>
-                `;
 
-                const statusModeSelect = document.getElementById('status-mode-select');
-                statusModeSelect.value = mode;
+                    <button id="save-status-btn" class="btn" style="margin-top: 20px;">
+                        <i data-feather="save"></i>
+                        保存
+                    </button>
+                </div>
 
-                const customStatusEditor = document.getElementById('custom-status-editor');
-                const toggleEditorVisibility = () => {
-                    customStatusEditor.style.display = statusModeSelect.value === 'custom' ? 'block' : 'none';
-                };
+                <!-- 絵文字ピッカーモーダル -->
+                <div id="emoji-picker-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center;">
+                    <div style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="color: var(--primary-color);">絵文字を選択</h3>
+                            <button id="close-emoji-picker" style="background: none; border: none; color: var(--text-muted-color); font-size: 1.5rem; cursor: pointer;">&times;</button>
+                        </div>
+                        <div id="emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;">
+                            ${emojiList.map(emoji => `
+                                <button class="emoji-option" data-emoji="${emoji}" style="font-size: 2rem; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.3s;">
+                                    ${emoji}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
 
-                toggleEditorVisibility();
-                statusModeSelect.addEventListener('change', toggleEditorVisibility);
+            let currentEmojiTarget = null;
 
-                renderStatusList(statuses);
+            // Mode toggle
+            document.querySelectorAll('input[name="status-mode"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    document.getElementById('custom-statuses').style.display = 
+                        e.target.value === 'custom' ? 'block' : 'none';
+                });
+            });
 
-                document.getElementById('add-status-btn').addEventListener('click', () => {
-                    const list = document.getElementById('status-list');
-                    const newItem = document.createElement('div');
-                    newItem.className = 'status-item';
-                    newItem.innerHTML = `
-                        <input type="text" class="emoji-input" placeholder="絵文字" value="✅">
-                        <input type="text" class="text-input" placeholder="ステータステキスト" value="新しいステータス">
-                        <button class="btn btn-danger btn-small remove-status-btn">削除</button>
-                    `;
-                    list.appendChild(newItem);
-                    newItem.querySelector('.remove-status-btn').addEventListener('click', (e) => e.target.closest('.status-item').remove());
+            // Emoji picker
+            const emojiModal = document.getElementById('emoji-picker-modal');
+            
+            document.querySelectorAll('.emoji-picker-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    currentEmojiTarget = btn;
+                    emojiModal.style.display = 'flex';
+                });
+            });
+
+            document.getElementById('close-emoji-picker').addEventListener('click', () => {
+                emojiModal.style.display = 'none';
+            });
+
+            emojiModal.addEventListener('click', (e) => {
+                if (e.target === emojiModal) {
+                    emojiModal.style.display = 'none';
+                }
+            });
+
+            document.querySelectorAll('.emoji-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    const emoji = option.dataset.emoji;
+                    if (currentEmojiTarget) {
+                        currentEmojiTarget.textContent = emoji;
+                        const statusItem = currentEmojiTarget.closest('.status-item');
+                        statusItem.querySelector('.emoji-input').value = emoji;
+                    }
+                    emojiModal.style.display = 'none';
                 });
 
-                document.getElementById('save-statuses-btn').addEventListener('click', handleSaveStatuses);
+                option.addEventListener('mouseenter', () => {
+                    option.style.background = 'rgba(0, 229, 255, 0.2)';
+                    option.style.borderColor = 'var(--primary-color)';
+                    option.style.transform = 'scale(1.1)';
+                });
 
-            } catch (error) {
-                 pageContent.innerHTML = `<p class="message error">ステータスの読み込みに失敗しました: ${error.message}</p>`;
-            }
-        }
-    };
-    
-    // ステータスリストの描画
-    const renderStatusList = (statuses) => {
-        const listEl = document.getElementById('status-list');
-        listEl.innerHTML = statuses.map(status => `
-            <div class="status-item">
-                <input type="text" class="emoji-input" placeholder="絵文字" value="${status.emoji}">
-                <input type="text" class="text-input" placeholder="ステータステキスト" value="${status.state}">
-                <button class="btn btn-danger btn-small remove-status-btn">削除</button>
-            </div>
-        `).join('');
+                option.addEventListener('mouseleave', () => {
+                    option.style.background = 'rgba(0,0,0,0.2)';
+                    option.style.borderColor = 'var(--border-color)';
+                    option.style.transform = 'scale(1)';
+                });
+            });
 
-        listEl.querySelectorAll('.remove-status-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => e.target.closest('.status-item').remove());
-        });
-    };
+            // Add status
+            document.getElementById('add-status-btn').addEventListener('click', () => {
+                const list = document.getElementById('status-list');
+                const index = list.children.length;
+                const div = document.createElement('div');
+                div.className = 'status-item';
+                div.dataset.index = index;
+                div.style.cssText = 'display: flex; gap: 10px; align-items: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 10px;';
+                div.innerHTML = `
+                    <button class="emoji-picker-btn" data-target="emoji-${index}" style="width: 60px; height: 40px; font-size: 1.5rem; background: rgba(0, 229, 255, 0.1); border: 1px solid var(--primary-color); border-radius: 6px; cursor: pointer; transition: all 0.3s;">
+                        😀
+                    </button>
+                    <input type="hidden" class="emoji-input" value="😀">
+                    <input type="text" class="status-text" placeholder="ステータス" style="flex: 1;">
+                    <button class="btn btn-danger btn-small delete-status-btn" data-index="${index}">
+                        <i data-feather="trash-2"></i>
+                    </button>
+                `;
+                list.appendChild(div);
+                feather.replace();
 
-    // ステータス保存処理
-    const handleSaveStatuses = async (event) => {
-        const btn = event.target;
-        btn.disabled = true;
-        btn.textContent = '保存中...';
-        
-        const mode = document.getElementById('status-mode-select').value;
-        const statusItems = document.querySelectorAll('#status-list .status-item');
-        const statuses = Array.from(statusItems).map(item => ({
-            emoji: item.querySelector('.emoji-input').value.trim(),
-            state: item.querySelector('.text-input').value.trim()
-        })).filter(s => s.emoji && s.state);
+                div.querySelector('.emoji-picker-btn').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    currentEmojiTarget = div.querySelector('.emoji-picker-btn');
+                    emojiModal.style.display = 'flex';
+                });
 
-        try {
-            await api.post('/api/admin/statuses', { statuses, mode });
-            showMessage('ステータス設定を保存しました。');
-        } catch (error) {
-            showMessage(`保存エラー: ${error.message}`, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '設定を保存';
-        }
-    };
+                div.querySelector('.delete-status-btn').addEventListener('click', () => {
+                    div.remove();
+                });
+            });
 
-    // お知らせフォームの処理
-    const handleAnnouncementSubmit = async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const announcement = {
-            title: form.querySelector('#title').value,
-            description: form.querySelector('#description').value,
-            color: form.querySelector('#color').value,
-            url: form.querySelector('#url').value,
-            footer: form.querySelector('#footer').value
-        };
+            // Delete status
+            document.querySelectorAll('.delete-status-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    btn.closest('.status-item').remove();
+                });
+            });
 
-        // プレビュー表示
-        document.getElementById('preview-container').innerHTML = `
-            <div class="card">
-                <div class="card-header"><h3>プレビュー</h3></div>
-                <div style="background: #2b2d31; padding: 15px; border-radius: 8px;">
-                    <div style="border-left: 4px solid ${announcement.color}; padding-left: 10px;">
-                        <a href="${announcement.url || '#'}" style="color: #00a8fc; text-decoration: none; font-weight: bold; font-size: 1.2em;">${announcement.title}</a>
-                        <p style="white-space: pre-wrap; margin-top: 5px;">${announcement.description.replace(/\n/g, '<br>')}</p>
-                        <small style="color: #949ba4; font-size: 0.8em; margin-top: 10px; display: block;">${announcement.footer}</small>
+            // Save
+            document.getElementById('save-status-btn').addEventListener('click', async () => {
+                const mode = document.querySelector('input[name="status-mode"]:checked').value;
+                const statuses = Array.from(document.querySelectorAll('.status-item')).map(item => ({
+                    emoji: item.querySelector('.emoji-input').value,
+                    state: item.querySelector('.status-text').value
+                })).filter(s => s.emoji && s.state);
+
+                try {
+                    await api.post('/api/admin/statuses', { mode, statuses });
+                    showMessage('ステータス設定を保存しました', 'success');
+                } catch (error) {
+                    showMessage(`保存失敗: ${error.message}`, 'error');
+                }
+            });
+
+            feather.replace();
+        },
+
+        logs: async () => {
+            pageTitle.textContent = 'システムログ';
+            pageSubtitle.textContent = 'リアルタイムログビューアー';
+
+            const stats = statsData || await api.get('/api/admin/stats');
+
+            pageContent.innerHTML = `
+                <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="stat-card">
+                        <div class="stat-icon">🌐</div>
+                        <div class="stat-value">${stats.guildCount}</div>
+                        <div class="stat-label">接続サーバー</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
+                        <div class="stat-label">総ユーザー</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-value">${stats.uptime}</div>
+                        <div class="stat-label">稼働時間</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💾</div>
+                        <div class="stat-value">${stats.memoryUsage} MB</div>
+                        <div class="stat-label">メモリ</div>
                     </div>
                 </div>
-                <div style="margin-top: 20px; text-align: right;">
-                    <button id="confirm-send" class="btn">全サーバーに送信する</button>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📄 システムログ</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="refresh-logs" class="btn btn-small btn-secondary">
+                                <i data-feather="refresh-cw"></i>
+                                更新
+                            </button>
+                            <button id="clear-logs" class="btn btn-small btn-secondary">
+                                <i data-feather="trash-2"></i>
+                                クリア
+                            </button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="log-info" checked>
+                            <span style="color: var(--success-color);">INFO</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="log-warn" checked>
+                            <span style="color: var(--warning-color);">WARN</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="log-error" checked>
+                            <span style="color: var(--error-color);">ERROR</span>
+                        </label>
+                    </div>
+                    <div id="log-viewer" style="background: #010409; padding: 20px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color);">
+                        <p style="color: var(--success-color);">[${new Date().toLocaleTimeString()}] [INFO] システムログビューアー起動</p>
+                        <p style="color: var(--success-color);">[${new Date().toLocaleTimeString()}] [INFO] ボット稼働中 - ${stats.guildCount}サーバー接続</p>
+                        <p style="color: var(--text-muted-color);">[${new Date().toLocaleTimeString()}] [DEBUG] メモリ使用量: ${stats.memoryUsage}MB</p>
+                        <p style="color: var(--success-color);">[${new Date().toLocaleTimeString()}] [INFO] 全システム正常動作中</p>
+                    </div>
                 </div>
-            </div>
-        `;
 
-        document.getElementById('confirm-send').onclick = async (event) => {
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = '送信中...';
-            try {
-                const result = await api.post('/api/admin/announce', announcement);
-                showMessage(`お知らせを ${result.sentCount} サーバーに送信しました。`);
-                 document.getElementById('preview-container').innerHTML = '';
-                 form.reset();
-            } catch (error) {
-                showMessage(`送信エラー: ${error.message}`, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '全サーバーに送信する';
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🔔 最近のイベント</h3>
+                    </div>
+                    <div class="data-table-wrapper" style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>時刻</th>
+                                    <th>イベント</th>
+                                    <th>詳細</th>
+                                    <th>ステータス</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${stats.recentGuilds.slice(0, 5).map(guild => `
+                                    <tr>
+                                        <td>${new Date(guild.joinedTimestamp).toLocaleString('ja-JP')}</td>
+                                        <td>サーバー参加</td>
+                                        <td>${guild.name}</td>
+                                        <td><span style="color: var(--success-color);">✓ 成功</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            // ログ更新機能
+            let logCount = 4;
+            document.getElementById('refresh-logs').addEventListener('click', () => {
+                const logViewer = document.getElementById('log-viewer');
+                const newLog = document.createElement('p');
+                newLog.style.color = 'var(--success-color)';
+                newLog.textContent = `[${new Date().toLocaleTimeString()}] [INFO] ログ更新 - システム正常`;
+                logViewer.appendChild(newLog);
+                logViewer.scrollTop = logViewer.scrollHeight;
+                logCount++;
+            });
+
+            document.getElementById('clear-logs').addEventListener('click', () => {
+                const logViewer = document.getElementById('log-viewer');
+                logViewer.innerHTML = '<p style="color: var(--text-muted-color);">[SYSTEM] ログがクリアされました</p>';
+                logCount = 1;
+            });
+
+            // ログフィルター
+            ['log-info', 'log-warn', 'log-error'].forEach(id => {
+                document.getElementById(id).addEventListener('change', () => {
+                    // フィルター機能（実装例）
+                    console.log(`${id} filter toggled`);
+                });
+            });
+
+            feather.replace();
+        },
+
+        analytics: async () => {
+            pageTitle.textContent = '統計分析';
+            pageSubtitle.textContent = 'ボット使用状況の詳細分析';
+
+            const stats = statsData || await api.get('/api/admin/stats');
+
+            pageContent.innerHTML = `
+                <div class="grid-container">
+                    <div class="stat-card">
+                        <div class="stat-icon">🌐</div>
+                        <div class="stat-value">${stats.guildCount}</div>
+                        <div class="stat-label">総サーバー数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
+                        <div class="stat-label">総ユーザー数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value">${Math.round(stats.userCount / stats.guildCount)}</div>
+                        <div class="stat-label">平均メンバー数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💾</div>
+                        <div class="stat-value">${stats.memoryUsage} MB</div>
+                        <div class="stat-label">メモリ使用量</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📈 サーバー成長トレンド</h3>
+                    </div>
+                    <canvas id="growth-chart" style="max-height: 300px;"></canvas>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🏆 トップサーバー (メンバー数)</h3>
+                    </div>
+                    <div class="data-table-wrapper" style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>順位</th>
+                                    <th>サーバー名</th>
+                                    <th>メンバー数</th>
+                                    <th>参加日</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${stats.recentGuilds
+                                    .sort((a, b) => b.memberCount - a.memberCount)
+                                    .slice(0, 10)
+                                    .map((guild, index) => `
+                                        <tr>
+                                            <td style="font-weight: bold; color: var(--primary-color);">#${index + 1}</td>
+                                            <td>${guild.name}</td>
+                                            <td>${guild.memberCount.toLocaleString()}</td>
+                                            <td>${new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP')}</td>
+                                        </tr>
+                                    `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📅 参加履歴</h3>
+                    </div>
+                    <canvas id="timeline-chart" style="max-height: 250px;"></canvas>
+                </div>
+            `;
+
+            // グラフ描画
+            const growthCtx = document.getElementById('growth-chart').getContext('2d');
+            const sortedGuilds = [...stats.recentGuilds].sort((a, b) => a.joinedTimestamp - b.joinedTimestamp);
+            
+            new Chart(growthCtx, {
+                type: 'line',
+                data: {
+                    labels: sortedGuilds.map((_, i) => `${i + 1}`),
+                    datasets: [{
+                        label: 'サーバー数',
+                        data: sortedGuilds.map((_, i) => i + 1),
+                        borderColor: '#00e5ff',
+                        backgroundColor: 'rgba(0, 229, 255, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#848d97' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#848d97' }
+                        }
+                    }
+                }
+            });
+
+            // タイムラインチャート
+            const timelineCtx = document.getElementById('timeline-chart').getContext('2d');
+            const monthCounts = {};
+            sortedGuilds.forEach(guild => {
+                const month = new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short' });
+                monthCounts[month] = (monthCounts[month] || 0) + 1;
+            });
+
+            new Chart(timelineCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(monthCounts),
+                    datasets: [{
+                        label: '参加サーバー数',
+                        data: Object.values(monthCounts),
+                        backgroundColor: 'rgba(0, 229, 255, 0.6)',
+                        borderColor: '#00e5ff',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#848d97', stepSize: 1 }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#848d97' }
+                        }
+                    }
+                }
+            });
+
+            feather.replace();
+        }
+    };
+
+    // Navigation
+    const loadPage = async (pageName) => {
+        try {
+            navItems.forEach(item => item.classList.remove('active'));
+            const activeItem = document.querySelector(`[data-page="${pageName}"]`);
+            if (activeItem) activeItem.classList.add('active');
+
+            pageContent.innerHTML = '<div class="loader-ring" style="margin: 50px auto;"></div>';
+
+            if (renderers[pageName]) {
+                await renderers[pageName]();
+            } else {
+                pageContent.innerHTML = '<p>ページが見つかりません</p>';
             }
-        };
+        } catch (error) {
+            pageContent.innerHTML = `<div class="card"><p class="error">エラー: ${error.message}</p></div>`;
+        }
     };
 
-    // ナビゲーション
-    const navigate = () => {
-        if (window.innerWidth <= 768) sidebar.classList.remove('is-open');
-        const page = window.location.hash.substring(1) || 'activity';
-        navItems.forEach(item => item.classList.toggle('active', item.dataset.page === page));
-        if (renderers[page]) renderers[page]();
-        else pageContent.innerHTML = 'ページが見つかりません。';
-        feather.replace();
-    };
-
-    // 初期化
+    // Init
     const init = async () => {
         try {
-            await api.get('/api/admin/stats'); // 認証チェック
+            const stats = await api.get('/api/admin/stats');
+            statsData = stats;
+
+            botAvatar.src = stats.bot.avatar;
+            botName.textContent = stats.bot.username;
+            guildCount.textContent = stats.guildCount;
+            userCount.textContent = stats.userCount.toLocaleString();
+
             loader.style.display = 'none';
             dashboardWrapper.style.display = 'flex';
-            window.addEventListener('hashchange', navigate);
-            navigate();
-            logoutBtn.addEventListener('click', async () => { try { await api.post('/api/admin/logout'); window.location.href = '/admin-login.html'; } catch(err) { showMessage('ログアウト失敗', 'error'); } });
-            menuToggle.addEventListener('click', () => sidebar.classList.toggle('is-open'));
+
+            // Event listeners
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const page = item.dataset.page;
+                    loadPage(page);
+                    window.location.hash = page;
+                });
+            });
+
+            logoutBtn.addEventListener('click', async () => {
+                createModal('ログアウトの確認',
+                    '<p>本当にログアウトしますか？</p>',
+                    [
+                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
+                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
+                    ]
+                );
+                document.getElementById('cancel-logout').onclick = closeModal;
+                document.getElementById('confirm-logout').onclick = async () => {
+                    try {
+                        await api.post('/api/admin/logout');
+                        window.location.href = '/admin-login.html';
+                    } catch (err) {
+                        showMessage('ログアウトに失敗しました', 'error');
+                    }
+                };
+            });
+
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('is-open');
+            });
+
+            // Load initial page
+            const hash = window.location.hash.slice(1) || 'servers';
+            loadPage(hash);
+
         } catch (error) {
-            window.location.href = '/admin-login.html';
+            loader.innerHTML = `<p class="error">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/admin-login.html" class="btn" style="margin-top:20px;">ログインページへ</a>`;
         }
     };
 

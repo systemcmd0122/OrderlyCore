@@ -1,38 +1,68 @@
 const { collection, query, where, getDocs, deleteDoc, doc } = require('firebase/firestore');
+const chalk = require('chalk');
 
 module.exports = {
     name: 'guildDelete',
     async execute(guild, client) {
-        console.log(`👋 サーバーから退出: ${guild.name} (ID: ${guild.id})`);
-        console.log(`📊 現在のサーバー数: ${client.guilds.cache.size}`);
+        console.log(chalk.yellow(`👋 サーバーから退出: ${guild.name} (ID: ${guild.id})`));
+        console.log(chalk.cyan(`📊 現在のサーバー数: ${client.guilds.cache.size}`));
 
         try {
             const guildId = guild.id;
-            let deletedCount = 0;
+            const db = client.db;
+            let totalDeleted = 0;
 
-            // 1. このサーバーのロールボードデータを削除
-            const boardsRef = collection(client.db, 'roleboards');
-            const boardQuery = query(boardsRef, where('guildId', '==', guildId));
-            const boardSnapshot = await getDocs(boardQuery);
-            
-            const boardDeletePromises = [];
-            boardSnapshot.forEach(doc => {
-                boardDeletePromises.push(deleteDoc(doc.ref));
-                deletedCount++;
-            });
-            await Promise.all(boardDeletePromises);
-            
-            if (deletedCount > 0) {
-                console.log(`🗑️ ${guild.name} の ${deletedCount} 個のロールボードデータを削除しました`);
+            // 削除するコレクションのリスト
+            const collectionsToClean = [
+                { name: 'roleboards', field: 'guildId' },
+                { name: 'levels', field: 'guildId' },
+                { name: 'warnings', field: 'guildId' },
+                { name: 'audit_logs', field: 'guildId' },
+                { name: 'quotes', field: 'guildId' }
+            ];
+
+            // 各コレクションからギルドデータを削除
+            for (const collectionInfo of collectionsToClean) {
+                try {
+                    const collectionRef = collection(db, collectionInfo.name);
+                    const q = query(collectionRef, where(collectionInfo.field, '==', guildId));
+                    const snapshot = await getDocs(q);
+                    
+                    if (!snapshot.empty) {
+                        const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+                        await Promise.all(deletePromises);
+                        totalDeleted += snapshot.size;
+                        console.log(chalk.green(`🗑️ ${collectionInfo.name}: ${snapshot.size}件削除`));
+                    }
+                } catch (error) {
+                    console.error(chalk.red(`❌ ${collectionInfo.name}の削除エラー:`), error.message);
+                }
             }
 
-            // 2. このサーバーの設定データ（ウェルカム、ボイスログ等）を削除
-            const guildConfigRef = doc(client.db, 'guilds', guildId);
-            await deleteDoc(guildConfigRef);
-            console.log(`🗑️ ${guild.name} のサーバー設定データを削除しました`);
+            // ギルド設定を削除
+            try {
+                const guildSettingsRef = doc(db, 'guild_settings', guildId);
+                await deleteDoc(guildSettingsRef);
+                totalDeleted++;
+                console.log(chalk.green(`🗑️ guild_settings: 削除完了`));
+            } catch (error) {
+                console.error(chalk.red(`❌ guild_settingsの削除エラー:`), error.message);
+            }
+
+            // guildsコレクションからも削除
+            try {
+                const guildsRef = doc(db, 'guilds', guildId);
+                await deleteDoc(guildsRef);
+                totalDeleted++;
+                console.log(chalk.green(`🗑️ guilds: 削除完了`));
+            } catch (error) {
+                console.error(chalk.red(`❌ guildsの削除エラー:`), error.message);
+            }
+
+            console.log(chalk.greenBright(`✅ ${guild.name} の全データ削除完了 (合計: ${totalDeleted}件)`));
 
         } catch (error) {
-            console.error(`❌ ${guild.name} のデータ削除中にエラーが発生:`, error);
+            console.error(chalk.red(`❌ ${guild.name} のデータ削除中にエラーが発生:`), error);
         }
     }
 };

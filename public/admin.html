@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="loader" class="loader-container">
@@ -17,39 +18,75 @@
     <div class="dashboard-wrapper" style="display: none;">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <a href="/admin.html" class="logo" data-text="[O] Admin_Panel">[O] Admin_Panel</a>
+                <div class="logo" data-text="[O] Admin_Panel">[O] Admin_Panel</div>
             </div>
-             <div class="server-info">
+            <div class="server-info">
                 <img id="bot-avatar" src="" alt="Bot Avatar" class="server-icon">
                 <h2 id="bot-name" class="glitch" data-text="OrderlyCore">OrderlyCore</h2>
+                <div class="bot-stats">
+                    <div class="stat-item">
+                        <i data-feather="server"></i>
+                        <span id="guild-count">0</span> サーバー
+                    </div>
+                    <div class="stat-item">
+                        <i data-feather="users"></i>
+                        <span id="user-count">0</span> ユーザー
+                    </div>
+                </div>
             </div>
             <nav class="sidebar-nav">
-                <a href="#activity" class="nav-item active" data-page="activity"><i data-feather="activity"></i><span>./activity</span></a>
-                <a href="#announcements" class="nav-item" data-page="announcements"><i data-feather="send"></i><span>./announcements</span></a>
-                <a href="#status" class="nav-item" data-page="status"><i data-feather="zap"></i><span>./status</span></a>
+                <div class="nav-category">MANAGEMENT</div>
+                <a href="#servers" class="nav-item active" data-page="servers">
+                    <i data-feather="server"></i><span>サーバー管理</span>
+                </a>
+                <a href="#announcements" class="nav-item" data-page="announcements">
+                    <i data-feather="send"></i><span>お知らせ送信</span>
+                </a>
+                <a href="#status" class="nav-item" data-page="status">
+                    <i data-feather="zap"></i><span>ステータス管理</span>
+                </a>
+                <div class="nav-category">MONITORING</div>
+                <a href="#logs" class="nav-item" data-page="logs">
+                    <i data-feather="file-text"></i><span>システムログ</span>
+                </a>
+                <a href="#analytics" class="nav-item" data-page="analytics">
+                    <i data-feather="bar-chart-2"></i><span>統計分析</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-secondary"><i data-feather="log-out"></i><span>logout</span></button>
+                <button id="logout-btn" class="btn btn-secondary">
+                    <i data-feather="log-out"></i><span>ログアウト</span>
+                </button>
             </div>
         </aside>
 
         <main class="main-content">
             <header class="main-header">
-                <button id="menu-toggle" class="menu-toggle-btn"><i data-feather="menu"></i></button>
-                <div class="prompt-display">
-                    <span class="prompt-user">admin@OrderlyCore:</span>
-                    <span class="prompt-path">~</span>
-                    <span id="page-title-wrapper">$ <h1 id="page-title"></h1></span>
-                    <span class="cursor">_</span>
+                <button id="menu-toggle" class="menu-toggle-btn">
+                    <i data-feather="menu"></i>
+                </button>
+                <div class="header-title">
+                    <h1 id="page-title">概要</h1>
+                    <p id="page-subtitle" class="subtitle"></p>
+                </div>
+                <div class="header-actions">
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span>オンライン</span>
+                    </div>
                 </div>
             </header>
             <div id="page-content-wrapper">
-                <div id="page-content" class="page-content">
-                    </div>
+                <div id="page-content" class="page-content"></div>
             </div>
         </main>
     </div>
 
+    <div id="modal-container"></div>
+
     <script src="/admin.js"></script>
+    <script>
+        feather.replace();
+    </script>
 </body>
 </html>

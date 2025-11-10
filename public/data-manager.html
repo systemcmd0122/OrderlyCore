@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OrderlyCore - データ管理</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+    <div id="loader" class="loader-container">
+        <div class="loader-ring"></div>
+        <p>データを読み込み中...</p>
+    </div>
+
+    <div class="dashboard-wrapper" style="display: none;">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">[O] OrderlyCore</div>
+            </div>
+            
+            <div class="server-info">
+                <img id="server-icon" src="" alt="Server Icon" class="server-icon">
+                <h2 id="server-name">サーバー名</h2>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><i data-feather="arrow-left"></i><span>ダッシュボードに戻る</span></a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn btn-secondary">
+                    <i data-feather="log-out"></i>
+                    <span>ログアウト</span>
+                </button>
+            </div>
+        </aside>
+        
+        <main class="main-content">
+            <header class="main-header">
+                <button id="menu-toggle" class="menu-toggle-btn">
+                    <i data-feather="menu"></i>
+                </button>
+                <h1>データ管理</h1>
+            </header>
+            
+            <div id="page-content-wrapper">
+                <div id="page-content" class="page-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🗄️ Firebaseデータ概要</h3>
+                        </div>
+                        <div id="collections-overview" class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div class="loader-ring"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📊 コレクション詳細</h3>
+                        </div>
+                        <div class="form-group">
+                            <label for="collection-select">コレクションを選択</label>
+                            <select id="collection-select">
+                                <option value="">選択してください</option>
+                                <option value="levels">レベルデータ</option>
+                                <option value="warnings">警告データ</option>
+                                <option value="audit_logs">監査ログ</option>
+                                <option value="quotes">引用データ</option>
+                                <option value="roleboards">ロールボード</option>
+                            </select>
+                        </div>
+                        <div id="collection-data" style="margin-top: 20px;">
+                            <p style="text-align: center; color: var(--text-muted-color);">コレクションを選択してください</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modal-container"></div>
+
+    <script>
+        console.log('Data manager page loaded');
+        console.log('Loader element:', document.getElementById('loader'));
+        console.log('Dashboard wrapper:', document.querySelector('.dashboard-wrapper'));
+    </script>
+    <script src="/data-manager.js"></script>
+    <script>
+        feather.replace();
+        console.log('Feather icons replaced');
+    </script>
+</body>
+</html>
