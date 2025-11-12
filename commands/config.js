@@ -40,7 +40,7 @@ const CONFIG_CATEGORIES = {
     ai: { emoji: '🤖', name: 'AI設定', color: COLORS.INFO },
 };
 
-// カスタムSettingBuilderクラス
+// カスタム SettingBuilderクラス
 class SettingBuilder extends ContainerBuilder {
     addText(content) {
         return this.addTextDisplayComponents(new TextDisplayBuilder({ content }));
@@ -136,6 +136,11 @@ class SettingBuilder extends ContainerBuilder {
     addSeparator(spacing = 1) {
         return this.addSeparatorComponents({ spacing });
     }
+
+    // ✅ 修正: toComponents メソッドを追加
+    toComponents() {
+        return [this];
+    }
 }
 
 // Firestoreから設定を取得するヘルパー関数
@@ -224,7 +229,7 @@ module.exports = {
                 .addSeparator()
                 .addSection('カテゴリーを選択', { prefix: '## ' });
 
-            // カテゴリーボタン（2行に分割）
+            // カテゴリーボタン(2行に分割)
             container.addButtons([
                 { id: 'config_general', label: '一般設定', style: ButtonStyle.Primary, emoji: '👥' },
                 { id: 'config_logging', label: 'ログ設定', style: ButtonStyle.Secondary, emoji: '📜' },
@@ -776,7 +781,7 @@ module.exports = {
                         return;
                     }
 
-                    // モーダル表示（NGワード設定）
+                    // モーダル表示(NGワード設定)
                     if (i.customId === 'config_automod_ngword') {
                         const settings = await getSettings(db, guild.id);
                         const modal = new ModalBuilder()
@@ -828,7 +833,7 @@ module.exports = {
                         return;
                     }
 
-                    // モーダル表示（AI性格設定）
+                    // モーダル表示(AI性格設定)
                     if (i.customId === 'config_ai_personality') {
                         const settings = await getSettings(db, guild.id);
                         const modal = new ModalBuilder()
