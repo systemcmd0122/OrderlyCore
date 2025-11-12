@@ -13,8 +13,13 @@ const {
     TextInputBuilder,
     TextInputStyle,
     Colors,
+    ContainerBuilder,
+    TextDisplayBuilder,
+    SectionBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
 } = require('discord.js');
-const { doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
+const { doc, getDoc, setDoc } = require('firebase/firestore');
 
 // 🎨 カラーテーマの定数
 const COLORS = {
@@ -35,7 +40,105 @@ const CONFIG_CATEGORIES = {
     ai: { emoji: '🤖', name: 'AI設定', color: COLORS.INFO },
 };
 
-// Firestoreから設定を取得するヘルパー関数（キャッシュ付き）
+// カスタムSettingBuilderクラス
+class SettingBuilder extends ContainerBuilder {
+    addText(content) {
+        return this.addTextDisplayComponents(new TextDisplayBuilder({ content }));
+    }
+
+    addDropdown(custom_id, options, defaultValue) {
+        return this.addActionRowComponents(
+            new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(custom_id)
+                    .addOptions(
+                        Object.entries(options).slice(0, 25).map(([key, value]) => {
+                            const option = new StringSelectMenuOptionBuilder()
+                                .setLabel(value)
+                                .setValue(key);
+                            if (key == defaultValue) option.setDefault(true);
+                            return option;
+                        })
+                    )
+            )
+        );
+    }
+
+    addChannelSelect(custom_id, placeholder, defaultChannels = []) {
+        const menu = new ChannelSelectMenuBuilder()
+            .setCustomId(custom_id)
+            .setPlaceholder(placeholder)
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement);
+        
+        if (defaultChannels.length > 0) {
+            menu.setDefaultChannels(defaultChannels);
+        }
+        
+        return this.addActionRowComponents(
+            new ActionRowBuilder().addComponents(menu)
+        );
+    }
+
+    addRoleSelect(custom_id, placeholder, defaultRoles = []) {
+        const menu = new RoleSelectMenuBuilder()
+            .setCustomId(custom_id)
+            .setPlaceholder(placeholder);
+        
+        if (defaultRoles.length > 0) {
+            menu.setDefaultRoles(defaultRoles);
+        }
+        
+        return this.addActionRowComponents(
+            new ActionRowBuilder().addComponents(menu)
+        );
+    }
+
+    addToggle(custom_id, text, value) {
+        return this.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder({ content: text })
+                )
+                .setButtonAccessory(
+                    new ButtonBuilder()
+                        .setCustomId(`${custom_id}:${value}`)
+                        .setLabel(!value ? 'OFF' : 'ON')
+                        .setStyle(!value ? ButtonStyle.Secondary : ButtonStyle.Success)
+                )
+        );
+    }
+
+    addButtons(buttons) {
+        return this.addActionRowComponents(
+            new ActionRowBuilder().addComponents(
+                ...buttons.map((btn) => {
+                    const button = new ButtonBuilder()
+                        .setCustomId(btn.id)
+                        .setLabel(btn.label)
+                        .setStyle(btn.style);
+                    if (btn.emoji) button.setEmoji(btn.emoji);
+                    return button;
+                })
+            )
+        );
+    }
+
+    addSection(content, options = {}) {
+        const { prefix = '### ', spacing = 1, addSeparator = true } = options;
+
+        this.addTextDisplayComponents(new TextDisplayBuilder({ content: `${prefix}${content}` }));
+
+        if (addSeparator) this.addSeparatorComponents({ spacing });
+
+        return this;
+    }
+
+    addSeparator(spacing = 1) {
+        return this.addSeparatorComponents({ spacing });
+    }
+}
+
+// Firestoreから設定を取得するヘルパー関数
 async function getSettings(db, guildId) {
     try {
         const settingsRef = doc(db, 'guild_settings', guildId);
@@ -57,6 +160,25 @@ async function updateSettings(db, guildId, updates) {
         console.error('❌ 設定更新エラー:', error);
         return { success: false, error };
     }
+}
+
+// 設定完了率を計算する関数
+function calculateCompletionRate(settings) {
+    const totalSettings = 10;
+    let completedSettings = 0;
+
+    if (settings.welcomeChannelId) completedSettings++;
+    if (settings.goodbyeChannelId) completedSettings++;
+    if (settings.botAutoroleId) completedSettings++;
+    if (settings.announcementChannelId) completedSettings++;
+    if (settings.auditLogChannel) completedSettings++;
+    if (settings.levelUpChannel) completedSettings++;
+    if (settings.automod?.blockInvites !== undefined) completedSettings++;
+    if (settings.automod?.ngWords?.length) completedSettings++;
+    if (settings.ai?.mentionReplyEnabled !== undefined) completedSettings++;
+    if (settings.ai?.aiPersonalityPrompt) completedSettings++;
+
+    return Math.round((completedSettings / totalSettings) * 100);
 }
 
 module.exports = {
@@ -82,250 +204,148 @@ module.exports = {
             const settings = await getSettings(db, guild.id);
             const completionRate = calculateCompletionRate(settings);
 
-            const mainEmbed = new EmbedBuilder()
-                .setColor(COLORS.PRIMARY)
-                .setAuthor({
-                    name: `${guild.name} 設定パネル`,
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle('⚙️ サーバー設定センター')
-                .setDescription(
+            const container = new SettingBuilder()
+                .addText(`# ⚙️ ${guild.name} 設定パネル`)
+                .addSeparator()
+                .addText(
                     '```ansi\n' +
-                    '\u001b[1;36m🎯 設定したい項目を下のボタンから選択してください\n' +
-                    '\u001b[1;32m💾 全ての設定は自動的に保存されます\n' +
-                    '\u001b[1;33m⏰ 操作は5分間有効です\n' +
-                    '```'
+                        '\u001b[1;36m🎯 設定したい項目を下のボタンから選択してください\n' +
+                        '\u001b[1;32m💾 全ての設定は自動的に保存されます\n' +
+                        '\u001b[1;33m⏰ 操作は5分間有効です\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: `${CONFIG_CATEGORIES.general.emoji} ${CONFIG_CATEGORIES.general.name}`,
-                        value:
-                            `> 参加・退出メッセージや自動ロールなど\n` +
-                            `> 基本的な設定を管理します\n` +
-                            `\n**現在の設定:**\n` +
-                            `🏠 ウェルカムCH: ${settings.welcomeChannelId ? `<#${settings.welcomeChannelId}>` : '`未設定`'}\n` +
-                            `👋 お別れCH: ${settings.goodbyeChannelId ? `<#${settings.goodbyeChannelId}>` : '`未設定`'}\n` +
-                            `🤖 Bot自動ロール: ${settings.botAutoroleId ? `<@&${settings.botAutoroleId}>` : '`未設定`'}`,
-                        inline: false,
-                    },
-                    {
-                        name: `${CONFIG_CATEGORIES.logging.emoji} ${CONFIG_CATEGORIES.logging.name}`,
-                        value:
-                            `> 監査ログやVCログなど\n` +
-                            `> サーバーの動作を記録する設定\n` +
-                            `\n**現在の設定:**\n` +
-                            `📋 監査ログCH: ${settings.auditLogChannel ? `<#${settings.auditLogChannel}>` : '`未設定`'}`,
-                        inline: true,
-                    },
-                    {
-                        name: `${CONFIG_CATEGORIES.leveling.emoji} ${CONFIG_CATEGORIES.leveling.name}`,
-                        value:
-                            `> サーバー内での活動を評価する\n` +
-                            `> レベリングシステムの設定\n` +
-                            `\n**現在の設定:**\n` +
-                            `🎉 レベルアップCH: ${settings.levelUpChannel ? `<#${settings.levelUpChannel}>` : '`未設定`'}`,
-                        inline: true,
-                    },
-                    {
-                        name: `${CONFIG_CATEGORIES.automod.emoji} ${CONFIG_CATEGORIES.automod.name}`,
-                        value:
-                            `> NGワードや招待リンクなど\n` +
-                            `> 自動管理機能の設定\n` +
-                            `\n**現在の設定:**\n` +
-                            `🚫 招待ブロック: ${settings.automod?.blockInvites !== false ? '`✅ 有効`' : '`❌ 無効`'}\n` +
-                            `📝 NGワード: ${settings.automod?.ngWords?.length ? `\`${settings.automod.ngWords.length}件\`` : '`未設定`'}`,
-                        inline: true,
-                    },
-                    {
-                        name: `${CONFIG_CATEGORIES.ai.emoji} ${CONFIG_CATEGORIES.ai.name}`,
-                        value:
-                            `> メンションへの自動応答など\n` +
-                            `> AIに関する設定を管理\n` +
-                            `\n**現在の設定:**\n` +
-                            `💬 メンション応答: ${settings.ai?.mentionReplyEnabled !== false ? '`✅ 有効`' : '`❌ 無効`'}\n` +
-                            `🎭 AI性格: ${settings.ai?.aiPersonalityPrompt ? '`✅ 設定済み`' : '`未設定`'}`,
-                        inline: true,
-                    },
-                ])
-                .addFields([
-                    {
-                        name: '📊 設定完了率',
-                        value: `\`\`\`\n${'█'.repeat(Math.floor(completionRate / 10))}${'░'.repeat(10 - Math.floor(completionRate / 10))} ${completionRate}%\n\`\`\``,
-                        inline: false,
-                    },
-                ])
-                .setFooter({
-                    text: `${user.username} によって実行 • 操作は5分間有効`,
-                    iconURL: user.displayAvatarURL({ dynamic: true }),
-                })
-                .setTimestamp();
+                .addSeparator()
+                .addSection('📊 設定完了率', { prefix: '## ' })
+                .addText(
+                    `\`\`\`\n${'█'.repeat(Math.floor(completionRate / 10))}${'░'.repeat(
+                        10 - Math.floor(completionRate / 10)
+                    )} ${completionRate}%\n\`\`\``
+                )
+                .addSeparator()
+                .addSection('カテゴリーを選択', { prefix: '## ' });
 
-            const mainRow1 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_general')
-                    .setLabel('一般設定')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('👥'),
-                new ButtonBuilder()
-                    .setCustomId('config_logging')
-                    .setLabel('ログ設定')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('📜'),
-                new ButtonBuilder()
-                    .setCustomId('config_leveling')
-                    .setLabel('レベリング')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('🏆')
-            );
+            // カテゴリーボタン（2行に分割）
+            container.addButtons([
+                { id: 'config_general', label: '一般設定', style: ButtonStyle.Primary, emoji: '👥' },
+                { id: 'config_logging', label: 'ログ設定', style: ButtonStyle.Secondary, emoji: '📜' },
+                { id: 'config_leveling', label: 'レベリング', style: ButtonStyle.Success, emoji: '🏆' },
+            ]);
 
-            const mainRow2 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_automod')
-                    .setLabel('オートモッド')
-                    .setStyle(ButtonStyle.Danger)
-                    .setEmoji('🛡️'),
-                new ButtonBuilder()
-                    .setCustomId('config_ai')
-                    .setLabel('AI設定')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🤖'),
-                new ButtonBuilder()
-                    .setCustomId('config_status')
-                    .setLabel('設定状況')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('📊')
-            );
+            container.addButtons([
+                { id: 'config_automod', label: 'オートモッド', style: ButtonStyle.Danger, emoji: '🛡️' },
+                { id: 'config_ai', label: 'AI設定', style: ButtonStyle.Primary, emoji: '🤖' },
+                { id: 'config_status', label: '設定状況', style: ButtonStyle.Secondary, emoji: '📊' },
+            ]);
 
             return {
-                embeds: [mainEmbed],
-                components: [mainRow1, mainRow2],
+                content: `📋 **${guild.name}の設定センター**`,
+                components: container.toComponents(),
                 ephemeral: true,
             };
         };
 
-        // --- 各設定画面の生成関数 ---
-
-        // 一般設定
+        // --- 一般設定 ---
         const generateGeneralMenu = async () => {
             const settings = await getSettings(db, guild.id);
-            const embed = new EmbedBuilder()
-                .setColor(CONFIG_CATEGORIES.general.color)
-                .setAuthor({
-                    name: CONFIG_CATEGORIES.general.name,
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle(`${CONFIG_CATEGORIES.general.emoji} サーバー基本設定`)
-                .setDescription(
+
+            const container = new SettingBuilder()
+                .addText(`# ${CONFIG_CATEGORIES.general.emoji} ${CONFIG_CATEGORIES.general.name}`)
+                .addSeparator()
+                .addText(
                     '```\n' +
-                    '新規メンバーの歓迎メッセージやBot用の自動ロールなど\n' +
-                    'サーバーの基本的な機能に関する設定を行います\n' +
-                    '```'
+                        '新規メンバーの歓迎メッセージやBot用の自動ロールなど\n' +
+                        'サーバーの基本的な機能に関する設定を行います\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: '🏠 ウェルカムチャンネル',
-                        value: settings.welcomeChannelId
-                            ? `現在: <#${settings.welcomeChannelId}>\n> 新規メンバーが参加した際に歓迎メッセージを送信します`
-                            : '`未設定`\n> 設定すると新規メンバーに歓迎メッセージを自動送信できます',
-                        inline: false,
-                    },
-                    {
-                        name: '👋 お別れチャンネル',
-                        value: settings.goodbyeChannelId
-                            ? `現在: <#${settings.goodbyeChannelId}>\n> メンバーが退出した際にお別れメッセージを送信します`
-                            : '`未設定`\n> 設定するとメンバー退出時にお別れメッセージを自動送信できます',
-                        inline: false,
-                    },
-                    {
-                        name: '🤖 Bot自動ロール',
-                        value: settings.botAutoroleId
-                            ? `現在: <@&${settings.botAutoroleId}>\n> Botが参加した際に自動でこのロールを付与します`
-                            : '`未設定`\n> 設定するとBot参加時に自動でロールを付与できます',
-                        inline: false,
-                    },
-                    {
-                        name: '📢 お知らせチャンネル',
-                        value: settings.announcementChannelId
-                            ? `現在: <#${settings.announcementChannelId}>\n> Botからの重要なお知らせを受信します`
-                            : '`未設定`\n> 設定するとBotからのお知らせを受信できます',
-                        inline: false,
-                    },
-                ])
-                .setFooter({ text: 'ドロップダウンメニューから設定したい項目を選択してください' })
-                .setTimestamp();
+                .addSeparator()
+                .addSection('🏠 ウェルカムチャンネル', { prefix: '### ' })
+                .addText(
+                    settings.welcomeChannelId
+                        ? `現在: <#${settings.welcomeChannelId}>\n> 新規メンバーが参加した際に歓迎メッセージを送信します`
+                        : '`未設定`\n> 設定すると新規メンバーに歓迎メッセージを自動送信できます'
+                );
 
-            const components = [];
-
-            // ウェルカムチャンネル選択
-            const welcomeChannelMenu = new ChannelSelectMenuBuilder()
-                .setCustomId('config_set_welcomeChannelId')
-                .setPlaceholder('🏠 ウェルカムメッセージを送信するチャンネルを選択')
-                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement);
-            if (settings.welcomeChannelId) welcomeChannelMenu.setDefaultChannels([settings.welcomeChannelId]);
-            components.push(new ActionRowBuilder().addComponents(welcomeChannelMenu));
-
-            // お別れチャンネル選択
-            const goodbyeChannelMenu = new ChannelSelectMenuBuilder()
-                .setCustomId('config_set_goodbyeChannelId')
-                .setPlaceholder('👋 お別れメッセージを送信するチャンネルを選択')
-                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement);
-            if (settings.goodbyeChannelId) goodbyeChannelMenu.setDefaultChannels([settings.goodbyeChannelId]);
-            components.push(new ActionRowBuilder().addComponents(goodbyeChannelMenu));
-
-            // Bot自動ロール選択
-            const botAutoroleMenu = new RoleSelectMenuBuilder()
-                .setCustomId('config_set_botAutoroleId')
-                .setPlaceholder('🤖 Bot参加時に付与するロールを選択');
-            if (settings.botAutoroleId) botAutoroleMenu.setDefaultRoles([settings.botAutoroleId]);
-            components.push(new ActionRowBuilder().addComponents(botAutoroleMenu));
-
-            // お知らせチャンネル選択
-            const announcementChannelMenu = new ChannelSelectMenuBuilder()
-                .setCustomId('config_set_announcementChannelId')
-                .setPlaceholder('📢 Botからのお知らせを受信するチャンネルを選択')
-                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement);
-            if (settings.announcementChannelId) announcementChannelMenu.setDefaultChannels([settings.announcementChannelId]);
-            components.push(new ActionRowBuilder().addComponents(announcementChannelMenu));
-
-            // 戻るボタンとクリアボタン
-            const navigationRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_back_main')
-                    .setLabel('メインメニューに戻る')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🔙'),
-                new ButtonBuilder()
-                    .setCustomId('config_clear_general')
-                    .setLabel('全てクリア')
-                    .setStyle(ButtonStyle.Danger)
-                    .setEmoji('🗑️')
+            container.addChannelSelect(
+                'config_set_welcomeChannelId',
+                '🏠 ウェルカムメッセージを送信するチャンネルを選択',
+                settings.welcomeChannelId ? [settings.welcomeChannelId] : []
             );
-            components.push(navigationRow);
 
-            return { embeds: [embed], components };
+            container
+                .addSeparator()
+                .addSection('👋 お別れチャンネル', { prefix: '### ' })
+                .addText(
+                    settings.goodbyeChannelId
+                        ? `現在: <#${settings.goodbyeChannelId}>\n> メンバーが退出した際にお別れメッセージを送信します`
+                        : '`未設定`\n> 設定するとメンバー退出時にお別れメッセージを自動送信できます'
+                );
+
+            container.addChannelSelect(
+                'config_set_goodbyeChannelId',
+                '👋 お別れメッセージを送信するチャンネルを選択',
+                settings.goodbyeChannelId ? [settings.goodbyeChannelId] : []
+            );
+
+            container
+                .addSeparator()
+                .addSection('🤖 Bot自動ロール', { prefix: '### ' })
+                .addText(
+                    settings.botAutoroleId
+                        ? `現在: <@&${settings.botAutoroleId}>\n> Botが参加した際に自動でこのロールを付与します`
+                        : '`未設定`\n> 設定するとBot参加時に自動でロールを付与できます'
+                );
+
+            container.addRoleSelect(
+                'config_set_botAutoroleId',
+                '🤖 Bot参加時に付与するロールを選択',
+                settings.botAutoroleId ? [settings.botAutoroleId] : []
+            );
+
+            container
+                .addSeparator()
+                .addSection('📢 お知らせチャンネル', { prefix: '### ' })
+                .addText(
+                    settings.announcementChannelId
+                        ? `現在: <#${settings.announcementChannelId}>\n> Botからの重要なお知らせを受信します`
+                        : '`未設定`\n> 設定するとBotからのお知らせを受信できます'
+                );
+
+            container.addChannelSelect(
+                'config_set_announcementChannelId',
+                '📢 Botからのお知らせを受信するチャンネルを選択',
+                settings.announcementChannelId ? [settings.announcementChannelId] : []
+            );
+
+            container.addSeparator().addButtons([
+                { id: 'config_back_main', label: 'メインメニューに戻る', style: ButtonStyle.Secondary, emoji: '🔙' },
+                { id: 'config_clear_general', label: '全てクリア', style: ButtonStyle.Danger, emoji: '🗑️' },
+            ]);
+
+            return {
+                content: `${CONFIG_CATEGORIES.general.emoji} **${CONFIG_CATEGORIES.general.name}**`,
+                components: container.toComponents(),
+                ephemeral: true,
+            };
         };
 
-        // ログ設定
+        // --- ログ設定 ---
         const generateLoggingMenu = async () => {
             const settings = await getSettings(db, guild.id);
-            const embed = new EmbedBuilder()
-                .setColor(CONFIG_CATEGORIES.logging.color)
-                .setAuthor({
-                    name: CONFIG_CATEGORIES.logging.name,
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle(`${CONFIG_CATEGORIES.logging.emoji} 監査ログ設定`)
-                .setDescription(
+
+            const container = new SettingBuilder()
+                .addText(`# ${CONFIG_CATEGORIES.logging.emoji} ${CONFIG_CATEGORIES.logging.name}`)
+                .addSeparator()
+                .addText(
                     '```\n' +
-                    'サーバー内の重要な操作を記録する監査ログの\n' +
-                    '送信先チャンネルを設定します\n' +
-                    '```'
+                        'サーバー内の重要な操作を記録する監査ログの\n' +
+                        '送信先チャンネルを設定します\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: '📋 監査ログチャンネル',
-                        value: settings.auditLogChannel
-                            ? `現在の設定: <#${settings.auditLogChannel}>\n\n` +
+                .addSeparator()
+                .addSection('📋 監査ログチャンネル', { prefix: '### ' })
+                .addText(
+                    settings.auditLogChannel
+                        ? `現在の設定: <#${settings.auditLogChannel}>\n\n` +
                               '**記録される内容:**\n' +
                               '```\n' +
                               '• メンバーの参加・退出\n' +
@@ -334,316 +354,282 @@ module.exports = {
                               '• メッセージの削除・編集\n' +
                               '• その他の重要な操作\n' +
                               '```'
-                            : '`未設定`\n\n' +
+                        : '`未設定`\n\n' +
                               '```\n' +
                               '監査ログを有効にすると、サーバーの\n' +
                               '重要な操作履歴を確認できます\n' +
-                              '```',
-                        inline: false,
-                    },
-                ])
-                .setFooter({ text: 'ドロップダウンメニューからチャンネルを選択してください' })
-                .setTimestamp();
+                              '```'
+                );
 
-            const auditLogMenu = new ChannelSelectMenuBuilder()
-                .setCustomId('config_set_auditLogChannel')
-                .setPlaceholder('📋 監査ログを送信するチャンネルを選択')
-                .addChannelTypes(ChannelType.GuildText);
-            if (settings.auditLogChannel) auditLogMenu.setDefaultChannels([settings.auditLogChannel]);
-
-            const backButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_back_main')
-                    .setLabel('メインメニューに戻る')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🔙')
+            container.addChannelSelect(
+                'config_set_auditLogChannel',
+                '📋 監査ログを送信するチャンネルを選択',
+                settings.auditLogChannel ? [settings.auditLogChannel] : []
             );
 
+            container.addSeparator().addButtons([
+                { id: 'config_back_main', label: 'メインメニューに戻る', style: ButtonStyle.Secondary, emoji: '🔙' },
+            ]);
+
             return {
-                embeds: [embed],
-                components: [new ActionRowBuilder().addComponents(auditLogMenu), backButton],
+                content: `${CONFIG_CATEGORIES.logging.emoji} **${CONFIG_CATEGORIES.logging.name}**`,
+                components: container.toComponents(),
+                ephemeral: true,
             };
         };
 
-        // レベリング設定
+        // --- レベリング設定 ---
         const generateLevelingMenu = async () => {
             const settings = await getSettings(db, guild.id);
-            const embed = new EmbedBuilder()
-                .setColor(CONFIG_CATEGORIES.leveling.color)
-                .setAuthor({
-                    name: CONFIG_CATEGORIES.leveling.name,
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle(`${CONFIG_CATEGORIES.leveling.emoji} レベルシステム設定`)
-                .setDescription(
+
+            const container = new SettingBuilder()
+                .addText(`# ${CONFIG_CATEGORIES.leveling.emoji} ${CONFIG_CATEGORIES.leveling.name}`)
+                .addSeparator()
+                .addText(
                     '```\n' +
-                    'メンバーの活動レベルを追跡し、レベルアップ時に\n' +
-                    '通知メッセージを送信する設定を行います\n' +
-                    '```'
+                        'メンバーの活動レベルを追跡し、レベルアップ時に\n' +
+                        '通知メッセージを送信する設定を行います\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: '🎉 レベルアップ通知チャンネル',
-                        value: settings.levelUpChannel
-                            ? `現在の設定: <#${settings.levelUpChannel}>\n\n` +
+                .addSeparator()
+                .addSection('🎉 レベルアップ通知チャンネル', { prefix: '### ' })
+                .addText(
+                    settings.levelUpChannel
+                        ? `現在の設定: <#${settings.levelUpChannel}>\n\n` +
                               '**通知される内容:**\n' +
                               '```\n' +
                               '• メンバーのレベルアップ情報\n' +
                               '• 獲得経験値と次のレベルまでの進捗\n' +
                               '• 特別な報酬ロールの付与通知\n' +
                               '```'
-                            : '`未設定`\n\n' +
+                        : '`未設定`\n\n' +
                               '```\n' +
                               'レベルアップ通知を有効にすると、\n' +
                               'メンバーのモチベーション向上に役立ちます\n' +
-                              '```',
-                        inline: false,
-                    },
-                ])
-                .setFooter({ text: 'ドロップダウンメニューからチャンネルを選択してください' })
-                .setTimestamp();
+                              '```'
+                );
 
-            const levelUpMenu = new ChannelSelectMenuBuilder()
-                .setCustomId('config_set_levelUpChannel')
-                .setPlaceholder('🎉 レベルアップ通知を送信するチャンネルを選択')
-                .addChannelTypes(ChannelType.GuildText);
-            if (settings.levelUpChannel) levelUpMenu.setDefaultChannels([settings.levelUpChannel]);
-
-            const backButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_back_main')
-                    .setLabel('メインメニューに戻る')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🔙')
+            container.addChannelSelect(
+                'config_set_levelUpChannel',
+                '🎉 レベルアップ通知を送信するチャンネルを選択',
+                settings.levelUpChannel ? [settings.levelUpChannel] : []
             );
 
+            container.addSeparator().addButtons([
+                { id: 'config_back_main', label: 'メインメニューに戻る', style: ButtonStyle.Secondary, emoji: '🔙' },
+            ]);
+
             return {
-                embeds: [embed],
-                components: [new ActionRowBuilder().addComponents(levelUpMenu), backButton],
+                content: `${CONFIG_CATEGORIES.leveling.emoji} **${CONFIG_CATEGORIES.leveling.name}**`,
+                components: container.toComponents(),
+                ephemeral: true,
             };
         };
 
-        // オートモッド設定
+        // --- オートモッド設定 ---
         const generateAutoModMenu = async () => {
             const settings = await getSettings(db, guild.id);
             const blockInvites = settings.automod?.blockInvites !== false;
             const ngWordsCount = settings.automod?.ngWords?.length || 0;
 
-            const embed = new EmbedBuilder()
-                .setColor(CONFIG_CATEGORIES.automod.color)
-                .setAuthor({
-                    name: CONFIG_CATEGORIES.automod.name,
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle(`${CONFIG_CATEGORIES.automod.emoji} 自動管理設定`)
-                .setDescription(
+            const container = new SettingBuilder()
+                .addText(`# ${CONFIG_CATEGORIES.automod.emoji} ${CONFIG_CATEGORIES.automod.name}`)
+                .addSeparator()
+                .addText(
                     '```\n' +
-                    '不適切な投稿を自動的に管理する機能です\n' +
-                    'サーバーの安全性とコミュニティの質を向上させます\n' +
-                    '```'
+                        '不適切な投稿を自動的に管理する機能です\n' +
+                        'サーバーの安全性とコミュニティの質を向上させます\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: '🚫 招待リンクブロック',
-                        value: blockInvites
-                            ? '```diff\n+ 有効\n```\n> 他サーバーへの招待リンクを自動削除します\n> ⚠️ 管理者権限を持つメンバーは除外されます'
-                            : '```diff\n- 無効\n```\n> 招待リンクの投稿が許可されています\n> 🔓 全てのメンバーが招待リンクを投稿できます',
-                        inline: true,
-                    },
-                    {
-                        name: '📝 NGワード設定',
-                        value: ngWordsCount > 0
-                            ? `\`\`\`\n${ngWordsCount}件のNGワードが設定済み\n\`\`\`\n> 設定されたワードを含む投稿を自動削除\n> 🛡️ サーバーの雰囲気を守ります`
-                            : '```\n未設定\n```\n> NGワードによる自動削除は無効です\n> 📝 ワードを設定して自動管理を開始できます',
-                        inline: true,
-                    },
-                ])
-                .setFooter({ text: 'ボタンを使用して各機能の設定を行ってください' })
-                .setTimestamp();
+                .addSeparator()
+                .addSection('🚫 招待リンクブロック', { prefix: '### ' });
 
-            const row1 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_automod_invites')
-                    .setLabel(blockInvites ? '招待ブロックを無効化' : '招待ブロックを有効化')
-                    .setStyle(blockInvites ? ButtonStyle.Secondary : ButtonStyle.Success)
-                    .setEmoji(blockInvites ? '❌' : '✅'),
-                new ButtonBuilder()
-                    .setCustomId('config_automod_ngword')
-                    .setLabel('NGワード設定')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('📝')
+            container.addToggle(
+                'config_automod_invites',
+                blockInvites
+                    ? '```diff\n+ 有効\n```\n> 他サーバーへの招待リンクを自動削除します\n> ⚠️ 管理者権限を持つメンバーは除外されます'
+                    : '```diff\n- 無効\n```\n> 招待リンクの投稿が許可されています\n> 🔓 全てのメンバーが招待リンクを投稿できます',
+                blockInvites
             );
 
-            const backButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_back_main')
-                    .setLabel('メインメニューに戻る')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🔙')
+            container.addSeparator().addSection('📝 NGワード設定', { prefix: '### ' });
+
+            container.addToggle(
+                'config_automod_ngword_view',
+                ngWordsCount > 0
+                    ? `\`\`\`\n${ngWordsCount}件のNGワードが設定済み\n\`\`\`\n> 設定されたワードを含む投稿を自動削除\n> 🛡️ サーバーの雰囲気を守ります`
+                    : '```\n未設定\n```\n> NGワードによる自動削除は無効です\n> 📝 ワードを設定して自動管理を開始できます',
+                ngWordsCount > 0
             );
 
-            return { embeds: [embed], components: [row1, backButton] };
+            container.addSeparator().addButtons([
+                {
+                    id: 'config_automod_ngword',
+                    label: 'NGワード編集',
+                    style: ButtonStyle.Primary,
+                    emoji: '📝',
+                },
+                { id: 'config_back_main', label: 'メインメニューに戻る', style: ButtonStyle.Secondary, emoji: '🔙' },
+            ]);
+
+            return {
+                content: `${CONFIG_CATEGORIES.automod.emoji} **${CONFIG_CATEGORIES.automod.name}**`,
+                components: container.toComponents(),
+                ephemeral: true,
+            };
         };
 
-        // AI設定
+        // --- AI設定 ---
         const generateAiMenu = async () => {
             const settings = await getSettings(db, guild.id);
             const mentionReply = settings.ai?.mentionReplyEnabled !== false;
             const hasPersonality = !!settings.ai?.aiPersonalityPrompt;
 
-            const embed = new EmbedBuilder()
-                .setColor(CONFIG_CATEGORIES.ai.color)
-                .setAuthor({
-                    name: CONFIG_CATEGORIES.ai.name,
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle(`${CONFIG_CATEGORIES.ai.emoji} AI応答設定`)
-                .setDescription(
+            const container = new SettingBuilder()
+                .addText(`# ${CONFIG_CATEGORIES.ai.emoji} ${CONFIG_CATEGORIES.ai.name}`)
+                .addSeparator()
+                .addText(
                     '```\n' +
-                    'Botにメンションした際にAIが自動で応答する\n' +
-                    '機能の設定を行います\n' +
-                    '```'
+                        'Botにメンションした際にAIが自動で応答する\n' +
+                        '機能の設定を行います\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: '💬 メンション自動応答',
-                        value: mentionReply
-                            ? '```diff\n+ 有効\n```\n> Botへのメンションに自動でAIが応答します\n> 🤖 自然な会話が可能です'
-                            : '```diff\n- 無効\n```\n> メンションへの自動応答は停止中です\n> 💤 手動でコマンドを使用する必要があります',
-                        inline: true,
-                    },
-                    {
-                        name: '🎭 AI性格設定',
-                        value: hasPersonality
-                            ? '```diff\n+ 設定済み\n```\n> カスタム性格が適用されています\n> ✨ 独自のキャラクターで応答します'
-                            : '```diff\n- 未設定\n```\n> デフォルトの性格で応答します\n> 🎨 性格を設定してカスタマイズできます',
-                        inline: true,
-                    },
-                ])
-                .addFields([
-                    {
-                        name: 'ℹ️ 使用方法',
-                        value:
-                            '```\n' +
-                            `1. Botをメンション (@${client.user.username})\n` +
-                            '2. 質問やメッセージを送信\n' +
-                            '3. AIが自動で応答します\n' +
-                            '```',
-                        inline: false,
-                    },
-                ])
-                .setFooter({ text: 'ボタンを使用してAI機能の設定を行ってください' })
-                .setTimestamp();
+                .addSeparator()
+                .addSection('💬 メンション自動応答', { prefix: '### ' });
 
-            const row1 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_ai_mention')
-                    .setLabel(mentionReply ? 'メンション応答を無効化' : 'メンション応答を有効化')
-                    .setStyle(mentionReply ? ButtonStyle.Secondary : ButtonStyle.Success)
-                    .setEmoji(mentionReply ? '❌' : '✅'),
-                new ButtonBuilder()
-                    .setCustomId('config_ai_personality')
-                    .setLabel('AI性格を設定')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🎭')
+            container.addToggle(
+                'config_ai_mention',
+                mentionReply
+                    ? '```diff\n+ 有効\n```\n> Botへのメンションに自動でAIが応答します\n> 🤖 自然な会話が可能です'
+                    : '```diff\n- 無効\n```\n> メンションへの自動応答は停止中です\n> 💤 手動でコマンドを使用する必要があります',
+                mentionReply
             );
 
-            const backButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_back_main')
-                    .setLabel('メインメニューに戻る')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🔙')
+            container.addSeparator().addSection('🎭 AI性格設定', { prefix: '### ' });
+
+            container.addToggle(
+                'config_ai_personality_view',
+                hasPersonality
+                    ? '```diff\n+ 設定済み\n```\n> カスタム性格が適用されています\n> ✨ 独自のキャラクターで応答します'
+                    : '```diff\n- 未設定\n```\n> デフォルトの性格で応答します\n> 🎨 性格を設定してカスタマイズできます',
+                hasPersonality
             );
 
-            return { embeds: [embed], components: [row1, backButton] };
+            container
+                .addSeparator()
+                .addSection('ℹ️ 使用方法', { prefix: '### ' })
+                .addText(
+                    '```\n' +
+                        `1. Botをメンション (@${client.user.username})\n` +
+                        '2. 質問やメッセージを送信\n' +
+                        '3. AIが自動で応答します\n' +
+                        '```'
+                )
+                .addSeparator();
+
+            container.addButtons([
+                {
+                    id: 'config_ai_personality',
+                    label: 'AI性格を編集',
+                    style: ButtonStyle.Primary,
+                    emoji: '🎭',
+                },
+                { id: 'config_back_main', label: 'メインメニューに戻る', style: ButtonStyle.Secondary, emoji: '🔙' },
+            ]);
+
+            return {
+                content: `${CONFIG_CATEGORIES.ai.emoji} **${CONFIG_CATEGORIES.ai.name}**`,
+                components: container.toComponents(),
+                ephemeral: true,
+            };
         };
 
-        // 設定状況表示
+        // --- 設定状況表示 ---
         const generateStatusMenu = async () => {
             const settings = await getSettings(db, guild.id);
-
             const getStatusIcon = (value) => (value ? '✅' : '❌');
             const getChannelDisplay = (channelId) => (channelId ? `<#${channelId}>` : '`未設定`');
             const getRoleDisplay = (roleId) => (roleId ? `<@&${roleId}>` : '`未設定`');
-
             const completionRate = calculateCompletionRate(settings);
 
-            const embed = new EmbedBuilder()
-                .setColor(COLORS.WARNING)
-                .setAuthor({
-                    name: '設定状況確認',
-                    iconURL: guild.iconURL({ dynamic: true }),
-                })
-                .setTitle('📊 現在の設定状況')
-                .setDescription(
+            const container = new SettingBuilder()
+                .addText('# 📊 現在の設定状況')
+                .addSeparator()
+                .addText(
                     '```\n' +
-                    'サーバーの全設定項目の現在の状況を確認できます\n' +
-                    '未設定の項目がある場合は各設定画面から設定してください\n' +
-                    '```'
+                        'サーバーの全設定項目の現在の状況を確認できます\n' +
+                        '未設定の項目がある場合は各設定画面から設定してください\n' +
+                        '```'
                 )
-                .addFields([
-                    {
-                        name: '👥 一般設定',
-                        value:
-                            `${getStatusIcon(settings.welcomeChannelId)} **ウェルカムCH:** ${getChannelDisplay(settings.welcomeChannelId)}\n` +
-                            `${getStatusIcon(settings.goodbyeChannelId)} **お別れCH:** ${getChannelDisplay(settings.goodbyeChannelId)}\n` +
-                            `${getStatusIcon(settings.botAutoroleId)} **Bot自動ロール:** ${getRoleDisplay(settings.botAutoroleId)}\n` +
-                            `${getStatusIcon(settings.announcementChannelId)} **お知らせCH:** ${getChannelDisplay(settings.announcementChannelId)}`,
-                        inline: false,
-                    },
-                    {
-                        name: '📜 ログ設定',
-                        value: `${getStatusIcon(settings.auditLogChannel)} **監査ログCH:** ${getChannelDisplay(settings.auditLogChannel)}`,
-                        inline: true,
-                    },
-                    {
-                        name: '🏆 レベリング',
-                        value: `${getStatusIcon(settings.levelUpChannel)} **レベルアップCH:** ${getChannelDisplay(settings.levelUpChannel)}`,
-                        inline: true,
-                    },
-                    {
-                        name: '🛡️ オートモッド',
-                        value:
-                            `${getStatusIcon(settings.automod?.blockInvites !== false)} **招待ブロック:** ${settings.automod?.blockInvites !== false ? '`有効`' : '`無効`'}\n` +
-                            `${getStatusIcon(settings.automod?.ngWords?.length)} **NGワード:** ${settings.automod?.ngWords?.length ? `\`${settings.automod.ngWords.length}件\`` : '`未設定`'}`,
-                        inline: false,
-                    },
-                    {
-                        name: '🤖 AI設定',
-                        value:
-                            `${getStatusIcon(settings.ai?.mentionReplyEnabled !== false)} **メンション応答:** ${settings.ai?.mentionReplyEnabled !== false ? '`有効`' : '`無効`'}\n` +
-                            `${getStatusIcon(settings.ai?.aiPersonalityPrompt)} **AI性格:** ${settings.ai?.aiPersonalityPrompt ? '`設定済み`' : '`未設定`'}`,
-                        inline: false,
-                    },
-                ])
-                .addFields([
-                    {
-                        name: '📈 設定完了率',
-                        value: `\`\`\`\n${'█'.repeat(Math.floor(completionRate / 10))}${'░'.repeat(10 - Math.floor(completionRate / 10))} ${completionRate}%\n\`\`\``,
-                        inline: false,
-                    },
-                ])
-                .setFooter({
-                    text: `最終更新: ${new Date().toLocaleString('ja-JP')} • ${user.username}`,
-                    iconURL: user.displayAvatarURL({ dynamic: true }),
-                })
-                .setTimestamp();
+                .addSeparator()
+                .addSection('📊 設定完了率', { prefix: '## ' })
+                .addText(
+                    `\`\`\`\n${'█'.repeat(Math.floor(completionRate / 10))}${'░'.repeat(
+                        10 - Math.floor(completionRate / 10)
+                    )} ${completionRate}%\n\`\`\``
+                )
+                .addSeparator()
+                .addSection('👥 一般設定', { prefix: '## ' })
+                .addText(
+                    `${getStatusIcon(settings.welcomeChannelId)} **ウェルカムCH:** ${getChannelDisplay(
+                        settings.welcomeChannelId
+                    )}\n` +
+                        `${getStatusIcon(settings.goodbyeChannelId)} **お別れCH:** ${getChannelDisplay(
+                            settings.goodbyeChannelId
+                        )}\n` +
+                        `${getStatusIcon(settings.botAutoroleId)} **Bot自動ロール:** ${getRoleDisplay(
+                            settings.botAutoroleId
+                        )}\n` +
+                        `${getStatusIcon(settings.announcementChannelId)} **お知らせCH:** ${getChannelDisplay(
+                            settings.announcementChannelId
+                        )}`
+                )
+                .addSeparator()
+                .addSection('📜 ログ設定', { prefix: '## ' })
+                .addText(
+                    `${getStatusIcon(settings.auditLogChannel)} **監査ログCH:** ${getChannelDisplay(
+                        settings.auditLogChannel
+                    )}`
+                )
+                .addSeparator()
+                .addSection('🏆 レベリング', { prefix: '## ' })
+                .addText(
+                    `${getStatusIcon(settings.levelUpChannel)} **レベルアップCH:** ${getChannelDisplay(
+                        settings.levelUpChannel
+                    )}`
+                )
+                .addSeparator()
+                .addSection('🛡️ オートモッド', { prefix: '## ' })
+                .addText(
+                    `${getStatusIcon(settings.automod?.blockInvites !== false)} **招待ブロック:** ${
+                        settings.automod?.blockInvites !== false ? '`✅ 有効`' : '`❌ 無効`'
+                    }\n` +
+                        `${getStatusIcon(settings.automod?.ngWords?.length)} **NGワード:** ${
+                            settings.automod?.ngWords?.length ? `\`${settings.automod.ngWords.length}件\`` : '`未設定`'
+                        }`
+                )
+                .addSeparator()
+                .addSection('🤖 AI設定', { prefix: '## ' })
+                .addText(
+                    `${getStatusIcon(settings.ai?.mentionReplyEnabled !== false)} **メンション応答:** ${
+                        settings.ai?.mentionReplyEnabled !== false ? '`✅ 有効`' : '`❌ 無効`'
+                    }\n` +
+                        `${getStatusIcon(settings.ai?.aiPersonalityPrompt)} **AI性格:** ${
+                            settings.ai?.aiPersonalityPrompt ? '`✅ 設定済み`' : '`未設定`'
+                        }`
+                )
+                .addSeparator();
 
-            const backButton = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('config_back_main')
-                    .setLabel('メインメニューに戻る')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🔙'),
-                new ButtonBuilder()
-                    .setCustomId('config_export_settings')
-                    .setLabel('設定をエクスポート')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('📤')
-            );
+            container.addButtons([
+                { id: 'config_back_main', label: 'メインメニューに戻る', style: ButtonStyle.Secondary, emoji: '🔙' },
+                { id: 'config_export_settings', label: '設定をエクスポート', style: ButtonStyle.Primary, emoji: '📤' },
+            ]);
 
-            return { embeds: [embed], components: [backButton] };
+            return {
+                content: `📊 **設定状況確認** - 最終更新: ${new Date().toLocaleString('ja-JP')}`,
+                components: container.toComponents(),
+                ephemeral: true,
+            };
         };
 
         try {
@@ -694,27 +680,26 @@ module.exports = {
                         if (result.success) {
                             // フィードバックメッセージを送信
                             await interaction.followUp({
-                                embeds: [
-                                    new EmbedBuilder()
-                                        .setColor(COLORS.SUCCESS)
-                                        .setDescription(`✅ **${i.component.placeholder}** を設定しました。`),
-                                ],
+                                content: `✅ **${i.component.data.placeholder}** を設定しました。`,
                                 ephemeral: true,
                             }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 3000));
                         } else {
                             await interaction.followUp({
-                                embeds: [
-                                    new EmbedBuilder()
-                                        .setColor(COLORS.DANGER)
-                                        .setDescription('❌ 設定の保存に失敗しました。もう一度お試しください。'),
-                                ],
+                                content: '❌ 設定の保存に失敗しました。もう一度お試しください。',
                                 ephemeral: true,
                             }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 5000));
                         }
 
                         // 親メニューを再生成
-                        const parentMenuAction = i.message.components[0].components[0].customId.split('_')[1];
-                        if (pageGenerators[parentMenuAction]) {
+                        const parentMenuAction = i.message.content.includes('一般設定')
+                            ? 'general'
+                            : i.message.content.includes('ログ設定')
+                            ? 'logging'
+                            : i.message.content.includes('レベリング')
+                            ? 'leveling'
+                            : null;
+
+                        if (parentMenuAction && pageGenerators[parentMenuAction]) {
                             await interaction.editReply(await pageGenerators[parentMenuAction]());
                         }
                         return;
@@ -731,11 +716,7 @@ module.exports = {
                         });
 
                         await interaction.followUp({
-                            embeds: [
-                                new EmbedBuilder()
-                                    .setColor(COLORS.WARNING)
-                                    .setDescription('🗑️ 一般設定を全てクリアしました。'),
-                            ],
+                            content: '🗑️ 一般設定を全てクリアしました。',
                             ephemeral: true,
                         }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 3000));
 
@@ -763,156 +744,153 @@ module.exports = {
                     }
 
                     // トグルボタンによる設定
-                    const toggleActions = {
-                        config_automod_invites: 'automod.blockInvites',
-                        config_ai_mention: 'ai.mentionReplyEnabled',
-                    };
-
-                    if (toggleActions[i.customId]) {
+                    if (i.customId.startsWith('config_automod_invites:') || i.customId.startsWith('config_ai_mention:')) {
                         await i.deferUpdate();
                         const settings = await getSettings(db, guild.id);
-                        const path = toggleActions[i.customId].split('.');
-                        const currentVal = path.reduce((o, k) => o && o[k], settings);
 
-                        const update = {};
-                        let current = update;
-                        for (let j = 0; j < path.length - 1; j++) {
-                            current[path[j]] = {};
-                            current = current[path[j]];
+                        if (i.customId.startsWith('config_automod_invites:')) {
+                            const currentVal = settings.automod?.blockInvites !== false;
+                            await updateSettings(db, guild.id, {
+                                automod: { ...settings.automod, blockInvites: !currentVal },
+                            });
+
+                            await interaction.followUp({
+                                content: `${!currentVal ? '✅' : '❌'} 招待ブロックを${!currentVal ? '有効' : '無効'}にしました。`,
+                                ephemeral: true,
+                            }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 3000));
+
+                            await interaction.editReply(await generateAutoModMenu());
+                        } else if (i.customId.startsWith('config_ai_mention:')) {
+                            const currentVal = settings.ai?.mentionReplyEnabled !== false;
+                            await updateSettings(db, guild.id, {
+                                ai: { ...settings.ai, mentionReplyEnabled: !currentVal },
+                            });
+
+                            await interaction.followUp({
+                                content: `${!currentVal ? '✅' : '❌'} メンション応答を${!currentVal ? '有効' : '無効'}にしました。`,
+                                ephemeral: true,
+                            }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 3000));
+
+                            await interaction.editReply(await generateAiMenu());
                         }
-                        current[path[path.length - 1]] = !(currentVal !== false);
-
-                        await updateSettings(db, guild.id, update);
-
-                        // 成功メッセージ
-                        const newState = !(currentVal !== false);
-                        await interaction.followUp({
-                            embeds: [
-                                new EmbedBuilder()
-                                    .setColor(newState ? COLORS.SUCCESS : COLORS.SECONDARY)
-                                    .setDescription(`${newState ? '✅' : '❌'} 設定を${newState ? '有効' : '無効'}にしました。`),
-                            ],
-                            ephemeral: true,
-                        }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 3000));
-
-                        await interaction.editReply(await pageGenerators[action]());
                         return;
                     }
 
-                    // モーダル表示
-                    if (i.customId === 'config_automod_ngword' || i.customId === 'config_ai_personality') {
+                    // モーダル表示（NGワード設定）
+                    if (i.customId === 'config_automod_ngword') {
                         const settings = await getSettings(db, guild.id);
-                        let modal;
+                        const modal = new ModalBuilder()
+                            .setCustomId('config_modal_ngword')
+                            .setTitle('🚫 NGワード設定');
 
-                        if (i.customId === 'config_automod_ngword') {
-                            modal = new ModalBuilder()
-                                .setCustomId('config_modal_ngword')
-                                .setTitle('🚫 NGワード設定');
+                        const ngwordInput = new TextInputBuilder()
+                            .setCustomId('ngwords')
+                            .setLabel('NGワードをカンマ区切りで入力してください')
+                            .setStyle(TextInputStyle.Paragraph)
+                            .setPlaceholder('例: バカ, アホ, 死ね\n※一行に一つずつでも入力可能です')
+                            .setRequired(false)
+                            .setMaxLength(2000)
+                            .setValue((settings.automod?.ngWords || []).join(', '));
 
-                            const ngwordInput = new TextInputBuilder()
-                                .setCustomId('ngwords')
-                                .setLabel('NGワードをカンマ区切りで入力してください')
-                                .setStyle(TextInputStyle.Paragraph)
-                                .setPlaceholder('例: バカ, アホ, 死ね\n※一行に一つずつでも入力可能です')
-                                .setRequired(false)
-                                .setMaxLength(2000)
-                                .setValue((settings.automod?.ngWords || []).join(', '));
-
-                            modal.addComponents(new ActionRowBuilder().addComponents(ngwordInput));
-                        } else {
-                            modal = new ModalBuilder()
-                                .setCustomId('config_modal_personality')
-                                .setTitle('🎭 AI性格設定');
-
-                            const personalityInput = new TextInputBuilder()
-                                .setCustomId('personality')
-                                .setLabel('AIへの指示(プロンプト)を入力してください')
-                                .setStyle(TextInputStyle.Paragraph)
-                                .setPlaceholder('例: あなたは猫のAIです。語尾に「にゃん」をつけて、優しく丁寧に答えてください。')
-                                .setRequired(false)
-                                .setMaxLength(1000)
-                                .setValue(settings.ai?.aiPersonalityPrompt || '');
-
-                            modal.addComponents(new ActionRowBuilder().addComponents(personalityInput));
-                        }
-
+                        modal.addComponents(new ActionRowBuilder().addComponents(ngwordInput));
                         await i.showModal(modal);
 
                         // モーダルの応答を待つ
                         try {
                             const submitted = await i.awaitModalSubmit({
                                 time: 180000,
-                                filter: (m) => m.user.id === user.id && m.customId === modal.data.custom_id,
+                                filter: (m) => m.user.id === user.id && m.customId === 'config_modal_ngword',
                             });
 
                             await submitted.deferUpdate();
 
-                            if (submitted.customId === 'config_modal_ngword') {
-                                const ngwordsText = submitted.fields.getTextInputValue('ngwords');
-                                const ngwords = ngwordsText
-                                    .split(/[,\n]/)
-                                    .map((w) => w.trim())
-                                    .filter(Boolean);
+                            const ngwordsText = submitted.fields.getTextInputValue('ngwords');
+                            const ngwords = ngwordsText
+                                .split(/[,\n]/)
+                                .map((w) => w.trim())
+                                .filter(Boolean);
 
-                                await updateSettings(db, guild.id, {
-                                    automod: { ...settings.automod, ngWords: ngwords },
-                                });
+                            await updateSettings(db, guild.id, {
+                                automod: { ...settings.automod, ngWords: ngwords },
+                            });
 
-                                await interaction.followUp({
-                                    embeds: [
-                                        new EmbedBuilder()
-                                            .setColor(COLORS.SUCCESS)
-                                            .setDescription(`✅ NGワードを${ngwords.length}件設定しました。`),
-                                    ],
-                                    ephemeral: true,
-                                }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 5000));
-                            } else if (submitted.customId === 'config_modal_personality') {
-                                const personality = submitted.fields.getTextInputValue('personality');
-                                await updateSettings(db, guild.id, {
-                                    ai: { ...settings.ai, aiPersonalityPrompt: personality },
-                                });
+                            await interaction.followUp({
+                                content: `✅ NGワードを${ngwords.length}件設定しました。`,
+                                ephemeral: true,
+                            }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 5000));
 
-                                await interaction.followUp({
-                                    embeds: [
-                                        new EmbedBuilder()
-                                            .setColor(COLORS.SUCCESS)
-                                            .setDescription(
-                                                personality
-                                                    ? '✅ AIの性格を設定しました。次回のメンションから反映されます。'
-                                                    : '✅ AIの性格をデフォルトにリセットしました。'
-                                            ),
-                                    ],
-                                    ephemeral: true,
-                                }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 5000));
-                            }
-
-                            await interaction.editReply(await pageGenerators[action]());
+                            await interaction.editReply(await generateAutoModMenu());
                         } catch (modalError) {
                             if (modalError.code !== 'InteractionCollectorError') {
                                 console.error('⚠️ モーダル応答エラー:', modalError);
                             }
-                            // タイムアウト時は何もしない(ユーザーがモーダルをキャンセルした)
+                        }
+                        return;
+                    }
+
+                    // モーダル表示（AI性格設定）
+                    if (i.customId === 'config_ai_personality') {
+                        const settings = await getSettings(db, guild.id);
+                        const modal = new ModalBuilder()
+                            .setCustomId('config_modal_personality')
+                            .setTitle('🎭 AI性格設定');
+
+                        const personalityInput = new TextInputBuilder()
+                            .setCustomId('personality')
+                            .setLabel('AIへの指示(プロンプト)を入力してください')
+                            .setStyle(TextInputStyle.Paragraph)
+                            .setPlaceholder(
+                                '例: あなたは猫のAIです。語尾に「にゃん」をつけて、優しく丁寧に答えてください。'
+                            )
+                            .setRequired(false)
+                            .setMaxLength(1000)
+                            .setValue(settings.ai?.aiPersonalityPrompt || '');
+
+                        modal.addComponents(new ActionRowBuilder().addComponents(personalityInput));
+                        await i.showModal(modal);
+
+                        // モーダルの応答を待つ
+                        try {
+                            const submitted = await i.awaitModalSubmit({
+                                time: 180000,
+                                filter: (m) => m.user.id === user.id && m.customId === 'config_modal_personality',
+                            });
+
+                            await submitted.deferUpdate();
+
+                            const personality = submitted.fields.getTextInputValue('personality');
+                            await updateSettings(db, guild.id, {
+                                ai: { ...settings.ai, aiPersonalityPrompt: personality },
+                            });
+
+                            await interaction.followUp({
+                                content: personality
+                                    ? '✅ AIの性格を設定しました。次回のメンションから反映されます。'
+                                    : '✅ AIの性格をデフォルトにリセットしました。',
+                                ephemeral: true,
+                            }).then((msg) => setTimeout(() => msg.delete().catch(() => {}), 5000));
+
+                            await interaction.editReply(await generateAiMenu());
+                        } catch (modalError) {
+                            if (modalError.code !== 'InteractionCollectorError') {
+                                console.error('⚠️ モーダル応答エラー:', modalError);
+                            }
                         }
                         return;
                     }
                 } catch (error) {
                     console.error('❌ インタラクション処理エラー:', error);
                     try {
-                        const errorEmbed = new EmbedBuilder()
-                            .setColor(COLORS.DANGER)
-                            .setTitle('❌ エラーが発生しました')
-                            .setDescription('設定の処理中にエラーが発生しました。もう一度お試しください。')
-                            .setFooter({ text: 'エラーが続く場合は管理者にお問い合わせください' })
-                            .setTimestamp();
+                        const errorMsg = '❌ エラーが発生しました。設定の処理中に問題が発生しました。もう一度お試しください。';
 
                         if (!i.replied && !i.deferred) {
                             await i.reply({
-                                embeds: [errorEmbed],
+                                content: errorMsg,
                                 ephemeral: true,
                             });
                         } else {
                             await interaction.followUp({
-                                embeds: [errorEmbed],
+                                content: errorMsg,
                                 ephemeral: true,
                             });
                         }
@@ -924,48 +902,37 @@ module.exports = {
 
             collector.on('end', async (collected, reason) => {
                 try {
-                    const endEmbed = new EmbedBuilder()
-                        .setColor(COLORS.SECONDARY)
-                        .setAuthor({
-                            name: 'セッション終了',
-                            iconURL: guild.iconURL({ dynamic: true }),
-                        })
-                        .setTitle('⏰ 設定パネル終了')
-                        .setDescription(
+                    const container = new SettingBuilder()
+                        .addText('# ⏰ 設定パネル終了')
+                        .addSeparator()
+                        .addText(
                             reason === 'time'
                                 ? '```\n' +
-                                  '操作がなかったため、設定パネルを終了しました\n' +
-                                  '再度設定を行う場合は /config コマンドを実行してください\n' +
-                                  '```'
-                                : '```\n' +
-                                  '設定パネルを終了しました\n' +
-                                  '```'
+                                      '操作がなかったため、設定パネルを終了しました\n' +
+                                      '再度設定を行う場合は /config コマンドを実行してください\n' +
+                                      '```'
+                                : '```\n設定パネルを終了しました\n```'
                         )
-                        .addFields([
-                            {
-                                name: 'ℹ️ 設定について',
-                                value:
-                                    '• 設定した内容は自動保存されています\n' +
-                                    '• いつでも `/config` で再設定可能です\n' +
-                                    '• 不明な点があれば管理者にお尋ねください',
-                                inline: false,
-                            },
-                            {
-                                name: '📊 統計情報',
-                                value: `• インタラクション数: ${collected.size}回\n• セッション時間: ${Math.floor((Date.now() - interaction.createdTimestamp) / 1000)}秒`,
-                                inline: false,
-                            },
-                        ])
-                        .setFooter({
-                            text: 'ご利用ありがとうございました',
-                            iconURL: user.displayAvatarURL({ dynamic: true }),
-                        })
-                        .setTimestamp();
+                        .addSeparator()
+                        .addSection('ℹ️ 設定について', { prefix: '### ' })
+                        .addText(
+                            '• 設定した内容は自動保存されています\n' +
+                                '• いつでも `/config` で再設定可能です\n' +
+                                '• 不明な点があれば管理者にお尋ねください'
+                        )
+                        .addSeparator()
+                        .addSection('📊 統計情報', { prefix: '### ' })
+                        .addText(
+                            `• インタラクション数: ${collected.size}回\n` +
+                                `• セッション時間: ${Math.floor((Date.now() - interaction.createdTimestamp) / 1000)}秒`
+                        );
 
-                    await interaction.editReply({ embeds: [endEmbed], components: [] });
+                    await interaction.editReply({
+                        content: '✅ **セッション終了** - ご利用ありがとうございました',
+                        components: container.toComponents(),
+                    });
                 } catch (error) {
                     if (error.code !== 10008 && error.code !== 10062) {
-                        // Unknown Message / Unknown Interaction
                         console.error('❌ 設定パネル終了時エラー:', error);
                     }
                 }
@@ -973,55 +940,26 @@ module.exports = {
         } catch (error) {
             console.error('❌ 設定パネル初期化エラー:', error);
 
-            const initErrorEmbed = new EmbedBuilder()
-                .setColor(COLORS.DANGER)
-                .setTitle('❌ 初期化エラー')
-                .setDescription('設定パネルの初期化中にエラーが発生しました。')
-                .addFields([
-                    {
-                        name: '考えられる原因',
-                        value:
-                            '• データベース接続の問題\n' +
-                            '• 権限の不足\n' +
-                            '• 一時的なサーバーエラー',
-                        inline: false,
-                    },
-                    {
-                        name: '対処方法',
-                        value:
-                            '• 少し時間をおいて再実行してください\n' +
-                            '• 問題が続く場合は管理者にご連絡ください',
-                        inline: false,
-                    },
-                ])
-                .setFooter({ text: 'エラーコード: INIT_FAILED' })
-                .setTimestamp();
+            const container = new SettingBuilder()
+                .addText('# ❌ 初期化エラー')
+                .addSeparator()
+                .addText('設定パネルの初期化中にエラーが発生しました。')
+                .addSeparator()
+                .addSection('考えられる原因', { prefix: '### ' })
+                .addText('• データベース接続の問題\n' + '• 権限の不足\n' + '• 一時的なサーバーエラー')
+                .addSeparator()
+                .addSection('対処方法', { prefix: '### ' })
+                .addText(
+                    '• 少し時間をおいて再実行してください\n' + '• 問題が続く場合は管理者にご連絡ください'
+                );
 
             if (!interaction.replied) {
                 await interaction.reply({
-                    embeds: [initErrorEmbed],
+                    content: '❌ **エラー発生** - エラーコード: INIT_FAILED',
+                    components: container.toComponents(),
                     ephemeral: true,
                 });
             }
         }
     },
 };
-
-// 設定完了率を計算するヘルパー関数
-function calculateCompletionRate(settings) {
-    const totalSettings = 10; // 総設定項目数
-    let completedSettings = 0;
-
-    if (settings.welcomeChannelId) completedSettings++;
-    if (settings.goodbyeChannelId) completedSettings++;
-    if (settings.botAutoroleId) completedSettings++;
-    if (settings.announcementChannelId) completedSettings++;
-    if (settings.auditLogChannel) completedSettings++;
-    if (settings.levelUpChannel) completedSettings++;
-    if (settings.automod?.blockInvites !== undefined) completedSettings++;
-    if (settings.automod?.ngWords?.length) completedSettings++;
-    if (settings.ai?.mentionReplyEnabled !== undefined) completedSettings++;
-    if (settings.ai?.aiPersonalityPrompt) completedSettings++;
-
-    return Math.round((completedSettings / totalSettings) * 100);
-}
