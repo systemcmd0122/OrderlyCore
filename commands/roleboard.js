@@ -21,6 +21,10 @@ module.exports = {
                 .addStringOption(option =>
                     option.setName('color')
                         .setDescription('埋め込みの色 (16進数、例: #FF0000)')
+                        .setRequired(false))
+                .addStringOption(option =>
+                    option.setName('password')
+                        .setDescription('パスワード保護を有効にする（パスワードを指定、最大128文字）')
                         .setRequired(false)))
         .addSubcommand(subcommand =>
             subcommand
@@ -68,6 +72,10 @@ module.exports = {
                 .addChannelOption(option =>
                     option.setName('channel')
                         .setDescription('送信先チャンネル（デフォルト: 現在のチャンネル）')
+                        .setRequired(false))
+                .addStringOption(option =>
+                    option.setName('password')
+                        .setDescription('パスワード保護を有効にする（パスワードを指定、最大128文字）')
                         .setRequired(false)))
         .addSubcommand(subcommand =>
             subcommand
@@ -220,6 +228,7 @@ module.exports = {
         const title = interaction.options.getString('title');
         const description = interaction.options.getString('description') || 'ボタンをクリックしてロールを取得・削除できます。';
         const color = interaction.options.getString('color');
+        const password = interaction.options.getString('password');
 
         // カラー検証
         let embedColor = 0x5865F2; // Discord デフォルト色
@@ -235,6 +244,14 @@ module.exports = {
             }
         }
 
+        // パスワード検証
+        if (password && password.length > 128) {
+            await this.safeEditReply(interaction, {
+                content: '⚠️ パスワードは128文字以内で指定してください。'
+            });
+            return;
+        }
+
         // 固有IDの生成
         const boardId = `rb_${guildId}_${Date.now()}`;
 
@@ -247,6 +264,7 @@ module.exports = {
                 color: embedColor,
                 roles: {},
                 genres: {},
+                password: password || null, // パスワードを保存
                 createdBy: interaction.user.id,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -261,7 +279,8 @@ module.exports = {
                 .addFields([
                     { name: '📋 ボードID', value: `\`${boardId}\``, inline: true },
                     { name: '📝 説明', value: description, inline: false },
-                    { name: '🎨 カラー', value: `#${embedColor.toString(16).padStart(6, '0').toUpperCase()}`, inline: true }
+                    { name: '🎨 カラー', value: `#${embedColor.toString(16).padStart(6, '0').toUpperCase()}`, inline: true },
+                    { name: '🔐 パスワード保護', value: password ? '✅ 有効' : '❌ 無効', inline: true }
                 ])
                 .setFooter({
                     text: '次に /roleboard add でロールを追加してください'
@@ -430,6 +449,7 @@ module.exports = {
     async handleSend(interaction, guildId) {
         const boardId = interaction.options.getString('board_id');
         const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+        const password = interaction.options.getString('password');
 
         try {
             // ロールボードの取得
@@ -452,13 +472,24 @@ module.exports = {
                 return;
             }
 
+            // パスワード設定時に指定パスワードを保存または更新
+            let passwordToUse = boardData.password;
+            if (password) {
+                passwordToUse = password;
+                // パスワード変更をデータベースに保存
+                await updateDoc(doc(interaction.client.db, 'roleboards', boardId), {
+                    password: password,
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
             // 埋め込み作成
             const embed = new EmbedBuilder()
                 .setColor(boardData.color)
                 .setTitle(`🎭 ${boardData.title}`)
                 .setDescription(boardData.description)
                 .setFooter({
-                    text: `ロールボードID: ${boardId} | ${roles.length}個のロール`
+                    text: `ロールボードID: ${boardId} | ${roles.length}個のロール${passwordToUse ? ' | 🔐 パスワード保護中' : ''}`
                 })
                 .setTimestamp();
 
@@ -510,7 +541,7 @@ module.exports = {
                     
                     if (role) {
                         const button = new ButtonBuilder()
-                            .setCustomId(`role_${roleId}`)
+                            .setCustomId(`role_${roleId}|${boardId}`)
                             .setLabel(role.name)
                             .setStyle(ButtonStyle.Secondary);
                         
@@ -548,7 +579,7 @@ module.exports = {
             await targetChannel.send({ embeds: [embed], components });
             
             await this.safeEditReply(interaction, {
-                content: `✅ ロールボードを ${targetChannel} に送信しました。`
+                content: `✅ ロールボードを ${targetChannel} に送信しました。${passwordToUse ? '\n🔐 パスワード保護が有効です。' : ''}`
             });
         } catch (error) {
             console.error('ロールボード送信エラー:', error);

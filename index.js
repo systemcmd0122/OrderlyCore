@@ -578,15 +578,21 @@ app.get('/api/roleboards', isAuthenticated, isGuildAdmin, async (req, res) => {
 
 app.post('/api/roleboards', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
-        const { title, description, color } = req.body;
+        const { title, description, color, password } = req.body;
         const guildId = req.session.guildId;
         const boardId = `rb_${guildId}_${Date.now()}`;
+
+        // パスワード検証
+        if (password && password.length > 128) {
+            return res.status(400).json({ error: 'パスワードは128文字以内で指定してください。' });
+        }
 
         const boardData = {
             guildId,
             title,
             description: description || 'ボタンをクリックしてロールを取得・削除できます。',
             color: parseInt(color.replace('#', ''), 16) || 0x5865F2,
+            password: password || null,
             roles: {},
             genres: {},
             createdBy: req.session.userId,

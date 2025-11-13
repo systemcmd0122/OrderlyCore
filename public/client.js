@@ -1140,6 +1140,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <input type="color" id="modal-color-picker" value="#5865F2">
                     <input type="text" id="modal-color-text" value="#5865F2">
                 </div>
+            </div>
+            <div class="form-group">
+                <label for="modal-password">
+                    🔐 パスワード保護（オプション）
+                    <small style="color: var(--text-muted-color); display: block; margin-top: 4px;">
+                        パスワードを設定すると、ユーザーはロール付与時にパスワード入力が必須になります。
+                    </small>
+                </label>
+                <input type="password" id="modal-password" placeholder="パスワード（最大128文字）" maxlength="128">
             </div>`,
             [{ id: 'save-new-board', text: '作成', class: 'btn' }]
         );
@@ -1162,7 +1171,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.post('/api/roleboards', {
                     title,
                     description: modal.querySelector('#modal-description').value.trim(),
-                    color: colorText.value
+                    color: colorText.value,
+                    password: modal.querySelector('#modal-password').value.trim() || null
                 });
                 showMessage('ロールボードを作成しました。');
                 closeModal();
@@ -1198,6 +1208,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="form-group">
                     <label>説明</label>
                     <textarea id="edit-desc">${board.description || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="edit-password">
+                        🔐 パスワード保護
+                        <small style="color: var(--text-muted-color); display: block; margin-top: 4px;">
+                            ユーザーがロール付与時にパスワード入力が必須になります。空欄で無効化。
+                        </small>
+                    </label>
+                    <input type="password" id="edit-password" value="${board.password || ''}" placeholder="パスワード（最大128文字、空欄で無効化）" maxlength="128">
                 </div>
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
                 <h4>ロール管理</h4>
@@ -1306,6 +1325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         title,
                         description: modal.querySelector('#edit-desc').value.trim(),
                         color: parseInt(colorText.value.replace('#', ''), 16),
+                        password: modal.querySelector('#edit-password').value.trim() || null,
                         roles: localBoard.roles,
                         genres: localBoard.genres
                     });
