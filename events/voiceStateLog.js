@@ -260,7 +260,10 @@ async function handleVoiceJoin(newState, client) {
         try {
             const logChannel = guild.channels.cache.get(logChannelId);
             if (logChannel?.isTextBased()) {
-                const message = await logChannel.send(`🎤 **${member.displayName}** が **${channel.name}** に参加しました`);
+                const message = await logChannel.send({ 
+                    content: `🎤 **${member.displayName}** が **${channel.name}** に参加しました`,
+                    flags: ['SuppressNotifications']
+                });
                 deleteManager.scheduleDelete(message.id, message);
             }
         } catch (error) {
@@ -292,7 +295,10 @@ async function handleVoiceLeave(oldState, client) {
         try {
             const logChannel = guild.channels.cache.get(logChannelId);
             if (logChannel?.isTextBased()) {
-                const message = await logChannel.send(`👋 **${member.displayName}** が **${channel.name}** から退出しました`);
+                const message = await logChannel.send({ 
+                    content: `👋 **${member.displayName}** が **${channel.name}** から退出しました`,
+                    flags: ['SuppressNotifications']
+                });
                 deleteManager.scheduleDelete(message.id, message);
             }
         } catch (error) {
@@ -312,19 +318,48 @@ module.exports = {
         const newChannelId = newState.channelId;
 
         try {
-            if (!oldChannelId && newChannelId) await handleVoiceJoin(newState, client);
-            else if (oldChannelId && !newChannelId) await handleVoiceLeave(oldState, client);
-            else if (oldChannelId && newChannelId && oldChannelId !== newChannelId) {
-                await handleVoiceLeave(oldState, client);
+            if (!oldChannelId && newChannelId) {
+                // VC参加
                 await handleVoiceJoin(newState, client);
+            } else if (oldChannelId && !newChannelId) {
+                // VC退出
+                await handleVoiceLeave(oldState, client);
+            } else if (oldChannelId && newChannelId && oldChannelId !== newChannelId) {
+                // VC移動 - 退出と参加の統計情報処理は行うが、ログメッセージは「移動」のみ送信
+                const { guild, member } = oldState;
+                const { db, rtdb } = client;
 
+                // セッション終了処理（統計のため）
+                const sessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
+                const sessionSnapshot = await get(sessionRef);
+                
+                if (sessionSnapshot.exists()) {
+                    const sessionData = sessionSnapshot.val();
+                    const stayDuration = Date.now() - sessionData.joinedAt;
+                    
+                    await updateUserStayTime(db, guild.id, member.id, stayDuration);
+                    await addVcExpAndLevelUp(client, oldState, stayDuration);
+                    
+                    await remove(sessionRef);
+                    console.log(chalk.yellow(`🔴 RTDB Session ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
+                }
+
+                // 新しいセッション開始
+                const newSessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
+                await set(newSessionRef, { channelId: newState.channelId, channelName: newState.channel.name, joinedAt: Date.now() });
+                console.log(chalk.green(`🔴 RTDB Session started for ${member.user.tag} in ${newState.channel.name}`));
+
+                // 移動ログのみ送信
                 const logDestId = await getLogChannelIdForVc(db, newState.guild.id, newState.channelId) || await getLogChannelIdForVc(db, oldState.guild.id, oldState.channelId);
                 if (logDestId) {
                     try {
                         const logChannel = newState.guild.channels.cache.get(logDestId);
                         if (logChannel?.isTextBased()) {
-                           const message = await logChannel.send(`↪️ **${newState.member.displayName}** が ${oldState.channel.name} から **${newState.channel.name}** に移動しました`);
-                           deleteManager.scheduleDelete(message.id, message);
+                            const message = await logChannel.send({ 
+                                content: `↪️ **${newState.member.displayName}** が **${oldState.channel.name}** から **${newState.channel.name}** に移動しました`,
+                                flags: ['SuppressNotifications']
+                            });
+                            deleteManager.scheduleDelete(message.id, message);
                         }
                     } catch(error) {
                         console.error(chalk.red('❌ Error sending move log:'), error);
