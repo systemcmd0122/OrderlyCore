@@ -1,59 +1,8 @@
 // ===== guildMemberAdd.js =====
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { PermissionsBitField } = require('discord.js');
 const { doc, getDoc, setDoc } = require('firebase/firestore');
-
-// ★★★★★【ここから追加・変更】★★★★★
-// Geminiでウェルカムメッセージを生成する関数
-async function generateWelcomeWithGemini(client, member) {
-    const { user, guild } = member;
-    try {
-        const prompt = `あなたはDiscordサーバーの歓迎担当AIです。新しく参加したユーザーを温かく、そしてクリエイティブに歓迎するメッセージを作成してください。
-
-# 指示
-- ポジティブで、歓迎の意が伝わるフレンドリーな文章を生成してください。
-- 以下の情報を文章に必ず含めてください。
-  - ユーザー名: ${user.displayName}
-  - サーバー名: ${guild.name}
-  - 現在のメンバー数: ${guild.memberCount}
-- 生成する文章は必ず**タイトル**と**説明文**の2つの部分に分けてください。
-- タイトルは「🎉」や「ようこそ！」などの絵文字を含んだ短いフレーズにしてください。（20文字以内）
-- 説明文は、ユーザーへの呼びかけから始まり、サーバーの簡単な紹介や、これから始まる素晴らしい体験への期待感を抱かせるような、少し長めの文章にしてください。（150文字以内）
-- 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式で出力してください。
-
-# 生成例
-{
-  "title": "🎉 新たな仲間が参加しました！",
-  "description": "${user.displayName}さん、ようこそ！${guild.name}の${guild.memberCount}人目のメンバーとして、あなたを心から歓迎します。ここではたくさんの素晴らしい出会いと楽しい時間が待っていますよ！"
-}`;
-
-        const result = await client.geminiModel.generateContent(prompt);
-        const text = result.response.text().replace(/```json|```/g, '').trim();
-        return JSON.parse(text);
-    } catch (error) {
-        console.error('❌ Geminiでのウェルカムメッセージ生成エラー:', error);
-        // フォールバック
-        return {
-            title: `🎉 ${guild.name}へようこそ！`,
-            description: `**${user.displayName}**さん、サーバーへのご参加ありがとうございます！これから一緒に楽しみましょう！`
-        };
-    }
-}
-
-// テキスト内の変数を置換する関数
-function replacePlaceholders(text, member, config) {
-    const { user, guild } = member;
-    const rulesChannel = config.rulesChannelId ? `<#${config.rulesChannelId}>` : 'ルールチャンネル';
-
-    return text
-        .replace(/{user.name}/g, user.username)
-        .replace(/{user.tag}/g, user.tag)
-        .replace(/{user.displayName}/g, user.displayName)
-        .replace(/{user.mention}/g, `<@${user.id}>`)
-        .replace(/{server.name}/g, guild.name)
-        .replace(/{server.memberCount}/g, guild.memberCount.toLocaleString())
-        .replace(/{rulesChannel}/g, rulesChannel);
-}
-// ★★★★★【ここまで追加・変更】★★★★★
+const { generateWelcomeWithGemini, replacePlaceholders } = require('../src/services/welcomeService');
+const { createStandardEmbed } = require('../src/utils/embedBuilder');
 
 
 module.exports = {
@@ -133,20 +82,17 @@ module.exports = {
                     title = generated.title;
                     description = generated.description;
                 } else {
-                    title = replacePlaceholders(welcomeMsgConfig.title, member, guildConfig);
-                    description = replacePlaceholders(welcomeMsgConfig.description, member, guildConfig);
+                    title = replacePlaceholders(welcomeMsgConfig.title, member, guildConfig.rulesChannelId);
+                    description = replacePlaceholders(welcomeMsgConfig.description, member, guildConfig.rulesChannelId);
                 }
 
-                const welcomeEmbed = new EmbedBuilder()
-                    .setColor(0x00ff00)
-                    .setTitle(title)
-                    .setDescription(description)
-                    .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
-                    .setTimestamp();
-                
-                if (welcomeMsgConfig.imageUrl) {
-                    welcomeEmbed.setImage(welcomeMsgConfig.imageUrl);
-                }
+                const welcomeEmbed = createStandardEmbed({
+                    color: 0x00ff00,
+                    title: title,
+                    description: description,
+                    thumbnail: user.displayAvatarURL({ dynamic: true, size: 256 }),
+                    image: welcomeMsgConfig.imageUrl || null
+                });
 
                 await welcomeChannel.send({
                     content: guildConfig.mentionOnWelcome ? `<@${user.id}>` : null,
@@ -156,12 +102,12 @@ module.exports = {
                 console.log(`💌 ${user.tag} のカスタムウェルカムメッセージを送信しました`);
 
             } else {
-                // --- 従来のウェルカムメッセージ（フォールバック） ---
-                const welcomeEmbed = new EmbedBuilder()
-                    .setColor(0x00ff00)
-                    .setTitle(`🎉 ${member.guild.name} へようこそ！`)
-                    .setDescription(`**${user.displayName}** さん、サーバーへのご参加ありがとうございます！`)
-                    .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }));
+                const welcomeEmbed = createStandardEmbed({
+                    color: 0x00ff00,
+                    title: `🎉 ${member.guild.name} へようこそ！`,
+                    description: `**${user.displayName}** さん、サーバーへのご参加ありがとうございます！`,
+                    thumbnail: user.displayAvatarURL({ dynamic: true, size: 256 })
+                });
                 
                 if (guildConfig.rulesChannelId) {
                     const rulesChannel = member.guild.channels.cache.get(guildConfig.rulesChannelId);
