@@ -1,7 +1,9 @@
-const { Events, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { Events, PermissionsBitField } = require('discord.js');
 const chalk = require('chalk');
-const { getFirestore, doc, getDoc, setDoc, updateDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
-const { getDatabase, ref, set, remove, get } = require('firebase/database');
+const { doc, getDoc, setDoc, increment, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
+const { ref, set, remove, get } = require('firebase/database');
+const { getLevelData, getRank, calculateRequiredXp, generateLevelUpComment, handleRoleRewards } = require('../src/services/levelingService');
+const { createStandardEmbed } = require('../src/utils/embedBuilder');
 
 class MessageDeleteManager {
     constructor() {
@@ -31,93 +33,6 @@ class MessageDeleteManager {
 }
 const deleteManager = new MessageDeleteManager();
 
-const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
-
-// Gemini AIにレベルアップコメントを生成させる関数 (修正済み)
-async function generateLevelUpComment(client, user, newLevel, serverName) {
-    try {
-        const prompt = `あなたはDiscordサーバーの優秀なアシスタントです。以下の指示に従って、ユーザーのレベルアップを祝福するメッセージを**一行で**生成してください。
-
-### 指示
-* **役割**: ユーザーの功績を称え、今後の活躍を期待させるような、ユニークでクリエイティブなメッセージを作成します。
-* **トーン**: 非常にポジティブで、少し壮大な雰囲気にしてください。
-* **必須要素**:
-    * ユーザー名: ${user.displayName}
-    * 新しいレベル: ${newLevel}
-    * サーバー名: ${serverName}
-* **厳格な制約**:
-    * 生成する文章は**必ず一行**にしてください。
-    * **80文字以内**に収めてください。
-    * 毎回必ず違うパターンの文章を生成してください。
-    * **回答には祝福メッセージのみを含め、それ以外の前置き、解説、リスト、引用符（「」）は絶対に含めないでください。**
-
-### 生成例
-* ${serverName}の歴史に名を刻む時が来た！${user.displayName}よ、レベル${newLevel}への到達、誠におめでとう！
-* 天晴れ！${user.displayName}の活躍により${serverName}は新たな時代へ。伝説はレベル${newLevel}から始まる！
-* ${serverName}に新たな光が灯った！${user.displayName}、レベル${newLevel}への昇格、心より祝福する。`;
-
-        const result = await client.geminiModel.generateContent(prompt);
-        // 不要な文字を除去する処理を強化
-        const text = result.response.text().trim().replace(/[\n*「」]/g, '').split('。')[0];
-        console.log(chalk.magenta(`[Gemini] Generated comment for VC Level Up: ${text}`));
-        return text;
-    } catch (error) {
-        console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
-        return `**${user.displayName} が新たな境地へ到達しました！**\n絶え間ない努力が実を結び、サーバー内での存在感がさらに増しました。`;
-    }
-}
-
-async function getLevelData(db, guildId, userId) {
-    const userRef = doc(db, 'levels', `${guildId}_${userId}`);
-    const docSnap = await getDoc(userRef);
-    if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (typeof data.level === 'undefined') data.level = 0;
-        return data;
-    }
-    return { guildId, userId, xp: 0, level: 0, messageCount: 0, lastMessageTimestamp: 0 };
-}
-
-// levelingSystem.js と同じロール報酬処理関数
-async function handleRoleRewards(member, oldLevel, newLevel, settings) {
-    const levelingSettings = settings.leveling || {};
-    const roleRewards = levelingSettings.roleRewards || [];
-    if (roleRewards.length === 0) return;
-
-    const rewardsToGive = roleRewards
-        .filter(reward => reward.level > oldLevel && reward.level <= newLevel)
-        .sort((a, b) => a.level - b.level);
-
-    if (rewardsToGive.length === 0) return;
-
-    if (!member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-        console.error(chalk.red(`[Role Reward] Bot does not have Manage Roles permission in ${member.guild.name}.`));
-        return;
-    }
-
-    let awardedRoles = [];
-    for (const reward of rewardsToGive) {
-        try {
-            const role = member.guild.roles.cache.get(reward.roleId);
-            if (!role) {
-                console.warn(chalk.yellow(`[Role Reward] Role ID ${reward.roleId} for level ${reward.level} not found.`));
-                continue;
-            }
-            if (role.position >= member.guild.members.me.roles.highest.position) {
-                console.warn(chalk.yellow(`[Role Reward] Cannot assign role ${role.name} as it is higher than or equal to the bot's role.`));
-                continue;
-            }
-            if (!member.roles.cache.has(role.id)) {
-                await member.roles.add(role);
-                awardedRoles.push(role);
-                console.log(chalk.green(`[Role Reward] Awarded role "${role.name}" to ${member.user.tag} for reaching level ${reward.level} (VC).`));
-            }
-        } catch (error) {
-            console.error(chalk.red(`[Role Reward] Failed to award role for level ${reward.level} to ${member.user.tag} (VC):`), error);
-        }
-    }
-    return awardedRoles;
-}
 
 async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
     if (!guildId || !voiceChannelId) return null;
@@ -193,26 +108,26 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                 const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 20) : 0;
                 const progressBar = `**[** ${'🟦'.repeat(progress)}${'⬛'.repeat(20 - progress)} **]**`;
 
-                const levelUpEmbed = new EmbedBuilder()
-                    .setColor(0x00FFFF)
-                    .setAuthor({ name: `LEVEL UP! (VC) - ${member.displayName}`, iconURL: member.user.displayAvatarURL() })
-                    .setTitle(`《 RANK UP: ${oldLevel}  ➔  ${userData.level} 》`)
-                    .setDescription(awesomeComment)
-                    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-                    .addFields(
+                const levelUpEmbed = createStandardEmbed({
+                    color: 0x00FFFF,
+                    author: { name: `LEVEL UP! (VC) - ${member.displayName}`, iconURL: member.user.displayAvatarURL() },
+                    title: `《 RANK UP: ${oldLevel}  ➔  ${userData.level} 》`,
+                    description: awesomeComment,
+                    thumbnail: member.user.displayAvatarURL({ dynamic: true, size: 256 }),
+                    fields: [
                         {
                             name: '📊 現在のステータス',
-                            value: `**サーバー内順位:** **${rank !== -1 ? `#${rank}` : 'N/A'}**\n**総メッセージ数:** **${userData.messageCount.toLocaleString()}** 回`,
+                            value: `**サーバー内順位:** **${rank !== -1 ? `#${rank}` : 'N/A'}**\n**総メッセージ数:** **${(userData.messageCount || 0).toLocaleString()}** 回`,
                             inline: false
                         },
                         {
                             name: `🚀 次のレベルまで (Lv. ${userData.level + 1})`,
-                            value: `あと **${(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar} **${userData.xp.toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
+                            value: `あと **${Math.floor(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar} **${Math.floor(userData.xp).toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
                             inline: false
                         }
-                    )
-                    .setFooter({ text: `ボイスチャンネルでの活動、お疲れ様です！ | ${guild.name}`, iconURL: guild.iconURL() })
-                    .setTimestamp();
+                    ],
+                    footer: { text: `ボイスチャンネルでの活動、お疲れ様です！ | ${guild.name}`, iconURL: guild.iconURL() }
+                });
                 
                 if (awardedRoles && awardedRoles.length > 0) {
                     levelUpEmbed.addFields({

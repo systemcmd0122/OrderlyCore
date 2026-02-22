@@ -13,7 +13,7 @@ try {
     console.error("フォントの読み込みに失敗しました。`fonts`ディレクトリに指定のフォントファイルがあるか確認してください。");
 }
 
-const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
+const { calculateRequiredXp } = require('../src/services/levelingService');
 
 // 角丸の四角形を描画するヘルパー関数
 function roundRect(ctx, x, y, width, height, radius) {

@@ -16,7 +16,7 @@ try {
 
 // --- ヘルパー関数 ---
 
-const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
+const { calculateRequiredXp } = require('../src/services/levelingService');
 
 function formatDuration(milliseconds) {
     if (milliseconds < 60000) {
