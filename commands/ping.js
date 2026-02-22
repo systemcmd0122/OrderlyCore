@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder, Colors } = require('discord.js');
+const { SlashCommandBuilder, Colors } = require('discord.js');
 const os = require('os');
+const { createStandardEmbed } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -8,71 +9,52 @@ module.exports = {
     
     async execute(interaction) {
         try {
-            // 初回応答時刻を記録
             const startTime = Date.now();
-            
             const sent = await interaction.reply({ 
                 content: '🏓 Pong! 詳細測定中...', 
                 fetchReply: true 
             });
 
-            // 各種遅延の計算
             const endTime = Date.now();
             const roundtripLatency = sent.createdTimestamp - interaction.createdTimestamp;
             const editLatency = endTime - startTime;
             const websocketLatency = Math.round(interaction.client.ws.ping);
             const apiLatency = Math.max(0, roundtripLatency - websocketLatency);
 
-            // システム情報の取得
             const uptime = process.uptime();
             const memUsage = process.memoryUsage();
             const totalMem = os.totalmem();
             const freeMem = os.freemem();
             const usedMem = totalMem - freeMem;
 
-            // 遅延レベルの判定
             function getLatencyLevel(ms) {
-                if (ms < 100) return { level: 'excellent', emoji: '🟢', color: Colors.Green, status: '優秀' };
-                if (ms < 200) return { level: 'good', emoji: '🟡', color: Colors.Yellow, status: '良好' };
-                if (ms < 500) return { level: 'fair', emoji: '🟠', color: Colors.Orange, status: '普通' };
-                return { level: 'poor', emoji: '🔴', color: Colors.Red, status: '遅延' };
+                if (ms < 100) return { emoji: '🟢', color: Colors.Green, status: '優秀' };
+                if (ms < 200) return { emoji: '🟡', color: Colors.Yellow, status: '良好' };
+                if (ms < 500) return { emoji: '🟠', color: Colors.Orange, status: '普通' };
+                return { emoji: '🔴', color: Colors.Red, status: '遅延' };
             }
 
             const wsLatencyInfo = getLatencyLevel(websocketLatency);
             const rtLatencyInfo = getLatencyLevel(roundtripLatency);
+            const overallInfo = getLatencyLevel(Math.max(websocketLatency, roundtripLatency));
 
-            // 全体的な接続状態の判定
-            const overallLatency = Math.max(websocketLatency, roundtripLatency);
-            const overallInfo = getLatencyLevel(overallLatency);
-
-            // 時間フォーマット関数
             function formatUptime(seconds) {
                 const days = Math.floor(seconds / 86400);
                 const hours = Math.floor((seconds % 86400) / 3600);
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const secs = Math.floor(seconds % 60);
-                
-                let result = '';
-                if (days > 0) result += `${days}日 `;
-                if (hours > 0) result += `${hours}時間 `;
-                if (minutes > 0) result += `${minutes}分 `;
-                result += `${secs}秒`;
-                
-                return result;
+                return `${days > 0 ? days + '日 ' : ''}${hours > 0 ? hours + '時間 ' : ''}${minutes > 0 ? minutes + '分 ' : ''}${secs}秒`;
             }
 
-            // メモリ使用量フォーマット
             function formatBytes(bytes) {
-                const mb = bytes / 1024 / 1024;
-                return `${mb.toFixed(1)}MB`;
+                return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
             }
 
-            // メイン埋め込み
-            const embed = new EmbedBuilder()
-                .setColor(overallInfo.color)
-                .setTitle(`${overallInfo.emoji} Pong! 接続状態: ${overallInfo.status}`)
-                .setDescription('🚀 **最新技術搭載Discord Bot** の詳細ステータス')
-                .addFields([
+            const embed = createStandardEmbed({
+                title: `${overallInfo.emoji} Pong! 接続状態: ${overallInfo.status}`,
+                description: '🚀 **最新技術搭載Discord Bot** の詳細ステータス',
+                color: overallInfo.color,
+                fields: [
                     {
                         name: '📡 接続遅延情報',
                         value: [
@@ -105,82 +87,17 @@ module.exports = {
                         ].join('\n'),
                         inline: false
                     }
-                ])
-                .setFooter({
-                    text: `実行者: ${interaction.user.tag} | 測定完了時刻`,
+                ],
+                footer: {
+                    text: `実行者: ${interaction.user.tag}`,
                     iconURL: interaction.user.displayAvatarURL()
-                })
-                .setTimestamp();
-
-            // パフォーマンス評価
-            let performanceNote = '';
-            if (overallLatency < 100) {
-                performanceNote = '🚀 **素晴らしい接続状態です!** 全ての機能が高速で動作します。';
-            } else if (overallLatency < 200) {
-                performanceNote = '✅ **良好な接続状態です。** 快適にご利用いただけます。';
-            } else if (overallLatency < 500) {
-                performanceNote = '⚠️ **接続にやや遅延があります。** 機能は正常に動作します。';
-            } else {
-                performanceNote = '🔴 **接続遅延が発生しています。** Discord側の問題の可能性があります。';
-            }
-
-            embed.addFields([
-                {
-                    name: '📊 パフォーマンス評価',
-                    value: performanceNote,
-                    inline: false
                 }
-            ]);
-
-            // リアルタイムステータス
-            const connectionStatus = interaction.client.ws.status;
-            const statusMap = {
-                0: '🟢 Ready (準備完了)',
-                1: '🟡 Connecting (接続中)',
-                2: '🟠 Reconnecting (再接続中)',
-                3: '🔴 Idle (待機中)',
-                4: '⚫ Nearly (ほぼ切断)',
-                5: '❌ Disconnected (切断済み)',
-                6: '🔄 Waiting for Guilds (ギルド待機)',
-                7: '🔄 Identifying (認証中)',
-                8: '🔄 Resuming (再開中)'
-            };
-
-            embed.addFields([
-                {
-                    name: '🔌 接続ステータス',
-                    value: `${statusMap[connectionStatus] || '❓ 不明'} (コード: ${connectionStatus})`,
-                    inline: true
-                },
-                {
-                    name: '🕐 測定日時',
-                    value: `<t:${Math.floor(Date.now()/1000)}:F>`,
-                    inline: true
-                }
-            ]);
-
-            await interaction.editReply({
-                content: '',
-                embeds: [embed]
             });
 
-            // コンソールログ
-            console.log(`🏓 Ping測定完了: WS=${websocketLatency}ms, RT=${roundtripLatency}ms | ユーザー: ${interaction.user.tag}`);
-
+            await interaction.editReply({ content: '', embeds: [embed] });
         } catch (error) {
             console.error('Ping コマンドエラー:', error);
-            
-            const errorEmbed = new EmbedBuilder()
-                .setColor(Colors.Red)
-                .setTitle('❌ エラーが発生しました')
-                .setDescription('Ping測定中にエラーが発生しました。しばらくしてから再度お試しください。')
-                .setTimestamp();
-
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ embeds: [errorEmbed] }).catch(() => {});
-            } else {
-                await interaction.reply({ embeds: [errorEmbed], ephemeral: true }).catch(() => {});
-            }
+            await interaction.editReply({ content: '❌ エラーが発生しました。' }).catch(() => {});
         }
     },
 };
