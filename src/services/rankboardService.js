@@ -1,8 +1,8 @@
-const { EmbedBuilder } = require('discord.js');
 const { collection, query, where, getDocs, orderBy, limit } = require('firebase/firestore');
 const { ref, get } = require('firebase/database');
 const chalk = require('chalk');
 const { calculateRequiredXp } = require('./levelingService');
+const { createStandardEmbed, COLORS } = require('../utils/embedBuilder');
 
 async function updateRankboards(client) {
     if (!client.isReady()) return;
@@ -14,44 +14,25 @@ async function updateRankboards(client) {
 
     try {
         const snapshot = await getDocs(q);
-        if (snapshot.empty) {
-            console.log(chalk.cyan('[Rankboard] No active rankboards found.'));
-            return;
-        }
+        if (snapshot.empty) return;
 
         for (const guildSettingsDoc of snapshot.docs) {
             const settings = guildSettingsDoc.data();
             const guildId = guildSettingsDoc.id;
             const rankBoardConfig = settings.rankBoard;
 
-            if (!rankBoardConfig || !rankBoardConfig.channelId || !rankBoardConfig.messageId) {
-                continue;
-            }
+            if (!rankBoardConfig || !rankBoardConfig.channelId || !rankBoardConfig.messageId) continue;
 
-            const guild = await client.guilds.fetch(guildId).catch(err => {
-                console.error(chalk.red(`[Rankboard] Failed to fetch guild ${guildId}`), err);
-                return null;
-            });
+            const guild = await client.guilds.fetch(guildId).catch(() => null);
             if (!guild) continue;
 
             try {
                 const levelsRef = collection(db, 'levels');
-                const levelQuery = query(
-                    levelsRef,
-                    where('guildId', '==', guildId),
-                    orderBy('level', 'desc'),
-                    orderBy('xp', 'desc'),
-                    limit(10)
-                );
+                const levelQuery = query(levelsRef, where('guildId', '==', guildId), orderBy('level', 'desc'), orderBy('xp', 'desc'), limit(10));
                 const levelSnapshot = await getDocs(levelQuery);
-                const userStats = [];
-                levelSnapshot.forEach(doc => {
+                const userStats = levelSnapshot.docs.map(doc => {
                     const data = doc.data();
-                    userStats.push({
-                        userId: data.userId,
-                        level: data.level || 0,
-                        xp: data.xp || 0,
-                    });
+                    return { userId: data.userId, level: data.level || 0, xp: data.xp || 0 };
                 });
 
                 const allSessionsRef = ref(rtdb, `voiceSessions/${guild.id}`);
@@ -63,36 +44,27 @@ async function updateRankboards(client) {
                     if (onlineUsers[stat.userId]) {
                         const sessionDurationMs = Date.now() - onlineUsers[stat.userId].joinedAt;
                         const minutesStayed = Math.floor(sessionDurationMs / 60000);
-                        const vcXpGained = minutesStayed * 5;
-                        currentXp += vcXpGained;
+                        currentXp += minutesStayed * 5;
                     }
                     return { ...stat, finalXp: currentXp };
-                });
+                }).sort((a, b) => b.level !== a.level ? b.level - a.level : b.finalXp - a.finalXp);
 
-                finalStats.sort((a, b) => {
-                    if (b.level !== a.level) {
-                        return b.level - a.level;
-                    }
-                    return b.finalXp - a.finalXp;
+                const rankEmbed = createStandardEmbed({
+                    title: `[RANKING] ${guild.name}`,
+                    color: COLORS.PRIMARY,
+                    thumbnail: guild.iconURL(),
+                    footer: { text: '[ON] VC参加中 | 定期更新システム' }
                 });
-
-                const rankEmbed = new EmbedBuilder()
-                    .setColor(0x00FFFF)
-                    .setTitle(`🏆 ${guild.name} リアルタイムランキング`)
-                    .setThumbnail(guild.iconURL({ dynamic: true }))
-                    .setTimestamp()
-                    .setFooter({ text: '🟢: VC参加中 | 5分ごとに更新' });
 
                 if (finalStats.length === 0) {
-                    rankEmbed.setDescription('まだデータがありません。');
+                    rankEmbed.setDescription('データがありません。');
                 } else {
                     const rankPromises = finalStats.map(async (stat, index) => {
                         const member = await guild.members.fetch(stat.userId).catch(() => null);
-                        const medal = ['🥇', '🥈', '🥉'][index] || `**#${index + 1}**`;
-                        const requiredXp = calculateRequiredXp(stat.level);
-                        const isOnline = onlineUsers[stat.userId] ? '🟢' : '';
-
-                        return `${medal} ${isOnline} **${member ? member.displayName : '不明なユーザー'}**\n> LV: \`${stat.level}\` | XP: \`${stat.finalXp.toLocaleString()} / ${requiredXp.toLocaleString()}\``;
+                        const medal = ['1st', '2nd', '3rd'][index] || `#${index + 1}`;
+                        const reqXp = calculateRequiredXp(stat.level);
+                        const isOnline = onlineUsers[stat.userId] ? '[ON]' : '';
+                        return `**${medal}** ${isOnline} **${member ? member.displayName : 'Unknown'}**\n> LV: \`${stat.level}\` | XP: \`${stat.finalXp.toLocaleString()} / ${reqXp.toLocaleString()}\``;
                     });
                     const rankStrings = await Promise.all(rankPromises);
                     rankEmbed.setDescription(rankStrings.join('\n\n'));
@@ -101,16 +73,14 @@ async function updateRankboards(client) {
                 const channel = await client.channels.fetch(rankBoardConfig.channelId).catch(() => null);
                 if (channel) {
                     const message = await channel.messages.fetch(rankBoardConfig.messageId).catch(() => null);
-                    if (message) {
-                        await message.edit({ embeds: [rankEmbed] });
-                    }
+                    if (message) await message.edit({ embeds: [rankEmbed] });
                 }
             } catch (error) {
-                console.error(chalk.red(`[Rankboard] Error updating board for guild ${guildId}:`), error);
+                console.error(chalk.red(`[Rankboard] Update failure for ${guildId}:`), error);
             }
         }
     } catch (error) {
-        console.error(chalk.red('[Rankboard] Failed to query for guild settings:'), error);
+        console.error(chalk.red('[Rankboard] Query failure:'), error);
     }
 }
 

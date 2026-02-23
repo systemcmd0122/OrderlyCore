@@ -1,16 +1,16 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const { ref, set } = require('firebase/database');
 const { v4: uuidv4 } = require('uuid');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('login')
         .setDescription('Webダッシュボードにログインするためのワンタイムトークンを発行します。'),
     async execute(interaction) {
-        // サーバー管理者のみが実行可能
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
             return interaction.reply({
-                content: '❌ このコマンドを実行するには「サーバーの管理」権限が必要です。',
+                content: '[ERROR] このコマンドを実行するには「サーバーの管理」権限が必要です。',
                 ephemeral: true,
             });
         }
@@ -25,43 +25,34 @@ module.exports = {
             userId: interaction.user.id,
             guildId: interaction.guild.id,
             createdAt: Date.now(),
-            expiresAt: Date.now() + 300000, // 5分間有効
+            expiresAt: Date.now() + 300000,
         };
 
         try {
             await set(tokenRef, tokenData);
-
             const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}login`;
 
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🔑 Webダッシュボード ログイン')
-                .setDescription('以下のトークンをWebサイトで入力してログインしてください。このトークンは **5分間** のみ有効です。')
-                .addFields(
+            const embed = createStandardEmbed({
+                title: '[AUTH] Web Dashboard Login',
+                description: '以下のトークンを使用してログインしてください。このトークンは **5分間** 有効です。',
+                color: COLORS.PRIMARY,
+                fields: [
                     { name: '認証トークン', value: `\`\`\`${token}\`\`\`` },
-                    { name: 'ログインページ', value: `[こちらをクリック](${loginUrl})` }
-                )
-                .setFooter({ text: 'このメッセージはあなたにのみ表示されています。トークンを他人と共有しないでください。' })
-                .setTimestamp();
+                    { name: 'ログインURL', value: `[こちらをクリック](${loginUrl})` }
+                ],
+                footer: { text: '他人と共有しないでください' }
+            });
 
             await interaction.user.send({ embeds: [embed] }).catch(async () => {
-                 await interaction.editReply({
-                    content: '❌ あなたのDMにメッセージを送信できませんでした。DMの受信設定を確認してください。',
-                });
-                 // DM送信失敗時はトークンを削除
-                 await remove(tokenRef);
+                 await interaction.editReply({ content: '[ERROR] DMの送信に失敗しました。受信設定を確認してください。' });
                  return;
             });
             
-            await interaction.editReply({
-                content: '✅ あなたのDMにログイン用のトークンを送信しました。確認してください。',
-            });
+            await interaction.editReply({ content: '[OK] DMにログイン用トークンを送信しました。' });
 
         } catch (error) {
-            console.error('Login command error:', error);
-            await interaction.editReply({
-                content: '❌ ログインセッションの作成中にエラーが発生しました。',
-            });
+            console.error('[ERROR] Login command error:', error);
+            await interaction.editReply({ content: '[ERROR] エラーが発生しました。' });
         }
     },
 };

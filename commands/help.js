@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,11 +18,10 @@ module.exports = {
             general: []
         };
         
-        const commandsPath = path.join(__dirname); // Get current 'commands' directory
+        const commandsPath = __dirname;
         const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
         for (const file of commandFiles) {
-            // help.js自身は除外
             if (file === 'help.js') continue;
 
             const filePath = path.join(commandsPath, file);
@@ -33,7 +33,6 @@ module.exports = {
                         description: command.data.description,
                     };
 
-                    // コマンド名に基づいてカテゴリ分け
                     if (command.data.name.includes('config') || command.data.name.includes('list') || command.data.name.includes('board') || command.data.name.includes('ticket') || command.data.name.includes('automod')) {
                         commands.management.push(commandData);
                     } else if (command.data.name.includes('role')) {
@@ -45,43 +44,45 @@ module.exports = {
                     }
                 }
             } catch (error) {
-                console.error(`コマンドファイル ${file} の読み込みに失敗しました:`, error);
+                console.error(`[ERROR] コマンドファイル ${file} の読み込みに失敗しました:`, error);
             }
         }
 
-        const helpEmbed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle('🤖 OrderlyCore コマンドヘルプ')
-            .setDescription('`/` を入力すると、各コマンドの詳細な説明が表示されます。')
-            .setThumbnail(interaction.client.user.displayAvatarURL())
-            .addFields(
+        const helpEmbed = createStandardEmbed({
+            title: '[HELP] OrderlyCore コマンド一覧',
+            description: 'スラッシュコマンドを使用して、ボットの様々な機能を呼び出すことができます。',
+            color: COLORS.PRIMARY,
+            thumbnail: interaction.client.user.displayAvatarURL(),
+            fields: [
                 { 
-                    name: '⚙️ サーバー管理',
+                    name: '[ADMIN] サーバー管理',
                     value: commands.management.map(cmd => `> </${cmd.name}:${interaction.client.application.id}>: ${cmd.description}`).join('\n') || 'コマンドなし',
                     inline: false 
                 },
                 { 
-                    name: '🎭 ロール管理',
+                    name: '[ROLE] ロール管理',
                     value: commands.roles.map(cmd => `> </${cmd.name}:${interaction.client.application.id}>: ${cmd.description}`).join('\n') || 'コマンドなし',
                     inline: false 
                 },
                 { 
-                    name: '🔊 ボイスチャンネル',
+                    name: '[VOICE] ボイスチャンネル',
                     value: commands.voice.map(cmd => `> </${cmd.name}:${interaction.client.application.id}>: ${cmd.description}`).join('\n') || 'コマンドなし',
                     inline: false 
                 },
                 { 
-                    name: '🔧 一般',
-                    // 自分自身（helpコマンド）を手動で追加
+                    name: '[INFO] 一般',
                     value: [
                         ...commands.general.map(cmd => `> </${cmd.name}:${interaction.client.application.id}>: ${cmd.description}`),
-                        `> </help:${interaction.client.application.id}>: このヘルプメッセージを表示します。`
+                        `> </help:${interaction.client.application.id}>: ヘルプを表示します。`
                     ].join('\n') || 'コマンドなし',
                     inline: false 
                 }
-            )
-            .setFooter({ text: `${interaction.guild.name} | Bot Version: ${require('../package.json').version}`, iconURL: interaction.guild.iconURL() })
-            .setTimestamp();
+            ],
+            footer: {
+                text: `${interaction.guild.name} | System Version: ${require('../package.json').version}`,
+                iconURL: interaction.guild.iconURL()
+            }
+        });
             
         await interaction.editReply({ embeds: [helpEmbed] });
     },

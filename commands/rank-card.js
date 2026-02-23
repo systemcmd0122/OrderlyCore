@@ -142,7 +142,7 @@ module.exports = {
 
         } catch (error) {
             console.error('ランクカード生成エラー:', error);
-            await interaction.editReply({ content: '❌ ランクカードの生成中にエラーが発生しました。' });
+            await interaction.editReply({ content: '[ERROR] ランクカードの生成中にエラーが発生しました。' });
         }
     }
 };

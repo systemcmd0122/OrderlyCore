@@ -88,11 +88,11 @@ loadEvents();
 
 // 8. Bot Login & Command Deployment
 client.login(process.env.DISCORD_TOKEN).then(async () => {
-    console.log(chalk.green('✅ Discord bot logged in.'));
+    console.log(chalk.green('[OK] Discord bot logged in.'));
     const { deployCommands } = require('./src/config/discord');
     await deployCommands(commands);
 }).catch(err => {
-    console.error(chalk.red('❌ Discord bot login failed:'), err);
+    console.error(chalk.red('[ERROR] Discord bot login failed:'), err);
 });
 
 // 9. Server Initialization
@@ -100,9 +100,9 @@ if (require.main === module) {
     app.listen(PORT, () => {
         console.log(chalk.bold.cyan(`
 --------------------------------------------------
-🚀 OrderlyCore Bot is starting up!
-🌐 Web Server: http://localhost:${PORT}
-🔧 Environment: ${NODE_ENV}
+OrderlyCore Bot is starting up!
+Web Server: http://localhost:${PORT}
+Environment: ${NODE_ENV}
 --------------------------------------------------
         `));
     });

@@ -1,4 +1,4 @@
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { PermissionsBitField } = require('discord.js');
 const { doc, getDoc, setDoc, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');
 
@@ -19,13 +19,14 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
     * 生成する文章は**必ず一行**にしてください。
     * **80文字以内**に収めてください。
     * 毎回必ず違うパターンの文章を生成してください。
-    * **回答には祝福メッセージのみを含め、それ以外の前置き、解説、リスト、引用符（「」）は絶対に含めないでください。**`;
+    * **回答には祝福メッセージのみを含め、それ以外の前置き、解説、リスト、引用符（「」）は絶対に含めないでください。**
+    * **絶対に絵文字を使用しないでください。**`;
 
         const result = await client.geminiModel.generateContent(prompt);
         const text = result.response.text().trim().replace(/[\n*「」]/g, '').split('。')[0];
         return text;
     } catch (error) {
-        console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
+        console.error(chalk.red('[ERROR] Gemini APIでのコメント生成に失敗:'), error.message);
         return `**${user.displayName} が新たな境地へ到達しました！**`;
     }
 }

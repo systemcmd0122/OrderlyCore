@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { doc, getDoc } = require('firebase/firestore');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 async function handleMessage(message, client) {
     if (!message.guild || message.author.bot) return;
@@ -19,10 +20,16 @@ async function handleMessage(message, client) {
         if (config.ngWords && config.ngWords.length > 0) {
             const foundWord = config.ngWords.find(word => content.includes(word.toLowerCase()));
             if (foundWord) {
-                await message.delete();
-                const dm = await message.author.send(`⚠️ あなたのメッセージはNGワード「${foundWord}」を含んでいたため削除されました。`);
-                setTimeout(() => dm.delete().catch(() => {}), 10000); // 10秒後にDMを削除
-                return; // 処罰が重複しないようにリターン
+                await message.delete().catch(() => {});
+                const embed = createStandardEmbed({
+                    title: '[AUTOMOD] メッセージ削除',
+                    description: `不適切な単語が含まれていたため、メッセージを削除しました。`,
+                    color: COLORS.ERROR,
+                    footer: { text: `対象サーバー: ${message.guild.name}` }
+                });
+                const dm = await message.author.send({ embeds: [embed] }).catch(() => null);
+                if (dm) setTimeout(() => dm.delete().catch(() => {}), 30000);
+                return;
             }
         }
 
@@ -30,21 +37,22 @@ async function handleMessage(message, client) {
         if (config.blockInvites) {
             const inviteRegex = /(discord\.(gg|io|me|li)|discordapp\.com\/invite)\/[^\s/]+?(?=\b)/;
             if (inviteRegex.test(content)) {
-                // 許可されたロールを持っているかなどの例外処理をここに追加可能
-                await message.delete();
-                const dm = await message.author.send(`⚠️ このサーバーでは招待リンクの投稿は禁止されています。`);
-                setTimeout(() => dm.delete().catch(() => {}), 10000);
+                await message.delete().catch(() => {});
+                const embed = createStandardEmbed({
+                    title: '[AUTOMOD] 招待リンク禁止',
+                    description: `このサーバーでは招待リンクの投稿は禁止されています。`,
+                    color: COLORS.ERROR,
+                    footer: { text: `対象サーバー: ${message.guild.name}` }
+                });
+                const dm = await message.author.send({ embeds: [embed] }).catch(() => null);
+                if (dm) setTimeout(() => dm.delete().catch(() => {}), 30000);
             }
         }
-        
-        // 3. 連続投稿チェック (簡易版)
-        // (より高度な実装にはキャッシュやユーザーごとの投稿履歴管理が必要です)
 
     } catch (error) {
-        console.error('オートモデレーターの処理中にエラー:', error);
+        console.error('[ERROR] オートモデレーターの処理失敗:', error);
     }
 }
-
 
 module.exports = (client) => {
     client.on(Events.MessageCreate, (message) => handleMessage(message, client));

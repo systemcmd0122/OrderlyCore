@@ -22,7 +22,7 @@ module.exports = {
         const db = interaction.client.db;
 
         if (!db) {
-            return interaction.editReply({ content: '❌ データベースへの接続に失敗しました。' });
+            return interaction.editReply({ content: '[ERROR] データベースへの接続に失敗しました。' });
         }
 
         const settingsRef = doc(db, 'guild_settings', guildId);
@@ -33,7 +33,7 @@ module.exports = {
 
         // 成功した場合の応答
         await interaction.editReply({
-            content: `✅ ボイスチャンネル **${voiceChannel.name}** のログ設定を解除しました。`
+            content: `[OK] ボイスチャンネル **${voiceChannel.name}** のログ設定を解除しました。`
         });
 
         console.log(chalk.yellow(`[SETTINGS] VC Log Unmapped: ${voiceChannel.name} for guild ${interaction.guild.name}`));

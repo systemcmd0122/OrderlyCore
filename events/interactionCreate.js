@@ -10,10 +10,10 @@ module.exports = {
         if (interaction.isChatInputCommand()) {
             const command = client.commands.get(interaction.commandName);
             if (!command) {
-                console.error(chalk.red(`❌ Unknown command: ${interaction.commandName}`));
+                console.error(chalk.red(`[ERROR] Unknown command: ${interaction.commandName}`));
                 if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({
-                        content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
+                        content: `[ERROR] コマンド「${interaction.commandName}」が見つかりません。`,
                         ephemeral: true
                     }).catch(() => {});
                 }
@@ -21,13 +21,13 @@ module.exports = {
             }
 
             try {
-                console.log(chalk.cyan(`🎯 Command Execution: /${interaction.commandName} | User: ${interaction.user.tag} | Guild: ${interaction.guild?.name || 'DM'}`));
+                console.log(chalk.cyan(`[INFO] Command Execution: /${interaction.commandName} | User: ${interaction.user.tag} | Guild: ${interaction.guild?.name || 'DM'}`));
                 await command.execute(interaction);
             } catch (error) {
-                console.error(chalk.red(`❌ Command Execution Error (${interaction.commandName}):`), error);
+                console.error(chalk.red(`[ERROR] Command Execution Error (${interaction.commandName}):`), error);
                 
                 const errorMessage = {
-                    content: '⚠️ コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。',
+                    content: '[WARN] コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。',
                     ephemeral: true
                 };
 
@@ -38,7 +38,7 @@ module.exports = {
                         await interaction.reply(errorMessage);
                     }
                 } catch (responseError) {
-                    console.error(chalk.red('❌ Failed to send error response:'), responseError);
+                    console.error(chalk.red('[ERROR] Failed to send error response:'), responseError);
                 }
             }
             return;
@@ -51,7 +51,7 @@ module.exports = {
             try {
                 await command.autocomplete(interaction);
             } catch (error) {
-                console.error(chalk.red(`❌ Autocomplete Error (${interaction.commandName}):`), error);
+                console.error(chalk.red(`[ERROR] Autocomplete Error (${interaction.commandName}):`), error);
             }
             return;
         }
