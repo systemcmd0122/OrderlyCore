@@ -11,7 +11,7 @@ module.exports = {
         try {
             const startTime = Date.now();
             const sent = await interaction.reply({ 
-                content: '🏓 Pong! 詳細測定中...', 
+                content: 'Pong! 詳細測定中...', 
                 fetchReply: true 
             });
 
@@ -28,10 +28,10 @@ module.exports = {
             const usedMem = totalMem - freeMem;
 
             function getLatencyLevel(ms) {
-                if (ms < 100) return { emoji: '🟢', color: Colors.Green, status: '優秀' };
-                if (ms < 200) return { emoji: '🟡', color: Colors.Yellow, status: '良好' };
-                if (ms < 500) return { emoji: '🟠', color: Colors.Orange, status: '普通' };
-                return { emoji: '🔴', color: Colors.Red, status: '遅延' };
+                if (ms < 100) return { emoji: '[OK]', color: Colors.Green, status: '優秀' };
+                if (ms < 200) return { emoji: '[GOOD]', color: Colors.Yellow, status: '良好' };
+                if (ms < 500) return { emoji: '[NORMAL]', color: Colors.Orange, status: '普通' };
+                return { emoji: '[LAG]', color: Colors.Red, status: '遅延' };
             }
 
             const wsLatencyInfo = getLatencyLevel(websocketLatency);
@@ -52,38 +52,38 @@ module.exports = {
 
             const embed = createStandardEmbed({
                 title: `${overallInfo.emoji} Pong! 接続状態: ${overallInfo.status}`,
-                description: '🚀 **最新技術搭載Discord Bot** の詳細ステータス',
+                description: '**最新技術搭載Discord Bot** の詳細ステータス',
                 color: overallInfo.color,
                 fields: [
                     {
-                        name: '📡 接続遅延情報',
+                        name: '接続遅延情報',
                         value: [
                             `${wsLatencyInfo.emoji} **WebSocket遅延**: \`${websocketLatency}ms\` (${wsLatencyInfo.status})`,
                             `${rtLatencyInfo.emoji} **往復遅延**: \`${roundtripLatency}ms\` (${rtLatencyInfo.status})`,
-                            `⚡ **API遅延**: \`${apiLatency}ms\``,
-                            `🔄 **編集遅延**: \`${editLatency}ms\``
+                            `**API遅延**: \`${apiLatency}ms\``,
+                            `**編集遅延**: \`${editLatency}ms\``
                         ].join('\n'),
                         inline: false
                     },
                     {
-                        name: '🖥️ システム情報',
+                        name: 'システム情報',
                         value: [
-                            `⏰ **稼働時間**: ${formatUptime(uptime)}`,
-                            `💾 **メモリ使用量**: ${formatBytes(memUsage.heapUsed)} / ${formatBytes(memUsage.heapTotal)}`,
-                            `🖥️ **システムメモリ**: ${formatBytes(usedMem)} / ${formatBytes(totalMem)} (${((usedMem/totalMem)*100).toFixed(1)}%)`,
-                            `📊 **CPU アーキテクチャ**: ${os.arch()}`,
-                            `💻 **プラットフォーム**: ${os.platform()}`
+                            `**稼働時間**: ${formatUptime(uptime)}`,
+                            `**メモリ使用量**: ${formatBytes(memUsage.heapUsed)} / ${formatBytes(memUsage.heapTotal)}`,
+                            `**システムメモリ**: ${formatBytes(usedMem)} / ${formatBytes(totalMem)} (${((usedMem/totalMem)*100).toFixed(1)}%)`,
+                            `**CPU アーキテクチャ**: ${os.arch()}`,
+                            `**プラットフォーム**: ${os.platform()}`
                         ].join('\n'),
                         inline: false
                     },
                     {
-                        name: '🔧 技術情報',
+                        name: '技術情報',
                         value: [
-                            `⚡ **Node.js**: ${process.version}`,
-                            `🤖 **Discord.js**: v${require('discord.js').version}`,
-                            `🔥 **Firebase**: 接続済み`,
-                            `🌐 **サーバー数**: ${interaction.client.guilds.cache.size}`,
-                            `👥 **ユーザー数**: ${interaction.client.users.cache.size}`
+                            `**Node.js**: ${process.version}`,
+                            `**Discord.js**: v${require('discord.js').version}`,
+                            `**Firebase**: 接続済み`,
+                            `**サーバー数**: ${interaction.client.guilds.cache.size}`,
+                            `**ユーザー数**: ${interaction.client.users.cache.size}`
                         ].join('\n'),
                         inline: false
                     }
@@ -97,7 +97,7 @@ module.exports = {
             await interaction.editReply({ content: '', embeds: [embed] });
         } catch (error) {
             console.error('Ping コマンドエラー:', error);
-            await interaction.editReply({ content: '❌ エラーが発生しました。' }).catch(() => {});
+            await interaction.editReply({ content: '[ERROR] エラーが発生しました。' }).catch(() => {});
         }
     },
 };

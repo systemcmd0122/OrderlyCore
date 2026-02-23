@@ -8,10 +8,10 @@ try {
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Regular.ttf'), 'NotoSansJP');
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Bold.ttf'), 'NotoSansJP-Bold');
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Light.ttf'), 'NotoSansJP-Light');
-    console.log('✅ フォントが正常に読み込まれました');
+    console.log('[OK] フォントが正常に読み込まれました');
 } catch (error) {
-    console.error('❌ フォントの読み込みエラー:', error.message);
-    console.error('📁 `fonts`ディレクトリにNoto Sans JPフォントファイルを配置してください');
+    console.error('[ERROR] フォントの読み込みエラー:', error.message);
+    console.error('[INFO] `fonts`ディレクトリにNoto Sans JPフォントファイルを配置してください');
 }
 
 // --- 最新のモダンテーマ ---
@@ -285,15 +285,15 @@ module.exports = {
                 .setDescription('デザインテーマを選択')
                 .setRequired(false)
                 .addChoices(
-                    { name: '🌌 ネオンサイバー', value: 'neon_cyber' },
-                    { name: '🌈 オーロラドリーム', value: 'aurora_dream' },
-                    { name: '🌅 サンセットブリス', value: 'sunset_bliss' },
-                    { name: '🌊 オーシャンデプス', value: 'ocean_depths' },
-                    { name: '🌲 エメラルドフォレスト', value: 'emerald_forest' },
-                    { name: '👑 ロイヤルパープル', value: 'royal_purple' },
-                    { name: '☁️ ミニマリストライト', value: 'minimalist_light' },
-                    { name: '🌸 チェリーブロッサム', value: 'cherry_blossom' },
-                    { name: '🎲 ランダム', value: 'random' }
+                    { name: 'ネオンサイバー', value: 'neon_cyber' },
+                    { name: 'オーロラドリーム', value: 'aurora_dream' },
+                    { name: 'サンセットブリス', value: 'sunset_bliss' },
+                    { name: 'オーシャンデプス', value: 'ocean_depths' },
+                    { name: 'エメラルドフォレスト', value: 'emerald_forest' },
+                    { name: 'ロイヤルパープル', value: 'royal_purple' },
+                    { name: 'ミニマリストライト', value: 'minimalist_light' },
+                    { name: 'チェリーブロッサム', value: 'cherry_blossom' },
+                    { name: 'ランダム', value: 'random' }
                 ))
         .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
 
@@ -308,7 +308,7 @@ module.exports = {
             const messageId = extractMessageId(input);
             if (!messageId) {
                 return await interaction.editReply({
-                    content: '❌ 無効なメッセージIDまたはURLです。\n💡 メッセージを右クリック→「IDをコピー」または、メッセージリンクをコピーしてください。',
+                    content: '[ERROR] 無効なメッセージIDまたはURLです。\n[INFO] メッセージを右クリック→「IDをコピー」または、メッセージリンクをコピーしてください。',
                     ephemeral: true
                 });
             }
@@ -318,14 +318,14 @@ module.exports = {
             
             if (!targetMessage) {
                 return await interaction.editReply({
-                    content: '❌ メッセージが見つかりませんでした。\n💡 このサーバー内のメッセージか確認してください。',
+                    content: '[ERROR] メッセージが見つかりませんでした。\n[INFO] このサーバー内のメッセージか確認してください。',
                     ephemeral: true
                 });
             }
 
             if (!targetMessage.content || targetMessage.content.trim() === '') {
                 return await interaction.editReply({
-                    content: '❌ このメッセージには引用できるテキストがありません。',
+                    content: '[ERROR] このメッセージには引用できるテキストがありません。',
                     ephemeral: true
                 });
             }
@@ -533,7 +533,7 @@ module.exports = {
                 : 'rgba(0, 0, 0, 0.15)';
             ctx.font = '18px "NotoSansJP-Light"';
             ctx.textAlign = 'right';
-            ctx.fillText('✨ Quote Generator', canvasWidth - 30, canvasHeight - 25);
+            ctx.fillText('Quote Generator', canvasWidth - 30, canvasHeight - 25);
 
             // --- PNG出力 ---
             const buffer = canvas.toBuffer('image/png');
@@ -541,7 +541,7 @@ module.exports = {
 
             // 送信
             await interaction.editReply({
-                content: `✨ **${displayName}** の名言を生成しました！\n🎨 テーマ: **${selectedTheme.name.replace(/_/g, ' ').toUpperCase()}**`,
+                content: `**${displayName}** の名言を生成しました！\nテーマ: **${selectedTheme.name.replace(/_/g, ' ').toUpperCase()}**`,
                 files: [attachment]
             });
 
@@ -550,7 +550,7 @@ module.exports = {
             
             const errorMessage = error.message || '不明なエラー';
             await interaction.editReply({
-                content: `❌ 画像生成中にエラーが発生しました。\n\`\`\`\n${errorMessage}\n\`\`\``,
+                content: `[ERROR] 画像生成中にエラーが発生しました。\n\`\`\`\n${errorMessage}\n\`\`\``,
                 ephemeral: true
             }).catch(console.error);
         }

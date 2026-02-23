@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const { doc, setDoc, getDoc } = require('firebase/firestore');
+const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { doc, setDoc } = require('firebase/firestore');
+const { createSuccessEmbed, createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -23,32 +24,21 @@ module.exports = {
 
         try {
             if (channel) {
-                // チャンネルを設定
-                await setDoc(settingsRef, {
-                    announcementChannelId: channel.id
-                }, { merge: true });
-
-                const embed = new EmbedBuilder()
-                    .setColor(0x00ff00)
-                    .setTitle('✅ 設定完了')
-                    .setDescription(`ボットからのお知らせを ${channel} で受信するように設定しました。`);
+                await setDoc(settingsRef, { announcementChannelId: channel.id }, { merge: true });
+                const embed = createSuccessEmbed('設定完了', `お知らせを ${channel} で受信するように設定しました。`);
                 await interaction.editReply({ embeds: [embed] });
-
             } else {
-                // チャンネル設定を解除
-                await setDoc(settingsRef, {
-                    announcementChannelId: null
-                }, { merge: true });
-
-                const embed = new EmbedBuilder()
-                    .setColor(0xffcc00)
-                    .setTitle('設定解除')
-                    .setDescription('ボットからのお知らせ受信を無効にしました。');
+                await setDoc(settingsRef, { announcementChannelId: null }, { merge: true });
+                const embed = createStandardEmbed({
+                    title: '[OK] 設定解除',
+                    description: 'お知らせ受信を無効にしました。',
+                    color: COLORS.WARNING
+                });
                 await interaction.editReply({ embeds: [embed] });
             }
         } catch (error) {
-            console.error('announcement-config コマンドエラー:', error);
-            await interaction.editReply({ content: '❌ 設定中にエラーが発生しました。' });
+            console.error('[ERROR] announcement-config error:', error);
+            await interaction.editReply({ content: '[ERROR] 設定に失敗しました。' });
         }
     }
 };

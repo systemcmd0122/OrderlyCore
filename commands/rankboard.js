@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, ChannelType, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { doc, getDoc, setDoc } = require('firebase/firestore');
 const chalk = require('chalk');
+const { createStandardEmbed, createSuccessEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -36,22 +37,19 @@ module.exports = {
             if (subcommand === 'setup') {
                 const channel = interaction.options.getChannel('channel');
 
-                // Check bot permissions in the target channel
                 if (!channel.permissionsFor(interaction.client.user).has([PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ViewChannel])) {
-                    return await interaction.editReply({ content: `❌ ${channel} でメッセージを送信・編集する権限がありません。` });
+                    return await interaction.editReply({ content: `[ERROR] ${channel} でメッセージを送信・編集する権限がありません。` });
                 }
 
-                // Send initial message
-                const initialEmbed = new EmbedBuilder()
-                    .setColor(0x3498db)
-                    .setTitle(`🏆 ${interaction.guild.name} リアルタイムランキング`)
-                    .setDescription('ランキングデータを集計中です。しばらくお待ちください...')
-                    .setFooter({ text: 'このメッセージは定期的に更新されます。' })
-                    .setTimestamp();
+                const initialEmbed = createStandardEmbed({
+                    title: `[RANKING] ${interaction.guild.name}`,
+                    description: 'ランキングデータを集計中です。しばらくお待ちください...',
+                    color: COLORS.PRIMARY,
+                    footer: { text: 'システムにより定期的に自動更新されます' }
+                });
 
                 const rankBoardMessage = await channel.send({ embeds: [initialEmbed] });
 
-                // Save settings
                 await setDoc(settingsRef, {
                     rankBoard: {
                         channelId: channel.id,
@@ -59,10 +57,10 @@ module.exports = {
                     }
                 }, { merge: true });
 
-                const successEmbed = new EmbedBuilder()
-                    .setColor(0x00ff00)
-                    .setTitle('✅ 設定完了')
-                    .setDescription(`ランキングボードを ${channel} に設置しました。\nデータは数分以内に更新されます。`);
+                const successEmbed = createSuccessEmbed(
+                    '設定完了',
+                    `ランキングボードを ${channel} に設置しました。\nデータは数分以内に更新されます。`
+                );
                 await interaction.editReply({ embeds: [successEmbed] });
 
                 console.log(chalk.blue(`[Rankboard] Setup in guild ${interaction.guild.name} (#${channel.name})`));
@@ -77,7 +75,7 @@ module.exports = {
                         const oldMessage = await oldChannel.messages.fetch(settings.rankBoard.messageId);
                         await oldMessage.delete();
                     } catch (error) {
-                        console.warn(chalk.yellow('[Rankboard] Could not delete old rankboard message. It might have been deleted already.'));
+                        console.warn(chalk.yellow('[Rankboard] Could not delete old rankboard message.'));
                     }
                 }
 
@@ -85,16 +83,17 @@ module.exports = {
                     rankBoard: null
                 }, { merge: true });
 
-                const embed = new EmbedBuilder()
-                    .setColor(0xffcc00)
-                    .setTitle('設定解除')
-                    .setDescription('ランキングボードを無効化しました。設置されていたメッセージも削除しました。');
+                const embed = createStandardEmbed({
+                    title: '[OK] 設定解除',
+                    description: 'ランキングボードを無効化しました。',
+                    color: COLORS.WARNING
+                });
                 await interaction.editReply({ embeds: [embed] });
                 console.log(chalk.yellow(`[Rankboard] Disabled in guild ${interaction.guild.name}`));
             }
         } catch (error) {
-            console.error('rankboard コマンドエラー:', error);
-            await interaction.editReply({ content: '❌ 設定中にエラーが発生しました。' });
+            console.error('[ERROR] rankboard コマンドエラー:', error);
+            await interaction.editReply({ content: '[ERROR] 設定中にエラーが発生しました。' });
         }
     }
 };

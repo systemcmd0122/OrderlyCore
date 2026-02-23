@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } = require('firebase/firestore');
+const { createStandardEmbed, createSuccessEmbed, createErrorEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -93,15 +94,8 @@ module.exports = {
 
     async autocomplete(interaction) {
         try {
-            // インタラクションの有効性をチェック
-            if (!interaction.isAutocomplete()) {
-                return;
-            }
-
-            // インタラクションが既に応答済みかチェック
-            if (interaction.responded) {
-                return;
-            }
+            if (!interaction.isAutocomplete()) return;
+            if (interaction.responded) return;
 
             const focusedOption = interaction.options.getFocused(true);
             
@@ -125,53 +119,26 @@ module.exports = {
                         choice.name.toLowerCase().includes(focusedOption.value.toLowerCase())
                     ).slice(0, 25);
 
-                    // 再度応答済みでないかチェック
                     if (!interaction.responded) {
                         await interaction.respond(filtered);
                     }
                 } catch (dbError) {
-                    console.error('データベースクエリエラー:', dbError);
-                    // エラーが発生した場合は空の配列で応答
-                    if (!interaction.responded) {
-                        try {
-                            await interaction.respond([]);
-                        } catch (responseError) {
-                            console.error('オートコンプリート応答エラー:', responseError);
-                        }
-                    }
+                    if (!interaction.responded) await interaction.respond([]);
                 }
             }
         } catch (error) {
-            console.error('オートコンプリートエラー:', error);
-            // エラーハンドリング - 応答していない場合のみ空の配列で応答
-            if (!interaction.responded) {
-                try {
-                    await interaction.respond([]);
-                } catch (finalError) {
-                    console.error('最終応答エラー:', finalError);
-                }
-            }
+            if (!interaction.responded) try { await interaction.respond([]); } catch (e) {}
         }
     },
 
     async execute(interaction) {
         try {
-            // インタラクションの有効性をチェック
-            if (!interaction.isChatInputCommand()) {
-                console.log('⚠️ チャットコマンド以外のインタラクションを受信しました');
-                return;
-            }
-
-            // インタラクションが既に応答済みの場合は処理しない
-            if (interaction.replied || interaction.deferred) {
-                console.log('⚠️ インタラクションは既に応答済みです');
-                return;
-            }
+            if (!interaction.isChatInputCommand()) return;
+            if (interaction.replied || interaction.deferred) return;
 
             const subcommand = interaction.options.getSubcommand();
             const guildId = interaction.guild.id;
 
-            // 最初に必ずdeferReplyを呼び出す（3秒以内に応答する必要があるため）
             await interaction.deferReply({ ephemeral: true });
 
             switch (subcommand) {
@@ -194,33 +161,11 @@ module.exports = {
                     await this.handleDelete(interaction, guildId);
                     break;
                 default:
-                    await this.safeEditReply(interaction, {
-                        content: '⚠️ 無効なサブコマンドです。'
-                    });
+                    await interaction.editReply({ content: '[ERROR] 無効なサブコマンドです。' });
             }
         } catch (error) {
-            console.error('ロールボードコマンドエラー:', error);
-            
-            const errorMessage = {
-                content: '⚠️ コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。'
-            };
-
-            await this.safeEditReply(interaction, errorMessage);
-        }
-    },
-
-    // 安全な応答メソッド（deferReply後専用）
-    async safeEditReply(interaction, options) {
-        try {
-            if (interaction.deferred) {
-                return await interaction.editReply(options);
-            } else {
-                console.error('editReplyを呼び出そうとしましたが、インタラクションがdeferされていません');
-                return null;
-            }
-        } catch (error) {
-            console.error('応答送信エラー:', error);
-            throw error;
+            console.error('[ERROR] ロールボードコマンドエラー:', error);
+            await interaction.editReply({ content: '[ERROR] コマンドの実行中にエラーが発生しました。' });
         }
     },
 
@@ -230,33 +175,23 @@ module.exports = {
         const color = interaction.options.getString('color');
         const password = interaction.options.getString('password');
 
-        // カラー検証
-        let embedColor = 0x5865F2; // Discord デフォルト色
+        let embedColor = COLORS.PRIMARY;
         if (color) {
             const colorMatch = color.match(/^#?([A-Fa-f0-9]{6})$/);
             if (colorMatch) {
                 embedColor = parseInt(colorMatch[1], 16);
             } else {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ 無効な色の形式です。16進数で入力してください（例: #FF0000）'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] 無効な色の形式です。' });
             }
         }
 
-        // パスワード検証
         if (password && password.length > 128) {
-            await this.safeEditReply(interaction, {
-                content: '⚠️ パスワードは128文字以内で指定してください。'
-            });
-            return;
+            return await interaction.editReply({ content: '[ERROR] パスワードは128文字以内で指定してください。' });
         }
 
-        // 固有IDの生成
         const boardId = `rb_${guildId}_${Date.now()}`;
 
         try {
-            // Firestoreに保存
             const boardData = {
                 guildId,
                 title,
@@ -264,7 +199,7 @@ module.exports = {
                 color: embedColor,
                 roles: {},
                 genres: {},
-                password: password || null, // パスワードを保存
+                password: password || null,
                 createdBy: interaction.user.id,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -272,27 +207,16 @@ module.exports = {
 
             await setDoc(doc(interaction.client.db, 'roleboards', boardId), boardData);
 
-            const embed = new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setTitle('✅ ロールボード作成完了')
-                .setDescription(`**${title}** のロールボードが作成されました。`)
+            const embed = createSuccessEmbed('作成完了', `**${title}** のロールボードが作成されました。`)
                 .addFields([
-                    { name: '📋 ボードID', value: `\`${boardId}\``, inline: true },
-                    { name: '📝 説明', value: description, inline: false },
-                    { name: '🎨 カラー', value: `#${embedColor.toString(16).padStart(6, '0').toUpperCase()}`, inline: true },
-                    { name: '🔐 パスワード保護', value: password ? '✅ 有効' : '❌ 無効', inline: true }
+                    { name: 'ボードID', value: `\`${boardId}\``, inline: true },
+                    { name: 'パスワード保護', value: password ? '[ON] 有効' : '[OFF] 無効', inline: true }
                 ])
-                .setFooter({
-                    text: '次に /roleboard add でロールを追加してください'
-                })
-                .setTimestamp();
+                .setFooter({ text: '次に /roleboard add でロールを追加してください' });
 
-            await this.safeEditReply(interaction, { embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error('ロールボード作成エラー:', error);
-            await this.safeEditReply(interaction, {
-                content: '⚠️ ロールボードの作成中にエラーが発生しました。'
-            });
+            await interaction.editReply({ content: '[ERROR] ロールボードの作成に失敗しました。' });
         }
     },
 
@@ -303,26 +227,17 @@ module.exports = {
         const emoji = interaction.options.getString('emoji');
 
         try {
-            // ロールボードの取得
             const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
             
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ 指定されたロールボードが見つかりません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
             }
 
-            // ボットのロール階層チェック
             const botMember = interaction.guild.members.cache.get(interaction.client.user.id);
             if (role.position >= botMember.roles.highest.position) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ このロールはボットの権限より上位にあるため、管理できません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] ボットの権限不足です。' });
             }
 
-            // データ更新
             const boardData = boardDoc.data();
             boardData.roles[role.id] = {
                 name: role.name,
@@ -331,16 +246,9 @@ module.exports = {
                 addedAt: new Date().toISOString()
             };
 
-            // ジャンル情報を更新
-            if (!boardData.genres) {
-                boardData.genres = {};
-            }
-            if (!boardData.genres[genre]) {
-                boardData.genres[genre] = [];
-            }
-            if (!boardData.genres[genre].includes(role.id)) {
-                boardData.genres[genre].push(role.id);
-            }
+            if (!boardData.genres) boardData.genres = {};
+            if (!boardData.genres[genre]) boardData.genres[genre] = [];
+            if (!boardData.genres[genre].includes(role.id)) boardData.genres[genre].push(role.id);
 
             boardData.updatedAt = new Date().toISOString();
 
@@ -350,30 +258,15 @@ module.exports = {
                 updatedAt: boardData.updatedAt
             });
 
-            const embed = new EmbedBuilder()
-                .setColor(0x00ff00)
-                .setTitle('✅ ロール追加完了')
-                .setDescription(`**${role.name}** をロールボードに追加しました。`)
+            const embed = createSuccessEmbed('ロール追加完了', `**${role.name}** をロールボードに追加しました。`)
                 .addFields([
-                    { name: '📋 ボードID', value: `\`${boardId}\``, inline: true },
-                    { name: '🎭 ロール', value: `${role}`, inline: true },
-                    { name: '🏷️ ジャンル', value: genre, inline: true }
+                    { name: 'ボードID', value: `\`${boardId}\``, inline: true },
+                    { name: 'ジャンル', value: genre, inline: true }
                 ]);
 
-            if (emoji) {
-                embed.addFields([
-                    { name: '😀 絵文字', value: emoji, inline: true }
-                ]);
-            }
-
-            embed.setTimestamp();
-
-            await this.safeEditReply(interaction, { embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error('ロール追加エラー:', error);
-            await this.safeEditReply(interaction, {
-                content: '⚠️ ロールの追加中にエラーが発生しました。'
-            });
+            await interaction.editReply({ content: '[ERROR] ロールの追加に失敗しました。' });
         }
     },
 
@@ -382,39 +275,24 @@ module.exports = {
         const role = interaction.options.getRole('role');
 
         try {
-            // ロールボードの取得
             const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
-            
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ 指定されたロールボードが見つかりません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
             }
 
             const boardData = boardDoc.data();
-            
             if (!boardData.roles[role.id]) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ このロールはロールボードに登録されていません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] 登録されていないロールです。' });
             }
 
             const roleGenre = boardData.roles[role.id].genre;
-
-            // ロール削除
             delete boardData.roles[role.id];
 
-            // ジャンルからロールを削除
             if (boardData.genres && boardData.genres[roleGenre]) {
                 const index = boardData.genres[roleGenre].indexOf(role.id);
                 if (index > -1) {
                     boardData.genres[roleGenre].splice(index, 1);
-                    // ジャンルが空になった場合は削除
-                    if (boardData.genres[roleGenre].length === 0) {
-                        delete boardData.genres[roleGenre];
-                    }
+                    if (boardData.genres[roleGenre].length === 0) delete boardData.genres[roleGenre];
                 }
             }
 
@@ -426,23 +304,12 @@ module.exports = {
                 updatedAt: boardData.updatedAt
             });
 
-            const embed = new EmbedBuilder()
-                .setColor(0xff9900)
-                .setTitle('✅ ロール削除完了')
-                .setDescription(`**${role.name}** をロールボードから削除しました。`)
-                .addFields([
-                    { name: '📋 ボードID', value: `\`${boardId}\``, inline: true },
-                    { name: '🗑️ 削除されたロール', value: `${role}`, inline: true },
-                    { name: '🏷️ ジャンル', value: roleGenre, inline: true }
-                ])
-                .setTimestamp();
+            const embed = createSuccessEmbed('ロール削除完了', `**${role.name}** を削除しました。`)
+                .addFields([{ name: 'ボードID', value: `\`${boardId}\``, inline: true }]);
 
-            await this.safeEditReply(interaction, { embeds: [embed] });
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error('ロール削除エラー:', error);
-            await this.safeEditReply(interaction, {
-                content: '⚠️ ロールの削除中にエラーが発生しました。'
-            });
+            await interaction.editReply({ content: '[ERROR] ロールの削除に失敗しました。' });
         }
     },
 
@@ -452,79 +319,51 @@ module.exports = {
         const password = interaction.options.getString('password');
 
         try {
-            // ロールボードの取得
             const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
-            
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ 指定されたロールボードが見つかりません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
             }
 
             const boardData = boardDoc.data();
             const roles = Object.keys(boardData.roles);
 
             if (roles.length === 0) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ このロールボードにはロールが登録されていません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] ロールが登録されていません。' });
             }
 
-            // パスワード設定時に指定パスワードを保存または更新
             let passwordToUse = boardData.password;
             if (password) {
                 passwordToUse = password;
-                // パスワード変更をデータベースに保存
                 await updateDoc(doc(interaction.client.db, 'roleboards', boardId), {
                     password: password,
                     updatedAt: new Date().toISOString()
                 });
             }
 
-            // 埋め込み作成
-            const embed = new EmbedBuilder()
-                .setColor(boardData.color)
-                .setTitle(`🎭 ${boardData.title}`)
-                .setDescription(boardData.description)
-                .setFooter({
-                    text: `ロールボードID: ${boardId} | ${roles.length}個のロール${passwordToUse ? ' | 🔐 パスワード保護中' : ''}`
-                })
-                .setTimestamp();
+            const embed = createStandardEmbed({
+                title: `[ROLEBOARD] ${boardData.title}`,
+                description: boardData.description,
+                color: boardData.color,
+                footer: { text: `ID: ${boardId} | ${roles.length} Roles${passwordToUse ? ' | [PASS] Protected' : ''}` }
+            });
 
-            // ジャンル別にロールを整理
             const genreFields = {};
             const validRoles = roles.filter(roleId => interaction.guild.roles.cache.has(roleId));
 
             validRoles.forEach(roleId => {
                 const roleData = boardData.roles[roleId];
                 const role = interaction.guild.roles.cache.get(roleId);
-                const genre = roleData.genre || 'その他';
+                const genre = roleData.genre || 'Others';
 
-                if (!genreFields[genre]) {
-                    genreFields[genre] = [];
-                }
-
-                const roleText = roleData.emoji 
-                    ? `${roleData.emoji} **${role.name}**`
-                    : `**${role.name}**`;
-                
+                if (!genreFields[genre]) genreFields[genre] = [];
+                const roleText = roleData.emoji ? `${roleData.emoji} **${role.name}**` : `**${role.name}**`;
                 genreFields[genre].push(roleText);
             });
 
-            // ジャンル別フィールドを追加
             Object.keys(genreFields).forEach(genre => {
-                embed.addFields([
-                    { 
-                        name: `🏷️ ${genre}`, 
-                        value: genreFields[genre].join('\n'), 
-                        inline: false 
-                    }
-                ]);
+                embed.addFields([{ name: `[GENRE] ${genre}`, value: genreFields[genre].join('\n'), inline: false }]);
             });
 
-            // ボタン作成（ジャンル別に整理、最大25個まで、5列×5行）
             const components = [];
             const genreKeys = Object.keys(genreFields);
             let buttonCount = 0;
@@ -532,60 +371,32 @@ module.exports = {
 
             for (const genre of genreKeys) {
                 const genreRoles = boardData.genres[genre] || [];
-                
                 for (const roleId of genreRoles) {
-                    if (buttonCount >= 25) break; // 最大25個まで
-                    
+                    if (buttonCount >= 25) break;
                     const roleData = boardData.roles[roleId];
                     const role = interaction.guild.roles.cache.get(roleId);
-                    
                     if (role) {
                         const button = new ButtonBuilder()
                             .setCustomId(`role_${roleId}|${boardId}`)
                             .setLabel(role.name)
                             .setStyle(ButtonStyle.Secondary);
-                        
-                        if (roleData.emoji) {
-                            try {
-                                button.setEmoji(roleData.emoji);
-                            } catch (emojiError) {
-                                console.warn(`無効な絵文字をスキップしました: ${roleData.emoji}`);
-                            }
-                        }
-                        
+                        if (roleData.emoji) try { button.setEmoji(roleData.emoji); } catch (e) {}
                         currentRow.addComponents(button);
                         buttonCount++;
-                        
-                        // 5個のボタンで行を完成させる
                         if (currentRow.components.length === 5) {
                             components.push(currentRow);
                             currentRow = new ActionRowBuilder();
                         }
-                        
-                        // 最大5行まで
-                        if (components.length >= 5) break;
                     }
                 }
-                
-                if (buttonCount >= 25 || components.length >= 5) break;
+                if (buttonCount >= 25) break;
             }
+            if (currentRow.components.length > 0 && components.length < 5) components.push(currentRow);
 
-            // 最後の行に残りのボタンがある場合は追加
-            if (currentRow.components.length > 0 && components.length < 5) {
-                components.push(currentRow);
-            }
-
-            // メッセージ送信
             await targetChannel.send({ embeds: [embed], components });
-            
-            await this.safeEditReply(interaction, {
-                content: `✅ ロールボードを ${targetChannel} に送信しました。${passwordToUse ? '\n🔐 パスワード保護が有効です。' : ''}`
-            });
+            await interaction.editReply({ content: `[OK] ロールボードを ${targetChannel} に送信しました。` });
         } catch (error) {
-            console.error('ロールボード送信エラー:', error);
-            await this.safeEditReply(interaction, {
-                content: '⚠️ ロールボードの送信に失敗しました。チャンネルの権限を確認してください。'
-            });
+            await interaction.editReply({ content: '[ERROR] ロールボードの送信に失敗しました。' });
         }
     },
 
@@ -595,107 +406,41 @@ module.exports = {
             const q = query(boardsRef, where('guildId', '==', guildId));
             const snapshot = await getDocs(q);
 
-            if (snapshot.empty) {
-                await this.safeEditReply(interaction, {
-                    content: '📋 このサーバーにはロールボードが作成されていません。'
-                });
-                return;
-            }
+            if (snapshot.empty) return await interaction.editReply({ content: '[INFO] ロールボードがありません。' });
 
-            const boards = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const roleCount = Object.keys(data.roles || {}).length;
-                const genreCount = Object.keys(data.genres || {}).length;
-                boards.push({
-                    id: doc.id,
-                    title: data.title,
-                    roleCount,
-                    genreCount,
-                    createdAt: new Date(data.createdAt).toLocaleDateString('ja-JP')
-                });
+            const boards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            const embed = createStandardEmbed({
+                title: '[LIST] ロールボード一覧',
+                description: `このサーバーには **${boards.length}** 個のロールボードがあります。`,
+                color: COLORS.PRIMARY
             });
 
-            // 作成日時で降順ソート
-            boards.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('📋 ロールボード一覧')
-                .setDescription(`このサーバーには **${boards.length}** 個のロールボードがあります。`)
-                .setFooter({
-                    text: `サーバー: ${interaction.guild.name}`
-                })
-                .setTimestamp();
-
-            // ロールボードを10個まで表示
-            const displayBoards = boards.slice(0, 10);
-            const boardList = displayBoards.map((board, index) => 
+            const boardList = boards.slice(0, 10).map((board, index) => 
                 `**${index + 1}.** ${board.title}\n` +
-                `　📋 ID: \`${board.id}\`\n` +
-                `　🎭 ロール数: ${board.roleCount}個\n` +
-                `　🏷️ ジャンル数: ${board.genreCount}個\n` +
-                `　📅 作成日: ${board.createdAt}`
+                `　ID: \`${board.id}\` | Roles: ${Object.keys(board.roles || {}).length}`
             ).join('\n\n');
 
-            embed.addFields([
-                { name: '🎭 ロールボード', value: boardList || 'なし', inline: false }
-            ]);
-
-            if (boards.length > 10) {
-                embed.addFields([
-                    { name: '📄 注意', value: `他に ${boards.length - 10} 個のロールボードがあります。`, inline: false }
-                ]);
-            }
-
-            await this.safeEditReply(interaction, { embeds: [embed] });
+            embed.addFields([{ name: 'ボード一覧', value: boardList || 'なし', inline: false }]);
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error('ロールボード一覧取得エラー:', error);
-            await this.safeEditReply(interaction, {
-                content: '⚠️ ロールボード一覧の取得中にエラーが発生しました。'
-            });
+            await interaction.editReply({ content: '[ERROR] 取得に失敗しました。' });
         }
     },
 
     async handleDelete(interaction, guildId) {
         const boardId = interaction.options.getString('board_id');
-
         try {
-            // ロールボードの取得
-            const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
-            
+            const boardRef = doc(interaction.client.db, 'roleboards', boardId);
+            const boardDoc = await getDoc(boardRef);
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                await this.safeEditReply(interaction, {
-                    content: '⚠️ 指定されたロールボードが見つかりません。'
-                });
-                return;
+                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
             }
-
-            const boardData = boardDoc.data();
-
-            // 削除実行
-            await deleteDoc(doc(interaction.client.db, 'roleboards', boardId));
-
-            const embed = new EmbedBuilder()
-                .setColor(0xff0000)
-                .setTitle('🗑️ ロールボード削除完了')
-                .setDescription(`**${boardData.title}** を削除しました。`)
-                .addFields([
-                    { name: '📋 削除されたボードID', value: `\`${boardId}\``, inline: true },
-                    { name: '🎭 含まれていたロール数', value: `${Object.keys(boardData.roles || {}).length}個`, inline: true },
-                    { name: '🏷️ 含まれていたジャンル数', value: `${Object.keys(boardData.genres || {}).length}個`, inline: true }
-                ])
-                .setFooter({
-                    text: '注意: 既に送信されたロールボードメッセージは手動で削除してください'
-                })
-                .setTimestamp();
-
-            await this.safeEditReply(interaction, { embeds: [embed] });
+            await deleteDoc(boardRef);
+            await interaction.editReply({ embeds: [createSuccessEmbed('削除完了', `ロールボードを削除しました。`)] });
         } catch (error) {
-            console.error('ロールボード削除エラー:', error);
-            await this.safeEditReply(interaction, {
-                content: '⚠️ ロールボードの削除中にエラーが発生しました。'
-            });
+            await interaction.editReply({ content: '[ERROR] 削除に失敗しました。' });
         }
     }
 };

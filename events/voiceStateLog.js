@@ -18,7 +18,7 @@ class MessageDeleteManager {
             try {
                 if (message && !message.deleted) await message.delete();
             } catch (error) {
-                if (error.code !== 10008) console.error(chalk.red('❌ Error deleting voice message:'), error);
+                if (error.code !== 10008) console.error(chalk.red('[ERROR] Error deleting voice message:'), error);
             } finally {
                 this.scheduledDeletions.delete(messageId);
             }
@@ -28,7 +28,7 @@ class MessageDeleteManager {
     cleanup() {
         this.scheduledDeletions.forEach(timeoutId => clearTimeout(timeoutId));
         this.scheduledDeletions.clear();
-        console.log(chalk.yellow('🧹 Voice message deletion schedules cleared'));
+        console.log(chalk.yellow('[CLEAN] Voice message deletion schedules cleared'));
     }
 }
 const deleteManager = new MessageDeleteManager();
@@ -45,7 +45,7 @@ async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
         }
         return null;
     } catch (error) {
-        console.error(chalk.red(`❌ Error fetching log channel for VC ${voiceChannelId}:`), error);
+        console.error(chalk.red(`[ERROR] Error fetching log channel for VC ${voiceChannelId}:`), error);
         return null;
     }
 }
@@ -106,22 +106,22 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                 });
 
                 const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 20) : 0;
-                const progressBar = `**[** ${'🟦'.repeat(progress)}${'⬛'.repeat(20 - progress)} **]**`;
+                const progressBar = `**[** \`${'#'.repeat(progress)}${'-'.repeat(20 - progress)}\` **]**`;
 
                 const levelUpEmbed = createStandardEmbed({
                     color: 0x00FFFF,
                     author: { name: `LEVEL UP! (VC) - ${member.displayName}`, iconURL: member.user.displayAvatarURL() },
-                    title: `《 RANK UP: ${oldLevel}  ➔  ${userData.level} 》`,
+                    title: `《 RANK UP: ${oldLevel}  ->  ${userData.level} 》`,
                     description: awesomeComment,
                     thumbnail: member.user.displayAvatarURL({ dynamic: true, size: 256 }),
                     fields: [
                         {
-                            name: '📊 現在のステータス',
+                            name: '[Status] 現在のステータス',
                             value: `**サーバー内順位:** **${rank !== -1 ? `#${rank}` : 'N/A'}**\n**総メッセージ数:** **${(userData.messageCount || 0).toLocaleString()}** 回`,
                             inline: false
                         },
                         {
-                            name: `🚀 次のレベルまで (Lv. ${userData.level + 1})`,
+                            name: `[Next] 次のレベルまで (Lv. ${userData.level + 1})`,
                             value: `あと **${Math.floor(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar} **${Math.floor(userData.xp).toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
                             inline: false
                         }
@@ -131,7 +131,7 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                 
                 if (awardedRoles && awardedRoles.length > 0) {
                     levelUpEmbed.addFields({
-                        name: '🏆 獲得したロール報酬',
+                        name: '[Award] 獲得したロール報酬',
                         value: awardedRoles.map(r => r.toString()).join('\n'),
                         inline: false
                     });
@@ -156,9 +156,9 @@ async function updateUserStayTime(db, guildId, userId, stayDuration) {
             totalStayTime: increment(stayDuration),
             guildId, userId, updatedAt: new Date(),
         }, { merge: true });
-        console.log(chalk.blue(`📊 Voice stats updated for ${userId}. Added ${Math.round(stayDuration / 1000)}s`));
+        console.log(chalk.blue(`[STATS] Voice stats updated for ${userId}. Added ${Math.round(stayDuration / 1000)}s`));
     } catch (error) {
-        console.error(chalk.red(`❌ Error updating user stay time for ${userId}:`), error);
+        console.error(chalk.red(`[ERROR] Error updating user stay time for ${userId}:`), error);
     }
 }
 
@@ -168,7 +168,7 @@ async function handleVoiceJoin(newState, client) {
 
     const sessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
     await set(sessionRef, { channelId: channel.id, channelName: channel.name, joinedAt: Date.now() });
-    console.log(chalk.green(`🔴 RTDB Session started for ${member.user.tag} in ${channel.name}`));
+    console.log(chalk.green(`[SESSION] started for ${member.user.tag} in ${channel.name}`));
     
     const logChannelId = await getLogChannelIdForVc(db, guild.id, channel.id);
     if (logChannelId) {
@@ -176,13 +176,13 @@ async function handleVoiceJoin(newState, client) {
             const logChannel = guild.channels.cache.get(logChannelId);
             if (logChannel?.isTextBased()) {
                 const message = await logChannel.send({ 
-                    content: `🎤 **${member.displayName}** が **${channel.name}** に参加しました`,
+                    content: `[JOIN] **${member.displayName}** が **${channel.name}** に参加しました`,
                     flags: ['SuppressNotifications']
                 });
                 deleteManager.scheduleDelete(message.id, message);
             }
         } catch (error) {
-            console.error(chalk.red('❌ Error sending join log:'), error);
+            console.error(chalk.red('[ERROR] Error sending join log:'), error);
         }
     }
 }
@@ -202,7 +202,7 @@ async function handleVoiceLeave(oldState, client) {
         await addVcExpAndLevelUp(client, oldState, stayDuration);
         
         await remove(sessionRef);
-        console.log(chalk.yellow(`🔴 RTDB Session ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
+        console.log(chalk.yellow(`[SESSION] ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
     }
 
     const logChannelId = await getLogChannelIdForVc(db, guild.id, channel.id);
@@ -211,13 +211,13 @@ async function handleVoiceLeave(oldState, client) {
             const logChannel = guild.channels.cache.get(logChannelId);
             if (logChannel?.isTextBased()) {
                 const message = await logChannel.send({ 
-                    content: `👋 **${member.displayName}** が **${channel.name}** から退出しました`,
+                    content: `[EXIT] **${member.displayName}** が **${channel.name}** から退出しました`,
                     flags: ['SuppressNotifications']
                 });
                 deleteManager.scheduleDelete(message.id, message);
             }
         } catch (error) {
-            console.error(chalk.red('❌ Error sending leave log:'), error);
+            console.error(chalk.red('[ERROR] Error sending leave log:'), error);
         }
     }
 }
@@ -256,13 +256,13 @@ module.exports = {
                     await addVcExpAndLevelUp(client, oldState, stayDuration);
                     
                     await remove(sessionRef);
-                    console.log(chalk.yellow(`🔴 RTDB Session ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
+                    console.log(chalk.yellow(`[SESSION] ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
                 }
 
                 // 新しいセッション開始
                 const newSessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
                 await set(newSessionRef, { channelId: newState.channelId, channelName: newState.channel.name, joinedAt: Date.now() });
-                console.log(chalk.green(`🔴 RTDB Session started for ${member.user.tag} in ${newState.channel.name}`));
+                console.log(chalk.green(`[SESSION] started for ${member.user.tag} in ${newState.channel.name}`));
 
                 // 移動ログのみ送信
                 const logDestId = await getLogChannelIdForVc(db, newState.guild.id, newState.channelId) || await getLogChannelIdForVc(db, oldState.guild.id, oldState.channelId);
@@ -271,22 +271,22 @@ module.exports = {
                         const logChannel = newState.guild.channels.cache.get(logDestId);
                         if (logChannel?.isTextBased()) {
                             const message = await logChannel.send({ 
-                                content: `↪️ **${newState.member.displayName}** が **${oldState.channel.name}** から **${newState.channel.name}** に移動しました`,
+                                content: `[MOVE] **${newState.member.displayName}** が **${oldState.channel.name}** から **${newState.channel.name}** に移動しました`,
                                 flags: ['SuppressNotifications']
                             });
                             deleteManager.scheduleDelete(message.id, message);
                         }
                     } catch(error) {
-                        console.error(chalk.red('❌ Error sending move log:'), error);
+                        console.error(chalk.red('[ERROR] Error sending move log:'), error);
                     }
                 }
             }
         } catch (error) {
-            console.error(chalk.red('❌ Error in voice state update handler:'), error);
+            console.error(chalk.red('[ERROR] Error in voice state update handler:'), error);
         }
     },
     shutdown() {
         deleteManager.cleanup();
-        console.log(chalk.yellow('🔄 Voice state log module shutdown completed'));
+        console.log(chalk.yellow('[INFO] Voice state log module shutdown completed'));
     },
 };

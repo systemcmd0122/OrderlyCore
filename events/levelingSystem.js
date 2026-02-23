@@ -1,8 +1,7 @@
-const { Events, PermissionsBitField } = require('discord.js');
+const { Events } = require('discord.js');
 const { doc, getDoc, setDoc } = require('firebase/firestore');
-const chalk = require('chalk');
 const { getLevelData, getRank, calculateRequiredXp, generateLevelUpComment, handleRoleRewards } = require('../src/services/levelingService');
-const { createStandardEmbed } = require('../src/utils/embedBuilder');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 async function handleMessage(message, client) {
     if (!message.guild || message.author.bot) return;
@@ -47,37 +46,38 @@ async function handleMessage(message, client) {
                 const rank = await getRank(db, guild.id, author.id);
                 
                 const progress = requiredXp > 0 ? Math.floor((userData.xp / requiredXp) * 20) : 0;
-                const progressBar = `**[** ${'🟦'.repeat(progress)}${'⬛'.repeat(20 - progress)} **]**`;
+                const progressBar = `\`${'#'.repeat(progress)}${'-'.repeat(20 - progress)}\` **${Math.floor((userData.xp / requiredXp) * 100)}%**`;
 
                 const embed = createStandardEmbed({
-                    author: { name: `LEVEL UP! - ${author.displayName}`, iconURL: author.displayAvatarURL() },
-                    title: `《 RANK UP: ${oldLevel}  ➔  ${userData.level} 》`,
+                    author: { name: `LEVEL UP: ${author.displayName}`, iconURL: author.displayAvatarURL() },
+                    title: `《 RANK UP: ${oldLevel} -> ${userData.level} 》`,
                     description: comment,
+                    color: COLORS.SUCCESS,
                     thumbnail: author.displayAvatarURL({ dynamic: true, size: 256 }),
                     fields: [
                         {
-                            name: '📊 現在のステータス',
-                            value: `**サーバー内順位:** **${rank !== -1 ? `#${rank}` : 'N/A'}**\n**総メッセージ数:** **${userData.messageCount.toLocaleString()}** 回`,
-                            inline: false
+                            name: '[STATUS] 統計',
+                            value: `順位: **${rank !== -1 ? `#${rank}` : 'N/A'}**\n総メッセージ: **${userData.messageCount.toLocaleString()}** 回`,
+                            inline: true
                         },
                         {
-                            name: `🚀 次のレベルまで (Lv. ${userData.level + 1})`,
-                            value: `あと **${Math.floor(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar} **${Math.floor(userData.xp).toLocaleString()}** / **${requiredXp.toLocaleString()}**`,
+                            name: `[NEXT] Lv. ${userData.level + 1}`,
+                            value: `残り: **${Math.floor(requiredXp - userData.xp).toLocaleString()}** XP\n${progressBar}`,
                             inline: false
                         }
                     ],
-                    footer: { text: `偉業達成おめでとうございます！ | ${guild.name}`, iconURL: guild.iconURL() }
+                    footer: { text: `システム管理: ${guild.name}`, iconURL: guild.iconURL() }
                 });
                 
                 if (awardedRoles && awardedRoles.length > 0) {
                     embed.addFields({
-                        name: '🏆 獲得したロール報酬',
-                        value: awardedRoles.map(r => r.toString()).join('\n'),
+                        name: '[AWARD] 獲得したロール報酬',
+                        value: awardedRoles.map(r => r.toString()).join(', '),
                         inline: false
                     });
                 }
 
-                await targetChannel.send({ embeds: [embed] }).catch(console.error);
+                await targetChannel.send({ embeds: [embed] }).catch(() => {});
             }
         }
     }
