@@ -51,6 +51,14 @@
 
         const form        = document.getElementById('login-form');
         const tokenInput  = document.getElementById('token');
+
+        // Admin shortcut
+        tokenInput.addEventListener('input', () => {
+            if (tokenInput.value.trim().toLowerCase() === 'admin') {
+                window.location.href = '/admin-login.html';
+            }
+        });
+
         const messageEl   = document.getElementById('message');
         const msgWrap     = document.getElementById('message-container');
         const submitBtn   = document.getElementById('submit-btn');
