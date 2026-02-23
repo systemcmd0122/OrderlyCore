@@ -113,10 +113,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         $dropdown.style.zIndex = '9999';
                         
                         // コントロールの幅に合わせる（最小幅は200px）
-                        const width = controlRect.width;
+                        let width = Math.max(controlRect.width, 200);
                         $dropdown.style.width = width + 'px';
                         $dropdown.style.minWidth = '200px';
-                        $dropdown.style.maxWidth = width + 'px';
                         
                         // 縦位置の計算
                         const dropdownHeight = Math.min($dropdown.scrollHeight, 300);
@@ -141,13 +140,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                         
                         // 横位置の調整（左端に合わせる）
-                        $dropdown.style.left = controlRect.left + 'px';
+                        let left = controlRect.left;
                         
                         // 右端がはみ出す場合の調整
-                        const rightEdge = controlRect.left + width;
-                        if (rightEdge > window.innerWidth - 8) {
-                            $dropdown.style.left = (window.innerWidth - width - 8) + 'px';
+                        if (left + width > window.innerWidth - 8) {
+                            left = window.innerWidth - width - 8;
                         }
+
+                        // 左端がはみ出す場合の調整
+                        if (left < 8) {
+                            left = 8;
+                        }
+
+                        $dropdown.style.left = left + 'px';
                     },
                     ...options
                 });

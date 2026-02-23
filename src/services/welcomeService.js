@@ -18,7 +18,9 @@ async function generateWelcomeWithGemini(client, member) {
 - 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式で出力してください。`;
 
         const result = await client.geminiModel.generateContent(prompt);
-        const text = result.response.text().replace(/```json|```/g, '').trim();
+        let text = result.response.text().trim();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
         return JSON.parse(text);
     } catch (error) {
         console.error('[ERROR] Geminiでのウェルカムメッセージ生成エラー:', error);
