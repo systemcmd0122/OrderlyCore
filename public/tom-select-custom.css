@@ -9,7 +9,6 @@
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
     padding: 11px 16px !important;
-    transition: all var(--transition-fast) !important;
     min-height: 48px !important;
     box-shadow: var(--shadow-sm) !important;
 }
@@ -52,7 +51,6 @@
 .ts-dropdown .option {
     padding: 12px 16px !important;
     color: var(--text-primary) !important;
-    transition: all var(--transition-fast) !important;
     border-radius: var(--radius-sm) !important;
     cursor: pointer !important;
     margin: 2px 0 !important;
@@ -70,7 +68,6 @@
 
 .ts-wrapper.single .ts-control::after {
     border-color: var(--text-muted) transparent transparent transparent !important;
-    transition: transform var(--transition-fast) !important;
     border-width: 5px 5px 0 5px !important;
 }
 

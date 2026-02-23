@@ -181,6 +181,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Dashboard Application Module ---
+    const escapeHTML = (str) => {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
     const App = {
         state: {
             currentPage: 'dashboard',
@@ -299,6 +309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderers: {
             dashboard: async () => {
             pageTitle.textContent = 'ダッシュボード';
+            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
             const [settings, trends] = await Promise.all([
                 api.get('/api/settings/guilds'),
                 api.get('/api/analytics/trends')
@@ -307,71 +318,62 @@ document.addEventListener('DOMContentLoaded', async () => {
             const recentLogs = await api.get('/api/audit-logs?limit=5');
 
             pageContent.innerHTML = `
-                <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-                    <div class="card stat-card glass">
-                        <div class="stat-icon"><i data-feather="users"></i></div>
-                        <div class="stat-info">
-                            <div class="stat-label">メンバー数</div>
-                            <div class="stat-value">${(guildInfo.memberCount || 0).toLocaleString()}</div>
+                <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="stat-card glass shadow-sm">
+                        <div class="stat-value text-primary">${(guildInfo.memberCount || 0).toLocaleString()}</div>
+                        <div class="stat-label">メンバー</div>
+                    </div>
+                    <div class="stat-card glass shadow-sm">
+                        <div class="stat-value text-secondary">${(guildInfo.botCount || 0).toLocaleString()}</div>
+                        <div class="stat-label">ボット</div>
+                    </div>
+                    <div class="stat-card glass shadow-sm">
+                        <div class="stat-value text-success">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
+                        <div class="stat-label">合計参加数</div>
+                    </div>
+                    <div class="stat-card glass shadow-sm">
+                        <div class="stat-value text-danger">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
+                        <div class="stat-label">合計退出数</div>
+                    </div>
+                </div>
+
+                <div class="grid-container" style="grid-template-columns: 2fr 1fr; margin-top: 24px; gap: 24px;">
+                    <div class="card glass no-border shadow-md">
+                        <div class="card-header"><h3>サーバー成長トレンド</h3></div>
+                        <div style="height: 300px; position: relative; padding: 10px;">
+                            <canvas id="trendChart"></canvas>
                         </div>
                     </div>
-                    <div class="card stat-card glass">
-                        <div class="stat-icon"><i data-feather="cpu"></i></div>
-                        <div class="stat-info">
-                            <div class="stat-label">ボット数</div>
-                            <div class="stat-value">${(guildInfo.botCount || 0).toLocaleString()}</div>
-                        </div>
-                    </div>
-                    <div class="card stat-card glass">
-                        <div class="stat-icon"><i data-feather="trending-up"></i></div>
-                        <div class="stat-info">
-                            <div class="stat-label">総参加者数</div>
-                            <div class="stat-value">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
-                        </div>
-                    </div>
-                    <div class="card stat-card glass">
-                        <div class="stat-icon"><i data-feather="trending-down"></i></div>
-                        <div class="stat-info">
-                            <div class="stat-label">総退出者数</div>
-                            <div class="stat-value">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
+                    <div class="card glass no-border shadow-md">
+                        <div class="card-header"><h3>クイックメニュー</h3></div>
+                        <div style="display: flex; flex-direction: column; gap: 12px; padding: 5px;">
+                            <a href="#announcements" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="bell" style="width:16px;"></i> お知らせ設定</a>
+                            <a href="#tickets" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="life-buoy" style="width:16px;"></i> チケット管理</a>
+                            <a href="#commands" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="settings" style="width:16px;"></i> コマンド設定</a>
+                            <a href="#members" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="users" style="width:16px;"></i> メンバーリスト</a>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid-container" style="grid-template-columns: 2fr 1fr; margin-top: 24px;">
-                    <div class="card glass">
-                        <div class="card-header"><h3>サーバー成長トレンド (直近30日)</h3></div>
-                        <div class="chart-container" style="height: 300px;"><canvas id="trendChart"></canvas></div>
-                    </div>
-                    <div class="card glass">
-                        <div class="card-header"><h3>クイックアクション</h3></div>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <button class="btn btn-secondary" onclick="window.location.hash='#announcements'"><i data-feather="bell"></i>お知らせ設定</button>
-                            <button class="btn btn-secondary" onclick="window.location.hash='#tickets'"><i data-feather="life-buoy"></i>チケット設定</button>
-                            <button class="btn btn-secondary" onclick="window.location.hash='#commands'"><i data-feather="toggle-left"></i>コマンド管理</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card glass" style="margin-top: 24px;">
-                    <div class="card-header"><h3>最近のアクティビティ</h3></div>
-                    <div class="table-container">
+                <div class="card glass no-border shadow-md" style="margin-top: 24px;">
+                    <div class="card-header"><h3>最新の監査ログ</h3></div>
+                    <div class="table-container" style="background: transparent; border: none;">
                         <table class="styled-table">
                             <thead>
-                                <tr>
+                                <tr style="background: rgba(0,0,0,0.1);">
                                     <th>日時</th>
-                                    <th>イベント</th>
+                                    <th>アクション</th>
                                     <th>ユーザー</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${recentLogs.logs.slice(0, 5).map(log => `
-                                    <tr>
-                                        <td>${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
-                                        <td>${log.eventType}</td>
-                                        <td>${log.executorTag || 'System'}</td>
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                                        <td style="color: var(--text-secondary); font-size: 0.9em;">${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
+                                        <td style="font-weight: 500;">${escapeHTML(log.eventType)}</td>
+                                        <td style="color: var(--primary-light);">${escapeHTML(log.executorTag || 'System')}</td>
                                     </tr>
-                                `).join('')}
+                                `).join('') || '<tr><td colspan="3" style="text-align:center;">表示可能なログはありません。</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -392,26 +394,45 @@ document.addEventListener('DOMContentLoaded', async () => {
                             label: '参加者',
                             data: dates.map(d => trends[d].joins),
                             borderColor: '#00e676',
+                            borderWidth: 3,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#00e676',
                             tension: 0.4,
                             fill: true,
-                            backgroundColor: 'rgba(0, 230, 118, 0.1)'
+                            backgroundColor: 'rgba(0, 230, 118, 0.05)'
                         },
                         {
                             label: '退出者',
                             data: dates.map(d => trends[d].leaves),
                             borderColor: '#ff5252',
+                            borderWidth: 3,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#ff5252',
                             tension: 0.4,
                             fill: true,
-                            backgroundColor: 'rgba(255, 82, 82, 0.1)'
+                            backgroundColor: 'rgba(255, 82, 82, 0.05)'
                         }
                     ]
                 },
                 options: {
                     maintainAspectRatio: false,
-                    plugins: { legend: { labels: { color: '#b4b9d6' } } },
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: '#b4b9d6', boxWidth: 10, usePointStyle: true, font: { size: 12 } }
+                        }
+                    },
                     scales: {
-                        x: { ticks: { color: '#b4b9d6' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        y: { ticks: { color: '#b4b9d6' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                        x: {
+                            ticks: { color: '#6b7299', maxRotation: 0, font: { size: 10 } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: { color: '#6b7299', font: { size: 10 } },
+                            grid: { color: 'rgba(255,255,255,0.03)' }
+                        }
                     }
                 }
             });
@@ -421,39 +442,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         members: async () => {
             pageTitle.textContent = 'メンバー管理';
             pageContent.innerHTML = `
-                <div class="card">
-                    <div class="card-header"><h3>メンバー一覧</h3></div>
-                    <div class="filter-bar">
+                <div class="card glass no-border shadow-md">
+                    <div class="card-header"><h3>サーバーメンバー</h3></div>
+                    <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
                         <div class="form-group">
-                             <label for="member-search">ユーザー検索</label>
-                            <input type="text" id="member-search" placeholder="名前で検索...">
+                             <label for="member-search">検索</label>
+                            <input type="text" id="member-search" placeholder="名前やユーザーID...">
                         </div>
                         <div class="form-group">
-                             <label for="role-filter">ロールで絞り込み</label>
-                            <select id="role-filter" placeholder="ロールを選択...">
+                             <label for="role-filter">ロール絞り込み</label>
+                            <select id="role-filter" placeholder="すべてのロール">
                                 <option value="">すべてのロール</option>
                                 ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
                             </select>
                         </div>
                     </div>
-                    <div class="table-container">
+                    <div class="table-container" style="background: transparent; border: none;">
                         <table class="styled-table">
                             <thead>
-                                <tr>
+                                <tr style="background: rgba(0,0,0,0.1);">
                                     <th data-sort="displayName">ユーザー <span class="sort-indicator"></span></th>
                                     <th>ロール</th>
                                     <th data-sort="joinedAt">参加日 <span class="sort-indicator"></span></th>
                                     <th data-sort="messageCount">統計 <span class="sort-indicator"></span></th>
-                                    <th>アクション</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="members-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="pagination-controls">
-                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                    <div class="pagination-controls glass" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前</button>
                         <span id="page-info" class="page-info"></span>
-                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
                     </div>
                 </div>`;
             initializeTomSelect('#role-filter');
@@ -479,12 +500,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="user-cell">
                                     <img src="${member.avatar}" alt="avatar">
                                     <div class="user-details">
-                                        <span class="display-name">${member.displayName}</span>
-                                        <span class="username">${member.username}</span>
+                                        <span class="display-name">${escapeHTML(member.displayName)}</span>
+                                        <span class="username">${escapeHTML(member.username)}</span>
                                     </div>
                                 </div>
                             </td>
-                            <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('')}</td>
+                            <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${escapeHTML(r.name)}</span>`).join('')}</td>
                             <td>${new Date(member.joinedAt).toLocaleDateString()}</td>
                             <td>
                                 <div><i data-feather="message-square" style="width:1em;height:1em;"></i> ${member.messageCount.toLocaleString()}</div>
@@ -552,11 +573,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             pageContent.innerHTML = `
-                <div class="card">
-                    <div class="card-header"><h3>監査ログビューア</h3></div>
-                     <div class="filter-bar">
+                <div class="card glass no-border shadow-md">
+                    <div class="card-header"><h3>操作履歴</h3></div>
+                     <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
                          <div class="form-group">
-                            <input type="text" id="log-user-search" placeholder="ユーザー名/タグで検索...">
+                            <input type="text" id="log-user-search" placeholder="ユーザー名やタグ...">
                         </div>
                         <div class="form-group">
                             <select id="log-type-filter">
@@ -569,10 +590,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </div>
                     </div>
-                     <div class="table-container">
+                     <div class="table-container" style="background: transparent; border: none;">
                         <table class="styled-table">
                             <thead>
-                                <tr>
+                                <tr style="background: rgba(0,0,0,0.1);">
                                     <th>日時</th>
                                     <th>アクション</th>
                                     <th>実行者</th>
@@ -583,10 +604,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <tbody id="logs-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="pagination-controls">
-                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                    <div class="pagination-controls glass" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前</button>
                         <span id="page-info" class="page-info"></span>
-                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
                     </div>
                 </div>`;
             initializeTomSelect('#log-type-filter');
@@ -701,7 +722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         roleboard: async () => {
             pageTitle.textContent = 'ロールボード管理';
             pageContent.innerHTML = `
-                <div class="card">
+                <div class="card glass">
                     <div class="card-header">
                         <h3>ロールボード一覧</h3>
                         <button id="add-roleboard-btn" class="btn">新規作成</button>
@@ -719,7 +740,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="announcements-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header">
                             <h3>ボットからのお知らせ受信</h3>
                         </div>
@@ -752,7 +773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="welcome-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>チャンネル設定</h3></div>
                         <div class="form-grid">
                             <div class="form-group">
@@ -778,7 +799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>機能設定</h3></div>
                         <div class="form-group">
                             <label for="welcomeRoleId">ウェルカムロール</label>
@@ -787,19 +808,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 ${createSelectOptions(guildInfo.roles)}
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>ウェルカム時メンション</label>
-                            <label class="switch">
-                                <input type="checkbox" id="mentionOnWelcome" ${settings.mentionOnWelcome ? 'checked' : ''}>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>退出時DM送信</label>
-                            <label class="switch">
-                                <input type="checkbox" id="sendGoodbyeDM" ${settings.sendGoodbyeDM !== false ? 'checked' : ''}>
-                                <span class="slider"></span>
-                            </label>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>参加時メンション</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="mentionOnWelcome" ${settings.mentionOnWelcome ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>退出時DM送信</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="sendGoodbyeDM" ${settings.sendGoodbyeDM !== false ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
@@ -946,7 +969,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             settingsCache['guild_settings'] = settings;
             pageContent.innerHTML = `
                 <form id="autorole-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>Bot用ロール</h3></div>
                         <div class="form-group">
                             <label for="botAutoroleId">自動付与ロール</label>
@@ -971,14 +994,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const automod = settings.automod || { ngWords: [], blockInvites: true };
             pageContent.innerHTML = `
                 <form id="automod-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>NGワードフィルター</h3></div>
                         <div class="form-group">
                             <label for="ngWords">NGワード (カンマ区切り)</label>
                             <textarea id="ngWords" rows="4" placeholder="word1,word2">${(automod.ngWords || []).join(',')}</textarea>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>招待リンクフィルター</h3></div>
                         <div class="form-group">
                             <label>招待リンクをブロック</label>
@@ -1000,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             settingsCache['guild_settings'] = settings;
             pageContent.innerHTML = `
                 <form id="logging-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>監査ログ</h3></div>
                         <div class="form-group">
                             <label for="auditLogChannel">監査ログチャンネル</label>
@@ -1032,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 listEl.innerHTML = Object.entries(mappings).map(([vcId, tcId]) => {
                     const vc = guildInfo.channels.find(c => c.id === vcId);
                     const tc = guildInfo.channels.find(c => c.id === tcId);
-                    if (!vc || !tc) return ''; // チャンネルが存在しない場合は表示しない
+                    if (!vc || !tc) return '';
                     return `
                         <div class="vc-log-mapping-item" data-vc-id="${vcId}">
                             <div class="vc-log-mapping-channels">
@@ -1057,11 +1080,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="vc-log-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>現在の設定</h3></div>
                         <div id="vc-log-mapping-list" class="vc-log-mapping-list"></div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>新しい設定を追加</h3></div>
                         <div class="form-grid">
                             <div class="form-group">
@@ -1118,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const levelingSettings = settings.leveling || { roleRewards: [] };
             pageContent.innerHTML = `
                 <form id="leveling-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>レベルアップ通知</h3></div>
                         <div class="form-group">
                             <label for="levelUpChannel">通知チャンネル</label>
@@ -1128,7 +1151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>ロール報酬</h3></div>
                         <div id="role-rewards-list"></div>
                         <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
@@ -1359,7 +1382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="ai-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>メンション応答機能</h3></div>
                         <div class="form-group">
                             <label>メンションへの自動応答</label>
@@ -1370,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <p class="form-hint">BotにメンションするとAIが返信します。</p>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>AIのペルソナ設定</h3></div>
                         <div class="form-group">
                             <label for="aiPersonalityPrompt">AIへの指示（プロンプト）</label>
@@ -1415,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             listEl.innerHTML = boards.map(board => `
-                <div class="card">
+                <div class="card glass">
                     <div class="card-header">
                         <h3>${board.title}</h3>
                         <div>

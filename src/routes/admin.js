@@ -14,7 +14,9 @@ router.get('/stats', isAdminAuthenticated, async (_req, res) => {
         const hours = Math.floor((uptimeSeconds % 86400) / 3600);
         const minutes = Math.floor((uptimeSeconds % 3600) / 60);
 
-        const recentGuilds = client.guilds.cache.sort((a, b) => b.joinedTimestamp - a.joinedTimestamp).first(5);
+        const guilds = Array.from(client.guilds.cache.values());
+        const recentGuilds = [...guilds].sort((a, b) => b.joinedTimestamp - a.joinedTimestamp).slice(0, 5);
+        const topGuilds = [...guilds].sort((a, b) => b.memberCount - a.memberCount).slice(0, 10);
 
         res.json({
             guildCount: client.guilds.cache.size,
@@ -26,6 +28,12 @@ router.get('/stats', isAdminAuthenticated, async (_req, res) => {
                 avatar: client.user.displayAvatarURL(),
             },
             recentGuilds: recentGuilds.map(g => ({
+                id: g.id,
+                name: g.name,
+                memberCount: g.memberCount,
+                joinedTimestamp: g.joinedTimestamp
+            })),
+            topGuilds: topGuilds.map(g => ({
                 id: g.id,
                 name: g.name,
                 memberCount: g.memberCount,
@@ -185,6 +193,38 @@ router.get('/health/history', isAdminAuthenticated, async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch health data.' });
+    }
+});
+
+router.get('/guilds', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { search = '', page = 1, limit = 20 } = req.query;
+        let guilds = Array.from(client.guilds.cache.values()).map(g => ({
+            id: g.id,
+            name: g.name,
+            memberCount: g.memberCount,
+            joinedTimestamp: g.joinedTimestamp
+        }));
+
+        if (search) {
+            const lowerSearch = search.toLowerCase();
+            guilds = guilds.filter(g => g.name.toLowerCase().includes(lowerSearch) || g.id.includes(lowerSearch));
+        }
+
+        guilds.sort((a, b) => b.joinedTimestamp - a.joinedTimestamp);
+
+        const total = guilds.length;
+        const start = (page - 1) * limit;
+        const paginated = guilds.slice(start, start + limit);
+
+        res.json({
+            guilds: paginated,
+            total,
+            totalPages: Math.ceil(total / limit),
+            currentPage: parseInt(page)
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch guilds.' });
     }
 });
 

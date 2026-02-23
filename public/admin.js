@@ -14,6 +14,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userCount = document.getElementById('user-count');
 
     let statsData = null;
+    let activeIntervals = [];
+
+    const clearIntervals = () => {
+        activeIntervals.forEach(clearInterval);
+        activeIntervals = [];
+    };
 
     // API
     const api = {
@@ -87,6 +93,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
+    const escapeHTML = (str) => {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
     // --- Admin Application Module ---
     const App = {
         init: async () => {
@@ -114,6 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         loadPage: async (pageName) => {
             try {
+                clearIntervals();
                 navItems.forEach(item => item.classList.remove('active'));
                 const activeItem = document.querySelector(`[data-page="${pageName}"]`);
                 if (activeItem) activeItem.classList.add('active');
@@ -175,11 +192,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         createModal('ユーザー検索結果', `
                             <div style="text-align: center; padding: 20px;">
                                 <img src="${data.avatar}" style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 10px;">
-                                <div style="font-size: 1.2rem; font-weight: 600;">${data.tag}</div>
-                                <div style="font-size: 0.8rem; color: var(--text-muted-color);">ID: ${data.id}</div>
+                                <div style="font-size: 1.2rem; font-weight: 600;">${escapeHTML(data.tag)}</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted-color);">ID: ${escapeHTML(data.id)}</div>
                                 <p style="margin-top: 15px;">所属サーバー (${data.guilds.length}):</p>
                                 <ul style="list-style: none; padding: 0; margin-top: 5px; max-height: 100px; overflow-y: auto;">
-                                    ${data.guilds.map(g => `<li style="font-size: 0.9rem;">${g.name}</li>`).join('') || 'なし'}
+                                    ${data.guilds.map(g => `<li style="font-size: 0.9rem;">${escapeHTML(g.name)}</li>`).join('') || 'なし'}
                                 </ul>
                                 <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
                                     <button class="btn btn-danger btn-small" onclick="App.blacklistUser('${data.id}')">ブラックリストに追加</button>
@@ -210,6 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageSubtitle.textContent = 'ボットが参加している全サーバーの管理';
 
             const stats = statsData || await api.get('/api/admin/stats');
+            let currentPage = 1;
 
             pageContent.innerHTML = `
                 <div class="grid-container">
@@ -237,48 +255,67 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>サーバー一覧 (${stats.guildCount})</h3>
+                        <h3>サーバー一覧</h3>
                         <div style="display: flex; gap: 10px;">
-                            <input type="text" id="server-search" placeholder="サーバー名で検索..." style="width: 250px; padding: 8px 12px;">
+                            <input type="text" id="server-search" placeholder="サーバー名やIDで検索..." style="width: 250px; padding: 8px 12px;">
                         </div>
                     </div>
-                    <div class="server-list" id="server-list">
-                        ${stats.recentGuilds.map(guild => `
-                            <div class="server-card" data-server-name="${guild.name.toLowerCase()}">
-                                <div class="server-card-header">
-                                    <div>
-                                        <div class="server-name">${guild.name}</div>
-                                        <div style="font-size: 0.8rem; color: var(--text-muted-color); margin-top: 5px;">
-                                            ID: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; font-size: 0.75rem;">${guild.id}</code>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="server-stats">
-                                    <div class="server-stat">
-                                        <i data-feather="users"></i>
-                                        <span>${guild.memberCount.toLocaleString()} メンバー</span>
-                                    </div>
-                                    <div class="server-stat">
-                                        <i data-feather="calendar"></i>
-                                        <span>参加: ${new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP')}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
+                    <div class="server-list" id="server-list"></div>
+                    <div class="pagination-controls glass" style="margin-top: 20px; display: flex; justify-content: center; gap: 15px; align-items: center; padding: 10px;">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                        <span id="page-info">Page 1</span>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
                     </div>
                 </div>
             `;
 
-            // 検索機能
-            document.getElementById('server-search').addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                document.querySelectorAll('.server-card').forEach(card => {
-                    const serverName = card.dataset.serverName;
-                    card.style.display = serverName.includes(searchTerm) ? 'block' : 'none';
-                });
-            });
+            const renderServers = async () => {
+                const search = document.getElementById('server-search').value;
+                const listEl = document.getElementById('server-list');
+                listEl.innerHTML = '<div class="loader-ring" style="margin: 30px auto;"></div>';
 
-            feather.replace();
+                try {
+                    const data = await api.get(`/api/admin/guilds?page=${currentPage}&search=${search}`);
+                    listEl.innerHTML = data.guilds.map(guild => `
+                        <div class="server-card">
+                            <div class="server-card-header">
+                                <div>
+                                    <div class="server-name">${escapeHTML(guild.name)}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted-color); margin-top: 5px;">
+                                        ID: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; font-size: 0.75rem;">${escapeHTML(guild.id)}</code>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="server-stats">
+                                <div class="server-stat">
+                                    <i data-feather="users"></i>
+                                    <span>${guild.memberCount.toLocaleString()} メンバー</span>
+                                </div>
+                                <div class="server-stat">
+                                    <i data-feather="calendar"></i>
+                                    <span>参加: ${new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP')}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') || '<p style="text-align: center; padding: 20px;">サーバーが見つかりません</p>';
+
+                    document.getElementById('page-info').textContent = `Page ${data.currentPage} of ${data.totalPages}`;
+                    document.getElementById('prev-page').disabled = data.currentPage <= 1;
+                    document.getElementById('next-page').disabled = data.currentPage >= data.totalPages;
+                    feather.replace();
+                } catch (e) {
+                    listEl.innerHTML = '<p class="error">読み込み失敗</p>';
+                }
+            };
+
+            document.getElementById('server-search').addEventListener('input', () => {
+                currentPage = 1;
+                renderServers();
+            });
+            document.getElementById('prev-page').onclick = () => { currentPage--; renderServers(); };
+            document.getElementById('next-page').onclick = () => { currentPage++; renderServers(); };
+
+            await renderServers();
         },
 
         announcements: async () => {
@@ -559,15 +596,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
 
             // ログ更新機能
-            let logCount = 4;
             document.getElementById('refresh-logs').addEventListener('click', () => {
                 const logViewer = document.getElementById('log-viewer');
                 const newLog = document.createElement('p');
                 newLog.style.color = 'var(--success-color)';
                 newLog.textContent = `[${new Date().toLocaleTimeString()}] [INFO] ログ更新 - システム正常`;
                 logViewer.appendChild(newLog);
+
+                // Limit logs to prevent infinite growth
+                while (logViewer.children.length > 50) {
+                    logViewer.removeChild(logViewer.firstChild);
+                }
+
                 logViewer.scrollTop = logViewer.scrollHeight;
-                logCount++;
             });
 
             document.getElementById('clear-logs').addEventListener('click', () => {
@@ -673,46 +714,104 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="grid-container" style="grid-template-columns: 1fr 1fr;">
                     <div class="card glass">
                         <div class="card-header"><h3>メモリ使用量 (MB)</h3></div>
-                        <canvas id="memoryChart" style="height: 250px;"></canvas>
+                        <div style="height: 250px; position: relative;">
+                            <canvas id="memoryChart"></canvas>
+                        </div>
                     </div>
                     <div class="card glass">
                         <div class="card-header"><h3>WebSocket Ping (ms)</h3></div>
-                        <canvas id="pingChart" style="height: 250px;"></canvas>
+                        <div style="height: 250px; position: relative;">
+                            <canvas id="pingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="card glass">
+                    <div class="card-header"><h3>システム状態履歴</h3></div>
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>時刻</th>
+                                    <th>メモリ (MB)</th>
+                                    <th>Ping (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="health-history-body"></tbody>
+                        </table>
                     </div>
                 </div>
             `;
 
-            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
-            const pingCtx = document.getElementById('pingChart').getContext('2d');
+            const memoryCtx = document.getElementById('memoryChart');
+            const pingCtx = document.getElementById('pingChart');
 
             const createChart = (ctx, label, color) => new Chart(ctx, {
                 type: 'line',
-                data: { labels: [], datasets: [{ label, data: [], borderColor: color, tension: 0.4, fill: true, backgroundColor: color + '22' }] },
-                options: { maintainAspectRatio: false, scales: { x: { display: false }, y: { beginAtZero: false } } }
+                data: { labels: [], datasets: [{ label, data: [], borderColor: color, tension: 0.3, fill: true, backgroundColor: color + '15', pointRadius: 2 }] },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 10 } },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        }
+                    }
+                }
             });
 
-            const memoryChart = createChart(memoryCtx, 'Memory Usage', '#00e5ff');
-            const pingChart = createChart(pingCtx, 'Ping', '#7c4dff'); // Secondary purple
+            const memoryChart = createChart(memoryCtx, 'Memory', '#00e5ff');
+            const pingChart = createChart(pingCtx, 'Ping', '#7c4dff');
 
             const updateHealth = async () => {
-                if (window.location.hash !== '#health') return;
+                if (window.location.hash !== '#health' || !document.getElementById('health-history-body')) return;
                 try {
                     const health = await api.get('/api/admin/health/history');
                     const time = new Date().toLocaleTimeString();
 
-                    [memoryChart, pingChart].forEach((chart, i) => {
-                        chart.data.labels.push(time);
-                        chart.data.datasets[0].data.push(i === 0 ? health.memory : health.ping);
-                        if (chart.data.labels.length > 20) {
-                            chart.data.labels.shift();
-                            chart.data.datasets[0].data.shift();
+                    // Update Memory Chart
+                    memoryChart.data.labels.push(time);
+                    memoryChart.data.datasets[0].data.push(health.memory);
+                    if (memoryChart.data.labels.length > 30) {
+                        memoryChart.data.labels.shift();
+                        memoryChart.data.datasets[0].data.shift();
+                    }
+                    memoryChart.update('none'); // Update without animation for performance
+
+                    // Update Ping Chart
+                    pingChart.data.labels.push(time);
+                    pingChart.data.datasets[0].data.push(health.ping);
+                    if (pingChart.data.labels.length > 30) {
+                        pingChart.data.labels.shift();
+                        pingChart.data.datasets[0].data.shift();
+                    }
+                    pingChart.update('none');
+
+                    const historyBody = document.getElementById('health-history-body');
+                    if (historyBody) {
+                        const row = document.createElement('tr');
+                        row.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                        row.innerHTML = `
+                            <td style="color: var(--text-muted-color); font-family: var(--font-mono);">${time}</td>
+                            <td style="font-weight: 600;">${health.memory} <span style="font-size: 0.8em; font-weight: normal;">MB</span></td>
+                            <td style="font-weight: 600;">${health.ping} <span style="font-size: 0.8em; font-weight: normal;">ms</span></td>
+                        `;
+                        historyBody.insertBefore(row, historyBody.firstChild);
+
+                        // Strictly enforce row limit
+                        while (historyBody.children.length > 10) {
+                            historyBody.removeChild(historyBody.lastChild);
                         }
-                        chart.update();
-                    });
-                } catch (e) {}
+                    }
+                } catch (e) {
+                    console.error('Health update error:', e);
+                }
             };
 
-            setInterval(updateHealth, 5000);
+            const healthInterval = setInterval(updateHealth, 5000);
+            activeIntervals.push(healthInterval);
             updateHealth();
         },
 
@@ -768,13 +867,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${stats.recentGuilds
-                                    .sort((a, b) => b.memberCount - a.memberCount)
-                                    .slice(0, 10)
+                                ${stats.topGuilds
                                     .map((guild, index) => `
                                         <tr>
                                             <td style="font-weight: bold; color: var(--primary-color);">#${index + 1}</td>
-                                            <td>${guild.name}</td>
+                                            <td>${escapeHTML(guild.name)}</td>
                                             <td>${guild.memberCount.toLocaleString()}</td>
                                             <td>${new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP')}</td>
                                         </tr>
@@ -875,5 +972,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 };
 
+    window.App = App;
     App.init();
 });

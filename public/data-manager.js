@@ -83,28 +83,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const loadCollectionsOverview = async () => {
         try {
-            console.log('Fetching collections overview...');
             const data = await api.get('/api/data-manager/collections');
-            console.log('Collections data received:', data);
             
             const collectionNames = {
-                levels: 'レベルデータ',
-                warnings: '警告データ',
+                levels: 'レベル',
+                warnings: '警告',
                 audit_logs: '監査ログ',
-                quotes: '引用データ',
-                roleboards: 'ロールボード',
+                quotes: '引用',
+                roleboards: 'ロール',
                 tickets: 'チケット'
             };
 
             collectionsOverview.innerHTML = Object.entries(data).map(([name, count]) => `
-                <div class="stat-card" style="padding: 20px;">
+                <div class="stat-card glass" style="padding: 20px;">
                     <div class="stat-label">${collectionNames[name] || name}</div>
-                    <div class="stat-value">${count.toLocaleString()}</div>
-                    <div class="stat-label" style="font-size: 0.9em; color: var(--text-muted-color);">件</div>
+                    <div class="stat-value" style="font-size: 1.8rem;">${count.toLocaleString()}</div>
                 </div>
             `).join('');
-            
-            console.log('Collections overview rendered');
         } catch (error) {
             console.error('Error loading collections overview:', error);
             collectionsOverview.innerHTML = `<p class="message error">読込失敗: ${error.message}</p>`;
@@ -112,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    const loadCollectionData = async (collectionName) => {
+    const loadCollectionData = async (collectionName, page = 1) => {
         if (!collectionName) {
             collectionData.innerHTML = '<p style="text-align: center; color: var(--text-muted-color);">コレクションを選択してください</p>';
             return;
@@ -121,18 +116,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         collectionData.innerHTML = '<div class="loader-ring" style="margin: 20px auto;"></div>';
 
         try {
-            const result = await api.get(`/api/data-manager/${collectionName}`);
+            const result = await api.get(`/api/data-manager/${collectionName}?page=${page}`);
             
             if (result.data.length === 0) {
                 collectionData.innerHTML = '<p style="text-align: center; color: var(--text-muted-color);">データがありません</p>';
                 return;
             }
 
-            const deleteAllBtn = `<button id="delete-all-btn" class="btn btn-danger" style="margin-bottom: 15px;">全て削除</button>`;
+            const deleteAllBtn = `<button id="delete-all-btn" class="btn btn-danger btn-small" style="margin-bottom: 15px;">全削除</button>`;
             
-            collectionData.innerHTML = deleteAllBtn + `
-                <div style="overflow-x: auto;">
-                    <table class="data-table">
+            collectionData.innerHTML = `
+                <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    ${deleteAllBtn}
+                    <div class="pagination-controls" style="margin:0; padding: 10px;">
+                        <button class="btn btn-secondary btn-small" id="prev-page" ${page <= 1 ? 'disabled' : ''}>前</button>
+                        <span class="page-info" style="min-width:auto; padding:0 10px;">${page} / ${result.totalPages}</span>
+                        <button class="btn btn-secondary btn-small" id="next-page" ${page >= result.totalPages ? 'disabled' : ''}>次</button>
+                    </div>
+                </div>
+                <div class="table-container glass" style="border:none; background: rgba(255,255,255,0.02);">
+                    <table class="styled-table">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -143,8 +146,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <tbody>
                             ${result.data.map(item => `
                                 <tr>
-                                    <td style="font-family: monospace; font-size: 0.85em;">${item.id}</td>
-                                    <td><pre style="max-width: 600px; overflow-x: auto; font-size: 0.85em;">${JSON.stringify(item, null, 2)}</pre></td>
+                                    <td style="font-family: monospace; font-size: 0.8em; color: var(--text-muted);">${item.id}</td>
+                                    <td><pre style="max-width: 500px; overflow: auto; font-size: 0.75em; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 4px;">${JSON.stringify(item, null, 2)}</pre></td>
                                     <td>
                                         <button class="btn btn-danger btn-small delete-item-btn" data-id="${item.id}">削除</button>
                                     </td>
@@ -153,14 +156,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </tbody>
                     </table>
                 </div>
-                <p style="text-align: center; margin-top: 15px; color: var(--text-muted-color);">
-                    ${result.totalItems}件中 ${result.data.length}件を表示
-                </p>
             `;
 
-            // 削除ボタンのイベントリスナー
+            document.getElementById('prev-page').onclick = () => loadCollectionData(collectionName, page - 1);
+            document.getElementById('next-page').onclick = () => loadCollectionData(collectionName, page + 1);
+
             document.querySelectorAll('.delete-item-btn').forEach(btn => {
-                btn.onclick = () => deleteItem(collectionName, btn.dataset.id);
+                btn.onclick = () => deleteItem(collectionName, btn.dataset.id, page);
             });
 
             document.getElementById('delete-all-btn').onclick = () => deleteAllItems(collectionName);
@@ -170,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    const deleteItem = async (collectionName, itemId) => {
+    const deleteItem = async (collectionName, itemId, currentPage = 1) => {
         createModal('削除の確認',
             '<p>このデータを削除してもよろしいですか？</p><p style="color: var(--error-color);">この操作は取り消せません。</p>',
             [
@@ -184,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await api.delete(`/api/data-manager/${collectionName}/${itemId}`);
                 showMessage('データを削除しました');
                 closeModal();
-                await loadCollectionData(collectionName);
+                await loadCollectionData(collectionName, currentPage);
                 await loadCollectionsOverview();
             } catch (error) {
                 showMessage(`削除失敗: ${error.message}`, 'error');
