@@ -1,4 +1,30 @@
 const chalk = require('chalk');
+const { doc, getDoc } = require('firebase/firestore');
+
+// In-memory cache to prevent excessive DB reads
+const globalCache = {
+    maintenance: { data: null, lastFetch: 0 },
+    blacklist: { data: null, lastFetch: 0 },
+    guildSettings: new Map() // guildId -> { data, lastFetch }
+};
+
+const CACHE_TTL = 60 * 1000; // 1 minute
+
+async function getCachedDoc(db, collection, id, cacheObj) {
+    const now = Date.now();
+    if (cacheObj.data && (now - cacheObj.lastFetch < CACHE_TTL)) {
+        return cacheObj.data;
+    }
+    try {
+        const snap = await getDoc(doc(db, collection, id));
+        cacheObj.data = snap.exists() ? snap.data() : null;
+        cacheObj.lastFetch = now;
+        return cacheObj.data;
+    } catch (err) {
+        console.error(chalk.red(`[CACHE ERROR] Failed to fetch ${collection}/${id}:`), err);
+        return cacheObj.data; // Return stale data on error
+    }
+}
 
 module.exports = {
     name: 'interactionCreate',
@@ -7,7 +33,52 @@ module.exports = {
         
         if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isModalSubmit()) return;
 
+        // 1. Global Checks (Maintenance & Blacklist)
+        const maintenanceData = await getCachedDoc(client.db, 'bot_settings', 'maintenance', globalCache.maintenance);
+        const blacklistData = await getCachedDoc(client.db, 'bot_settings', 'blacklist', globalCache.blacklist);
+
+        // Blacklist check
+        if (blacklistData && blacklistData.users?.includes(interaction.user.id)) {
+            const message = { content: '[ERR] あなたはボットの使用を制限されています。', ephemeral: true };
+            return interaction.isAutocomplete() ? null : interaction.reply(message);
+        }
+
+        // Maintenance mode check (Bypass for Bot Owners)
+        if (maintenanceData && maintenanceData.enabled) {
+            // Get bot owners from application
+            if (!client.application.owner) await client.application.fetch();
+            const owners = client.application.owner.members
+                ? client.application.owner.members.map(m => m.id)
+                : [client.application.owner.id];
+
+            if (!owners.includes(interaction.user.id)) {
+                const reason = maintenanceData.reason || '現在メンテナンス中です。';
+                const message = { content: `[INFO] ${reason}`, ephemeral: true };
+                return interaction.isAutocomplete() ? null : interaction.reply(message);
+            }
+        }
+
         if (interaction.isChatInputCommand()) {
+            // 2. Guild-specific Command Check
+            if (interaction.guildId) {
+                if (!globalCache.guildSettings.has(interaction.guildId)) {
+                    globalCache.guildSettings.set(interaction.guildId, { data: null, lastFetch: 0 });
+                }
+                const guildSettings = await getCachedDoc(
+                    client.db,
+                    'guild_settings',
+                    interaction.guildId,
+                    globalCache.guildSettings.get(interaction.guildId)
+                );
+
+                if (guildSettings && guildSettings.disabledCommands?.includes(interaction.commandName)) {
+                    return interaction.reply({
+                        content: `[INFO] このコマンド「${interaction.commandName}」はこのサーバーで無効化されています。`,
+                        ephemeral: true
+                    });
+                }
+            }
+
             const command = client.commands.get(interaction.commandName);
             if (!command) {
                 console.error(chalk.red(`[ERROR] Unknown command: ${interaction.commandName}`));
