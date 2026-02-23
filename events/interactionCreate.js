@@ -29,10 +29,6 @@ async function getCachedDoc(db, collection, id, cacheObj) {
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
-        if (interaction.isButton()) return;
-        
-        if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isModalSubmit()) return;
-
         // 1. Global Checks (Maintenance & Blacklist)
         const maintenanceData = await getCachedDoc(client.db, 'bot_settings', 'maintenance', globalCache.maintenance);
         const blacklistData = await getCachedDoc(client.db, 'bot_settings', 'blacklist', globalCache.blacklist);
@@ -40,7 +36,9 @@ module.exports = {
         // Blacklist check
         if (blacklistData && blacklistData.users?.includes(interaction.user.id)) {
             const message = { content: '[ERR] あなたはボットの使用を制限されています。', ephemeral: true };
-            return interaction.isAutocomplete() ? null : interaction.reply(message);
+            if (interaction.isAutocomplete()) return null;
+            if (interaction.isRepliable()) return interaction.reply(message);
+            return;
         }
 
         // Maintenance mode check (Bypass for Bot Owners)
@@ -54,9 +52,15 @@ module.exports = {
             if (!owners.includes(interaction.user.id)) {
                 const reason = maintenanceData.reason || '現在メンテナンス中です。';
                 const message = { content: `[INFO] ${reason}`, ephemeral: true };
-                return interaction.isAutocomplete() ? null : interaction.reply(message);
+                if (interaction.isAutocomplete()) return null;
+                if (interaction.isRepliable()) return interaction.reply(message);
+                return;
             }
         }
+
+        if (interaction.isButton()) return;
+
+        if (!interaction.isChatInputCommand() && !interaction.isAutocomplete() && !interaction.isModalSubmit()) return;
 
         if (interaction.isChatInputCommand()) {
             // 2. Guild-specific Command Check

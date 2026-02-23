@@ -15,7 +15,14 @@ async function generateAIStatus(client) {
 - ステータスメッセージは30文字以内にしてください。`;
 
         const result = await client.geminiModel.generateContent(prompt);
-        const text = result.response.text().replace(/```json|```/g, '').trim();
+        let text = result.response.text().trim();
+
+        // JSONを抽出するためのロバストな処理
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            text = jsonMatch[0];
+        }
+
         return JSON.parse(text);
     } catch (error) {
         console.error(chalk.red('[ERROR] Geminiによるステータス生成に失敗:'), error);
