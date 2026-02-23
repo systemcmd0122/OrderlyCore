@@ -188,37 +188,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageContent.innerHTML = `
                 <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
                     <div class="card stat-card">
-                        <div class="stat-icon">👥</div>
+                        <div class="stat-icon"><i data-feather="users"></i></div>
                         <div class="stat-info">
-                            <div class="stat-value">${(guildInfo.memberCount || 0).toLocaleString()}</div>
                             <div class="stat-label">メンバー数</div>
+                            <div class="stat-value">${(guildInfo.memberCount || 0).toLocaleString()}</div>
                         </div>
                     </div>
                     <div class="card stat-card">
-                        <div class="stat-icon">🤖</div>
+                        <div class="stat-icon"><i data-feather="cpu"></i></div>
                         <div class="stat-info">
-                            <div class="stat-value">${(guildInfo.botCount || 0).toLocaleString()}</div>
                             <div class="stat-label">ボット数</div>
+                            <div class="stat-value">${(guildInfo.botCount || 0).toLocaleString()}</div>
                         </div>
                     </div>
                     <div class="card stat-card">
-                        <div class="stat-icon">📈</div>
+                        <div class="stat-icon"><i data-feather="trending-up"></i></div>
                         <div class="stat-info">
-                            <div class="stat-value">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
                             <div class="stat-label">総参加者数</div>
+                            <div class="stat-value">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
                         </div>
                     </div>
                     <div class="card stat-card">
-                        <div class="stat-icon">📉</div>
+                        <div class="stat-icon"><i data-feather="trending-down"></i></div>
                         <div class="stat-info">
-                            <div class="stat-value">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
                             <div class="stat-label">総退出者数</div>
+                            <div class="stat-value">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
                         </div>
                     </div>
                 </div>`;
+            feather.replace();
         },
 
-        // ★★★★★【ここから変更】★★★★★
+        // =====【ここから変更】=====
         members: async () => {
             pageTitle.textContent = 'メンバー管理';
             pageContent.innerHTML = `
@@ -497,7 +498,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 options: { maintainAspectRatio: false }
             });
         },
-        // ★★★★★【ここまで変更】★★★★★
+        // =====【ここまで変更】=====
 
         roleboard: async () => {
             pageTitle.textContent = 'ロールボード管理';
@@ -612,7 +613,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             trackChanges('#welcome-form');
         },
         
-        // ★★★★★【ここから変更】★★★★★
+        // =====【ここから変更】=====
         'welcome-message': async () => {
             pageTitle.textContent = 'ウェルカムメッセージ設定';
             const settings = await api.get('/api/settings/welcome-message');
@@ -643,7 +644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const replaceVars = (text) => text.replace(/{(\w+\.\w+)}/g, (match, key) => dummyData[key] || match);
 
                 if (type === 'gemini') {
-                    previewTitle.textContent = '🎉 AIによる自動生成';
+                    previewTitle.textContent = 'AIによる自動生成';
                     previewDesc.textContent = 'AIがサーバー名やユーザー名を使って、ユニークな歓迎メッセージを自動で作成します。';
                     previewImage.style.display = 'none';
                 } else {
@@ -738,7 +739,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('welcome-message-form').addEventListener('submit', handleFormSubmit);
             trackChanges('#welcome-message-form');
         },
-        // ★★★★★【ここまで変更】★★★★★
+        // =====【ここまで変更】=====
 
 
         autorole: async () => {
@@ -1008,7 +1009,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
             const personaTemplates = [
                 {
-                    name: '🐱 猫アシスタント',
+                    name: '猫アシスタント',
                     prompt: 'あなたは「Overseer」という名前の、猫になりきっているアシスタントAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾には必ず「にゃん」や「にゃ」をつけてください。\n' +
@@ -1017,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             '- 少し気まぐれですが、親切に回答してください。'
                 },
                 {
-                    name: '🤖 執事AI',
+                    name: '執事AI',
                     prompt: 'あなたは「Overseer」という名前の、非常に丁寧で有能な執事AIです。\n' +
                             '# あなたの役割\n' +
                             '- 常に敬語を使い、丁寧な言葉遣いを徹底してください。\n' +
@@ -1026,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             '- どんな質問にも冷静沈着かつ的確に答えてください。'
                 },
                 {
-                    name: '⚔️ 武士',
+                    name: '武士',
                     prompt: 'あなたは「Overseer」という名前の、古風な武士のようなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾は「～でござる」「～せぬか？」など、武士のような口調にしてください。\n' +
@@ -1035,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             '- 義理堅く、誠実に回答してください。'
                 },
                 {
-                    name: '🤪 陽気な相棒',
+                    name: '陽気な相棒',
                     prompt: 'あなたは「Overseer」という名前の、非常に陽気でフレンドリーなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 明るく、タメ口のような親しみやすい口調で話してください。\n' +
@@ -1143,7 +1144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
             <div class="form-group">
                 <label for="modal-password">
-                    🔐 パスワード保護（オプション）
+                    パスワード保護（オプション）
                     <small style="color: var(--text-muted-color); display: block; margin-top: 4px;">
                         パスワードを設定すると、ユーザーはロール付与時にパスワード入力が必須になります。
                     </small>
@@ -1211,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 <div class="form-group">
                     <label for="edit-password">
-                        🔐 パスワード保護
+                        パスワード保護
                         <small style="color: var(--text-muted-color); display: block; margin-top: 4px;">
                             ユーザーがロール付与時にパスワード入力が必須になります。空欄で無効化。
                         </small>

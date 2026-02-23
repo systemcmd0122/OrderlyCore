@@ -4,8 +4,8 @@ const { isAdminAuthenticated } = require('../middleware/auth');
 const { client } = require('../config/discord');
 const { db } = require('../config/firebase');
 const { doc, getDoc, setDoc, collection, query, where, getDocs } = require('firebase/firestore');
-const { EmbedBuilder } = require('discord.js');
 const chalk = require('chalk');
+const { createStandardEmbed, COLORS } = require('../utils/embedBuilder');
 
 router.get('/stats', isAdminAuthenticated, async (_req, res) => {
     try {
@@ -45,11 +45,11 @@ router.post('/announce', isAdminAuthenticated, async (req, res) => {
     }
 
     try {
-        const embed = new EmbedBuilder()
-            .setTitle(title)
-            .setDescription(description)
-            .setColor(color || '#3498db')
-            .setTimestamp();
+        const embed = createStandardEmbed({
+            title: title,
+            description: description,
+            color: color ? parseInt(color.replace('#', ''), 16) : COLORS.PRIMARY,
+        });
         if (url) embed.setURL(url);
         if (footer) embed.setFooter({ text: footer });
 
@@ -69,12 +69,12 @@ router.post('/announce', isAdminAuthenticated, async (req, res) => {
                     if (channel && channel.isTextBased()) {
                         return channel.send({ embeds: [embed] }).then(() => {
                             sentCount++;
-                            console.log(chalk.green(`📢 Announcement sent to guild ${doc.id}`));
+                            console.log(chalk.green(`[OK] Announcement sent to guild ${doc.id}`));
                         });
                     }
                 })
                 .catch(err => {
-                    console.error(chalk.red(`Failed to send announcement to channel ${channelId} in guild ${doc.id}:`), err.message);
+                    console.error(chalk.red(`[ERROR] Failed to send announcement to ${channelId}:`), err.message);
                 });
             sendPromises.push(promise);
         });
@@ -107,10 +107,6 @@ router.post('/statuses', isAdminAuthenticated, async (req, res) => {
     if (!['ai', 'custom'].includes(mode)) {
         return res.status(400).json({ error: 'Invalid mode specified.' });
     }
-    if (mode === 'custom' && !Array.isArray(statuses)) {
-        return res.status(400).json({ error: 'Statuses must be an array for custom mode.' });
-    }
-
     try {
         const settingsRef = doc(db, 'bot_settings', 'statuses');
         const currentSettings = (await getDoc(settingsRef)).data() || {};
@@ -119,10 +115,6 @@ router.post('/statuses', isAdminAuthenticated, async (req, res) => {
             list: mode === 'custom' ? statuses : currentSettings.list || []
         };
         await setDoc(settingsRef, newSettings);
-
-        // Note: Actual status update is handled by statusService, but we need to notify it or update global state.
-        // For now, we'll assume the status rotation will pick up the changes from DB.
-        
         res.status(200).json({ message: 'Statuses settings updated successfully.' });
     } catch (error) {
         console.error("Error updating statuses:", error);

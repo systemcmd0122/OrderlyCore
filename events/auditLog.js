@@ -1,5 +1,6 @@
-const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
+const { Events, AuditLogEvent } = require('discord.js');
 const { doc, getDoc, collection, addDoc, Timestamp } = require('firebase/firestore');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 // --- 共通ログ送信関数 ---
 async function getLogChannelId(client, guildId) {
@@ -11,8 +12,7 @@ async function getLogChannelId(client, guildId) {
     return null;
 }
 
-// ★★★★★【ここから変更】★★★★★
-// Firestoreにログを保存する関数を追加
+// Firestoreにログを保存
 async function saveLogToFirestore(client, guild, logData) {
     try {
         const logWithDefaults = {
@@ -22,7 +22,7 @@ async function saveLogToFirestore(client, guild, logData) {
         };
         await addDoc(collection(client.db, 'audit_logs'), logWithDefaults);
     } catch (error) {
-        console.error('Firestoreへの監査ログ保存に失敗しました:', error);
+        console.error('[ERROR] Firestoreへの監査ログ保存に失敗しました:', error);
     }
 }
 
@@ -40,10 +40,9 @@ async function sendLog(client, guild, embed, firestoreData) {
             }
         }
     } catch (error) {
-        console.error('監査ログのチャンネル送信に失敗しました:', error);
+        console.error('[ERROR] 監査ログのチャンネル送信に失敗しました:', error);
     }
 }
-// ★★★★★【ここまで変更】★★★★★
 
 // --- イベントリスナー ---
 module.exports = (client) => {
@@ -72,25 +71,21 @@ module.exports = (client) => {
             }
 
             if (executor && author && executor.id !== author.id) {
-                descriptionText = `**実行者:** ${executor.tag}\n**送信者:** ${author.tag}\n**チャンネル:** ${message.channel}`;
+                descriptionText = `実行者: ${executor.tag}\n送信者: ${author.tag}\nチャンネル: ${message.channel}`;
             } else {
-                descriptionText = `**送信者:** ${author ? author.tag : '不明なユーザー'}\n**チャンネル:** ${message.channel}`;
+                descriptionText = `送信者: ${author ? author.tag : '不明'}\nチャンネル: ${message.channel}`;
             }
 
-            const messageContent = message.content ? message.content.substring(0, 1024) : '（キャッシュ外のため内容を取得できませんでした）';
+            const messageContent = message.content ? message.content.substring(0, 1024) : '(取得不可)';
 
-            const embed = new EmbedBuilder()
-                .setColor(0xff6b6b)
-                .setTitle('メッセージ削除')
-                .setDescription(descriptionText)
-                .addFields({ name: 'メッセージ内容', value: `>>> ${messageContent}` })
-                .setTimestamp();
-            
-            if (author) {
-                 embed.setThumbnail(author.displayAvatarURL());
-            }
+            const embed = createStandardEmbed({
+                title: '[LOG] メッセージ削除',
+                description: descriptionText,
+                color: COLORS.ERROR,
+                fields: [{ name: '内容', value: `>>> ${messageContent}` }],
+                thumbnail: author ? author.displayAvatarURL() : null
+            });
 
-            // ★★★★★【ここから変更】★★★★★
             const firestoreData = {
                 eventType: 'MessageDelete',
                 executorId: executor ? executor.id : (author ? author.id : null),
@@ -104,10 +99,9 @@ module.exports = (client) => {
                 }
             };
             await sendLog(client, message.guild, embed, firestoreData);
-            // ★★★★★【ここまで変更】★★★★★
 
         } catch (error) {
-            console.error("メッセージ削除ログの処理中にエラー:", error);
+            console.error("[ERROR] メッセージ削除ログの処理失敗:", error);
         }
     });
 
@@ -116,21 +110,20 @@ module.exports = (client) => {
         if (!newMessage.guild || (newMessage.author && newMessage.author.bot) || oldMessage.content === newMessage.content) return;
 
         const author = newMessage.author;
-        const oldContent = oldMessage.content ? oldMessage.content.substring(0, 1024) : '（内容を取得できませんでした）';
-        const newContent = newMessage.content ? newMessage.content.substring(0, 1024) : '（内容を取得できませんでした）';
+        const oldContent = oldMessage.content ? oldMessage.content.substring(0, 1024) : '(取得不可)';
+        const newContent = newMessage.content ? newMessage.content.substring(0, 1024) : '(取得不可)';
 
-        const embed = new EmbedBuilder()
-            .setColor(0x3498db)
-            .setTitle('メッセージ編集')
-            .setDescription(`**チャンネル:** ${newMessage.channel}\n**送信者:** ${author.tag}`)
-            .addFields(
+        const embed = createStandardEmbed({
+            title: '[LOG] メッセージ編集',
+            description: `チャンネル: ${newMessage.channel}\n送信者: ${author.tag}`,
+            color: COLORS.INFO,
+            fields: [
                 { name: '変更前', value: oldContent },
                 { name: '変更後', value: newContent }
-            )
-            .setURL(newMessage.url)
-            .setTimestamp();
+            ],
+            thumbnail: author.displayAvatarURL()
+        }).setURL(newMessage.url);
 
-        // ★★★★★【ここから変更】★★★★★
         const firestoreData = {
             eventType: 'MessageUpdate',
             executorId: author.id,
@@ -146,38 +139,30 @@ module.exports = (client) => {
             }
         };
         await sendLog(client, newMessage.guild, embed, firestoreData);
-        // ★★★★★【ここまで変更】★★★★★
     });
     
-    // メンバーのニックネーム変更
+    // ニックネーム変更
     client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
          if (oldMember.nickname === newMember.nickname) return;
 
-         // ★★★★★【ここから変更】★★★★★
-         const fetchedLogs = await newMember.guild.fetchAuditLogs({
-            limit: 1,
-            type: AuditLogEvent.MemberUpdate,
-         });
+         const fetchedLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberUpdate });
          const log = fetchedLogs.entries.first();
          let executor = null;
          if (log && log.target.id === newMember.id && (Date.now() - log.createdTimestamp < 5000)) {
              executor = log.executor;
          }
-         // ★★★★★【ここまで変更】★★★★★
 
-         const embed = new EmbedBuilder()
-            .setColor(0xf1c40f)
-            .setTitle('ニックネーム変更')
-            // ★★★★★【ここから変更】★★★★★
-            .setDescription(`**対象:** ${newMember.user.tag}\n**実行者:** ${executor ? executor.tag : '不明 (本人 or ログなし)'}`)
-            // ★★★★★【ここまで変更】★★★★★
-            .addFields(
-                { name: '変更前', value: oldMember.nickname || '（なし）' },
-                { name: '変更後', value: newMember.nickname || '（なし）' }
-            )
-            .setTimestamp();
+         const embed = createStandardEmbed({
+            title: '[LOG] ニックネーム変更',
+            description: `対象: ${newMember.user.tag}\n実行者: ${executor ? executor.tag : '本人/不明'}`,
+            color: COLORS.WARNING,
+            fields: [
+                { name: '前', value: oldMember.nickname || '(なし)', inline: true },
+                { name: '後', value: newMember.nickname || '(なし)', inline: true }
+            ],
+            thumbnail: newMember.user.displayAvatarURL()
+         });
 
-        // ★★★★★【ここから変更】★★★★★
         const firestoreData = {
             eventType: 'NicknameUpdate',
             executorId: executor ? executor.id : newMember.id,
@@ -185,12 +170,11 @@ module.exports = (client) => {
             targetId: newMember.id,
             targetTag: newMember.user.tag,
             details: {
-                before: oldMember.nickname || '（なし）',
-                after: newMember.nickname || '（なし）'
+                before: oldMember.nickname || '(なし)',
+                after: newMember.nickname || '(なし)'
             }
         };
         await sendLog(client, newMember.guild, embed, firestoreData);
-        // ★★★★★【ここまで変更】★★★★★
     });
 
      // ロール変更
@@ -199,48 +183,50 @@ module.exports = (client) => {
         const newRoles = newMember.roles.cache;
         if (oldRoles.size === newRoles.size) return;
 
-        // ★★★★★【ここから変更】★★★★★
-        const fetchedLogs = await newMember.guild.fetchAuditLogs({
-            limit: 1,
-            type: AuditLogEvent.MemberRoleUpdate,
-        });
+        const fetchedLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberRoleUpdate });
         const log = fetchedLogs.entries.first();
         let executor = null;
         if (log && log.target.id === newMember.id && (Date.now() - log.createdTimestamp < 5000)) {
             executor = log.executor;
         }
-        // ★★★★★【ここまで変更】★★★★★
 
-        const embed = new EmbedBuilder()
-            .setColor(0x9b59b6)
-            .setTimestamp()
-            // ★★★★★【ここから変更】★★★★★
-            .setDescription(`**対象:** ${newMember.user.tag}\n**実行者:** ${executor ? executor.tag : '不明 (ログなし)'}`);
-            // ★★★★★【ここまで変更】★★★★★
-
-        let eventType, roleName;
-        if (oldRoles.size > newRoles.size) { // ロール剥奪
+        let eventType, roleName, embedTitle, embedColor;
+        if (oldRoles.size > newRoles.size) {
             const removedRole = oldRoles.find(role => !newRoles.has(role.id));
             if (removedRole) {
-                embed.setTitle('ロール剥奪').addFields({ name: '剥奪されたロール', value: `${removedRole.name}` });
+                embedTitle = '[LOG] ロール剥奪';
+                embedColor = COLORS.ERROR;
                 eventType = 'RoleRemove';
                 roleName = removedRole.name;
-                // ★★★★★【ここから変更】★★★★★
-                const firestoreData = { eventType, executorId: executor?.id, executorTag: executor?.tag, targetId: newMember.id, targetTag: newMember.user.tag, details: { roleName } };
-                await sendLog(client, newMember.guild, embed, firestoreData);
-                // ★★★★★【ここまで変更】★★★★★
             }
-        } else { // ロール付与
+        } else {
             const addedRole = newRoles.find(role => !oldRoles.has(role.id));
             if (addedRole) {
-                embed.setTitle('ロール付与').addFields({ name: '付与されたロール', value: `${addedRole.name}` });
+                embedTitle = '[LOG] ロール付与';
+                embedColor = COLORS.SUCCESS;
                 eventType = 'RoleAdd';
                 roleName = addedRole.name;
-                // ★★★★★【ここから変更】★★★★★
-                const firestoreData = { eventType, executorId: executor?.id, executorTag: executor?.tag, targetId: newMember.id, targetTag: newMember.user.tag, details: { roleName } };
-                await sendLog(client, newMember.guild, embed, firestoreData);
-                // ★★★★★【ここまで変更】★★★★★
             }
+        }
+
+        if (eventType) {
+            const embed = createStandardEmbed({
+                title: embedTitle,
+                description: `対象: ${newMember.user.tag}\n実行者: ${executor ? executor.tag : '不明'}`,
+                color: embedColor,
+                fields: [{ name: 'ロール名', value: roleName }],
+                thumbnail: newMember.user.displayAvatarURL()
+            });
+
+            const firestoreData = {
+                eventType,
+                executorId: executor?.id,
+                executorTag: executor?.tag,
+                targetId: newMember.id,
+                targetTag: newMember.user.tag,
+                details: { roleName }
+            };
+            await sendLog(client, newMember.guild, embed, firestoreData);
         }
     });
 };

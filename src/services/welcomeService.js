@@ -12,7 +12,8 @@ async function generateWelcomeWithGemini(client, member) {
   - サーバー名: ${guild.name}
   - 現在のメンバー数: ${guild.memberCount}
 - 生成する文章は必ず**タイトル**と**説明文**の2つの部分に分けてください。
-- タイトルは「🎉」や「ようこそ！」などの絵文字を含んだ短いフレーズにしてください。（20文字以内）
+- タイトルは「Welcome!」や「ようこそ！」などの短いフレーズにしてください（20文字以内）。
+- **絶対に絵文字を使用しないでください。**
 - 説明文は、ユーザーへの呼びかけから始まり、サーバーの簡単な紹介や、これから始まる素晴らしい体験への期待感を抱かせるような、少し長めの文章にしてください。（150文字以内）
 - 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式で出力してください。`;
 
@@ -20,9 +21,9 @@ async function generateWelcomeWithGemini(client, member) {
         const text = result.response.text().replace(/```json|```/g, '').trim();
         return JSON.parse(text);
     } catch (error) {
-        console.error('❌ Geminiでのウェルカムメッセージ生成エラー:', error);
+        console.error('[ERROR] Geminiでのウェルカムメッセージ生成エラー:', error);
         return {
-            title: `🎉 ${guild.name}へようこそ！`,
+            title: `Welcome to ${guild.name}!`,
             description: `**${user.displayName}**さん、サーバーへのご参加ありがとうございます！これから一緒に楽しみましょう！`
         };
     }

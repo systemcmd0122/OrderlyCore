@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const deleteAllItems = async (collectionName) => {
         createModal('全削除の確認',
-            '<p>このコレクションの全データを削除してもよろしいですか？</p><p style="color: var(--error-color); font-weight: bold;">⚠️ この操作は取り消せません！</p>',
+            '<p>このコレクションの全データを削除してもよろしいですか？</p><p style="color: var(--error-color); font-weight: bold;">[WARN] この操作は取り消せません！</p>',
             [
                 { id: 'cancel-delete-all', text: 'キャンセル', class: 'btn-secondary' },
                 { id: 'confirm-delete-all', text: '全て削除', class: 'btn-danger' }

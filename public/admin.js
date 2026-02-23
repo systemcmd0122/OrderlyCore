@@ -98,30 +98,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageContent.innerHTML = `
                 <div class="grid-container">
                     <div class="stat-card">
-                        <div class="stat-icon">🌐</div>
-                        <div class="stat-value">${stats.guildCount}</div>
+                        <div class="stat-icon"><i data-feather="globe"></i></div>
                         <div class="stat-label">総サーバー数</div>
+                        <div class="stat-value">${stats.guildCount}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
+                        <div class="stat-icon"><i data-feather="users"></i></div>
                         <div class="stat-label">総ユーザー数</div>
+                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">⏱️</div>
-                        <div class="stat-value">${stats.uptime}</div>
+                        <div class="stat-icon"><i data-feather="clock"></i></div>
                         <div class="stat-label">稼働時間</div>
+                        <div class="stat-value">${stats.uptime}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">💾</div>
-                        <div class="stat-value">${stats.memoryUsage} MB</div>
+                        <div class="stat-icon"><i data-feather="database"></i></div>
                         <div class="stat-label">メモリ使用量</div>
+                        <div class="stat-value">${stats.memoryUsage} MB</div>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>📡 サーバー一覧 (${stats.guildCount})</h3>
+                        <h3>サーバー一覧 (${stats.guildCount})</h3>
                         <div style="display: flex; gap: 10px;">
                             <input type="text" id="server-search" placeholder="サーバー名で検索..." style="width: 250px; padding: 8px 12px;">
                         </div>
@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageContent.innerHTML = `
                 <div class="card">
                     <div class="card-header">
-                        <h3>📢 お知らせ作成</h3>
+                        <h3>お知らせ作成</h3>
                     </div>
                     <form id="announcement-form">
                         <div class="form-group">
@@ -238,12 +238,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const settings = await api.get('/api/admin/statuses');
 
-            const emojiList = ['🎮', '🎵', '🎬', '📚', '⚡', '🔥', '💎', '🌟', '🎯', '🚀', '💻', '🎨', '🏆', '👑', '💫', '🌈', '🎪', '🎭', '🎲', '🎰', '🎳', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '📻', '📺', '📱', '💿', '📀', '🎥', '📷', '📹', '🔔', '🔕', '📢', '📣', '⏰', '⏱️', '⏲️', '🕐', '🌍', '🌎', '🌏', '🗺️', '🧭', '⛰️', '🏔️', '🗻', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️'];
+            // 絵文字リストは空にするか、削除する方向
+            const emojiList = [];
 
             pageContent.innerHTML = `
                 <div class="card">
                     <div class="card-header">
-                        <h3>⚡ ステータスメッセージ設定</h3>
+                        <h3>ステータスメッセージ設定</h3>
                     </div>
                     <div class="form-group">
                         <label>モード</label>
@@ -261,7 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     <div id="custom-statuses" style="${settings.mode === 'ai' ? 'display: none;' : ''}">
                         <div class="card-header" style="margin-top: 20px;">
-                            <h3>📝 ステータス一覧</h3>
+                            <h3>ステータス一覧</h3>
                             <button id="add-status-btn" class="btn btn-small">
                                 <i data-feather="plus"></i>
                                 追加
@@ -270,10 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div id="status-list">
                             ${(settings.list || []).map((status, index) => `
                                 <div class="status-item" data-index="${index}" style="display: flex; gap: 10px; align-items: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 10px;">
-                                    <button class="emoji-picker-btn" data-target="emoji-${index}" style="width: 60px; height: 40px; font-size: 1.5rem; background: rgba(0, 229, 255, 0.1); border: 1px solid var(--primary-color); border-radius: 6px; cursor: pointer; transition: all 0.3s;">
-                                        ${status.emoji || '😀'}
-                                    </button>
-                                    <input type="hidden" class="emoji-input" value="${status.emoji || '😀'}">
+                                    <input type="hidden" class="emoji-input" value="">
                                     <input type="text" class="status-text" value="${status.state}" placeholder="ステータス" style="flex: 1;">
                                     <button class="btn btn-danger btn-small delete-status-btn" data-index="${index}">
                                         <i data-feather="trash-2"></i>
@@ -289,25 +287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </button>
                 </div>
 
-                <!-- 絵文字ピッカーモーダル -->
-                <div id="emoji-picker-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; justify-content: center; align-items: center;">
-                    <div style="background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h3 style="color: var(--primary-color);">絵文字を選択</h3>
-                            <button id="close-emoji-picker" style="background: none; border: none; color: var(--text-muted-color); font-size: 1.5rem; cursor: pointer;">&times;</button>
-                        </div>
-                        <div id="emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px;">
-                            ${emojiList.map(emoji => `
-                                <button class="emoji-option" data-emoji="${emoji}" style="font-size: 2rem; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.3s;">
-                                    ${emoji}
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
             `;
-
-            let currentEmojiTarget = null;
 
             // Mode toggle
             document.querySelectorAll('input[name="status-mode"]').forEach(radio => {
@@ -317,50 +297,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            // Emoji picker
-            const emojiModal = document.getElementById('emoji-picker-modal');
-            
-            document.querySelectorAll('.emoji-picker-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    currentEmojiTarget = btn;
-                    emojiModal.style.display = 'flex';
-                });
-            });
-
-            document.getElementById('close-emoji-picker').addEventListener('click', () => {
-                emojiModal.style.display = 'none';
-            });
-
-            emojiModal.addEventListener('click', (e) => {
-                if (e.target === emojiModal) {
-                    emojiModal.style.display = 'none';
-                }
-            });
-
-            document.querySelectorAll('.emoji-option').forEach(option => {
-                option.addEventListener('click', () => {
-                    const emoji = option.dataset.emoji;
-                    if (currentEmojiTarget) {
-                        currentEmojiTarget.textContent = emoji;
-                        const statusItem = currentEmojiTarget.closest('.status-item');
-                        statusItem.querySelector('.emoji-input').value = emoji;
-                    }
-                    emojiModal.style.display = 'none';
-                });
-
-                option.addEventListener('mouseenter', () => {
-                    option.style.background = 'rgba(0, 229, 255, 0.2)';
-                    option.style.borderColor = 'var(--primary-color)';
-                    option.style.transform = 'scale(1.1)';
-                });
-
-                option.addEventListener('mouseleave', () => {
-                    option.style.background = 'rgba(0,0,0,0.2)';
-                    option.style.borderColor = 'var(--border-color)';
-                    option.style.transform = 'scale(1)';
-                });
-            });
 
             // Add status
             document.getElementById('add-status-btn').addEventListener('click', () => {
@@ -371,10 +307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 div.dataset.index = index;
                 div.style.cssText = 'display: flex; gap: 10px; align-items: center; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 10px;';
                 div.innerHTML = `
-                    <button class="emoji-picker-btn" data-target="emoji-${index}" style="width: 60px; height: 40px; font-size: 1.5rem; background: rgba(0, 229, 255, 0.1); border: 1px solid var(--primary-color); border-radius: 6px; cursor: pointer; transition: all 0.3s;">
-                        😀
-                    </button>
-                    <input type="hidden" class="emoji-input" value="😀">
+                    <input type="hidden" class="emoji-input" value="">
                     <input type="text" class="status-text" placeholder="ステータス" style="flex: 1;">
                     <button class="btn btn-danger btn-small delete-status-btn" data-index="${index}">
                         <i data-feather="trash-2"></i>
@@ -382,12 +315,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
                 list.appendChild(div);
                 feather.replace();
-
-                div.querySelector('.emoji-picker-btn').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    currentEmojiTarget = div.querySelector('.emoji-picker-btn');
-                    emojiModal.style.display = 'flex';
-                });
 
                 div.querySelector('.delete-status-btn').addEventListener('click', () => {
                     div.remove();
@@ -429,22 +356,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageContent.innerHTML = `
                 <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                     <div class="stat-card">
-                        <div class="stat-icon">🌐</div>
+                        <div class="stat-icon"><i data-feather="globe"></i></div>
                         <div class="stat-value">${stats.guildCount}</div>
                         <div class="stat-label">接続サーバー</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">👥</div>
+                        <div class="stat-icon"><i data-feather="users"></i></div>
                         <div class="stat-value">${stats.userCount.toLocaleString()}</div>
                         <div class="stat-label">総ユーザー</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">⏱️</div>
+                        <div class="stat-icon"><i data-feather="clock"></i></div>
                         <div class="stat-value">${stats.uptime}</div>
                         <div class="stat-label">稼働時間</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">💾</div>
+                        <div class="stat-icon"><i data-feather="database"></i></div>
                         <div class="stat-value">${stats.memoryUsage} MB</div>
                         <div class="stat-label">メモリ</div>
                     </div>
@@ -452,7 +379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>📄 システムログ</h3>
+                        <h3>システムログ</h3>
                         <div style="display: flex; gap: 10px;">
                             <button id="refresh-logs" class="btn btn-small btn-secondary">
                                 <i data-feather="refresh-cw"></i>
@@ -488,7 +415,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>🔔 最近のイベント</h3>
+                        <h3>最近のイベント</h3>
                     </div>
                     <div class="data-table-wrapper" style="overflow-x: auto;">
                         <table class="data-table">
@@ -506,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         <td>${new Date(guild.joinedTimestamp).toLocaleString('ja-JP')}</td>
                                         <td>サーバー参加</td>
                                         <td>${guild.name}</td>
-                                        <td><span style="color: var(--success-color);">✓ 成功</span></td>
+                                        <td><span style="color: var(--success-color);">[OK] 成功</span></td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -553,37 +480,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             pageContent.innerHTML = `
                 <div class="grid-container">
                     <div class="stat-card">
-                        <div class="stat-icon">🌐</div>
-                        <div class="stat-value">${stats.guildCount}</div>
+                        <div class="stat-icon"><i data-feather="globe"></i></div>
                         <div class="stat-label">総サーバー数</div>
+                        <div class="stat-value">${stats.guildCount}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
+                        <div class="stat-icon"><i data-feather="users"></i></div>
                         <div class="stat-label">総ユーザー数</div>
+                        <div class="stat-value">${stats.userCount.toLocaleString()}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">📊</div>
-                        <div class="stat-value">${Math.round(stats.userCount / stats.guildCount)}</div>
+                        <div class="stat-icon"><i data-feather="bar-chart-2"></i></div>
                         <div class="stat-label">平均メンバー数</div>
+                        <div class="stat-value">${Math.round(stats.userCount / stats.guildCount)}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">💾</div>
-                        <div class="stat-value">${stats.memoryUsage} MB</div>
+                        <div class="stat-icon"><i data-feather="database"></i></div>
                         <div class="stat-label">メモリ使用量</div>
+                        <div class="stat-value">${stats.memoryUsage} MB</div>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>📈 サーバー成長トレンド</h3>
+                        <h3>サーバー成長トレンド</h3>
                     </div>
                     <canvas id="growth-chart" style="max-height: 300px;"></canvas>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>🏆 トップサーバー (メンバー数)</h3>
+                        <h3>トップサーバー (メンバー数)</h3>
                     </div>
                     <div class="data-table-wrapper" style="overflow-x: auto;">
                         <table class="data-table">
@@ -614,7 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>📅 参加履歴</h3>
+                        <h3>参加履歴</h3>
                     </div>
                     <canvas id="timeline-chart" style="max-height: 250px;"></canvas>
                 </div>

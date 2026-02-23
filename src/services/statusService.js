@@ -10,15 +10,16 @@ async function generateAIStatus(client) {
 # 指示
 - サーバー数 (${client.guilds.cache.size}個) や、総ユーザー数 (${userCount}人) などの動的な情報を含めることができます。
 - 短く、キャッチーで、少しユーモラスなものが望ましいです。
-- 必ずJSON形式で {"emoji": "絵文字", "state": "ステータスメッセージ"} の形式で出力してください。
+- **絶対に絵文字を使用しないでください。**
+- 必ずJSON形式で {"emoji": null, "state": "ステータスメッセージ"} の形式で出力してください。emojiは必ずnullにしてください。
 - ステータスメッセージは30文字以内にしてください。`;
 
         const result = await client.geminiModel.generateContent(prompt);
         const text = result.response.text().replace(/```json|```/g, '').trim();
         return JSON.parse(text);
     } catch (error) {
-        console.error(chalk.red('❌ Geminiによるステータス生成に失敗:'), error);
-        return { emoji: '⚠️', state: 'AI思考エラー' };
+        console.error(chalk.red('[ERROR] Geminiによるステータス生成に失敗:'), error);
+        return { emoji: null, state: '[ERROR] AI Status Failure' };
     }
 }
 
@@ -34,16 +35,16 @@ async function loadStatusSettings(db) {
             };
         } else {
             const defaultStatuses = [
-                { emoji: '✅', state: '正常稼働中' },
-                { emoji: '💡', state: '/help でコマンド一覧' },
-                { emoji: '🛡️', state: '${serverCount} サーバーを保護中' },
+                { emoji: null, state: '[OK] System Online' },
+                { emoji: null, state: '[INFO] Type /help' },
+                { emoji: null, state: '[SECURE] Active on ${serverCount} guilds' },
             ];
             await setDoc(settingsRef, { list: defaultStatuses, mode: 'custom' });
             return { list: defaultStatuses, mode: 'custom' };
         }
     } catch (error) {
-        console.error(chalk.red('❌ Firestoreからのステータス読み込みに失敗:'), error.message);
-        return { list: [{ emoji: '❌', state: 'ステータス読込エラー' }], mode: 'custom' };
+        console.error(chalk.red('[ERROR] Firestoreからのステータス読み込みに失敗:'), error.message);
+        return { list: [{ emoji: null, state: '[ERROR] Load Failure' }], mode: 'custom' };
     }
 }
 
@@ -72,7 +73,7 @@ function startStatusRotation(client) {
                 statusToShow = { emoji: statusTemplate.emoji, state: statusState };
                 i = (i + 1) % dynamicStatuses.length;
             } else {
-                statusToShow = { emoji: '🔧', state: 'ステータス設定待ち' };
+                statusToShow = { emoji: null, state: 'Waiting for configuration' };
             }
         }
 

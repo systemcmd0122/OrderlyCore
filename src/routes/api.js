@@ -288,7 +288,7 @@ router.get('/settings/welcome-message', isAuthenticated, isGuildAdmin, async (re
             res.json({
                 enabled: true,
                 type: 'default',
-                title: '🎉 {server.name} へようこそ！',
+                title: 'Welcome to {server.name}!',
                 description: '**{user.displayName}** さん、サーバーへのご参加ありがとうございます！\n\nまずはルールをご確認ください: {rulesChannel}',
                 imageUrl: ''
             });

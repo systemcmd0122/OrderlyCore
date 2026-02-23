@@ -1,6 +1,6 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { doc, getDoc } = require('firebase/firestore');
-const chalk = require('chalk');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -8,41 +8,31 @@ module.exports = {
         .setDescription('設定されているボイスチャンネルのログ設定一覧を表示します。')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
     async execute(interaction) {
-        // 最初に必ず応答を保留し、タイムアウトを防ぐ
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         const guildId = interaction.guild.id;
         const db = interaction.client.db;
-
-        if (!db) {
-            return interaction.editReply({ content: '❌ データベースへの接続に失敗しました。' });
-        }
+        if (!db) return interaction.editReply({ content: '[ERROR] データベース接続失敗。' });
 
         const settingsRef = doc(db, 'guild_settings', guildId);
         const docSnap = await getDoc(settingsRef);
 
-        const embed = new EmbedBuilder()
-            .setTitle('🔊 ボイスチャンネルログ設定一覧')
-            .setColor(0x5865F2)
-            .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() })
-            .setTimestamp();
+        const embed = createStandardEmbed({
+            title: '[VOICE] ログ設定一覧',
+            color: COLORS.INFO,
+            footer: { text: interaction.guild.name, iconURL: interaction.guild.iconURL() }
+        });
 
         if (docSnap.exists() && docSnap.data().voiceChannelMappings) {
             const mappings = docSnap.data().voiceChannelMappings;
             const description = Object.entries(mappings)
-                .map(([vcId, tcId]) => `🎤 <#${vcId}>  ➔  ✍️ <#${tcId}>`)
+                .map(([vcId, tcId]) => `[VC] <#${vcId}> -> [LOG] <#${tcId}>`)
                 .join('\n');
-            
-            if (description) {
-                embed.setDescription(description);
-            } else {
-                embed.setDescription('ログ設定はまだありません。\n`/set-vc-log` コマンドで設定してください。');
-            }
+            embed.setDescription(description || '設定なし');
         } else {
-            embed.setDescription('ログ設定はまだありません。\n`/set-vc-log` コマンドで設定してください。');
+            embed.setDescription('設定なし');
         }
 
-        // 成功した場合の応答
         await interaction.editReply({ embeds: [embed] });
     },
 };

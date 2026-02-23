@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
+const { createStandardEmbed, COLORS } = require('../src/utils/embedBuilder');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -7,26 +8,19 @@ module.exports = {
     
     async execute(interaction) {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-            return await interaction.reply({
-                content: '❌ この機能を使用するには「サーバー管理」権限が必要です。',
-                ephemeral: true
-            });
+            return await interaction.reply({ content: '[ERROR] 権限が不足しています。', ephemeral: true });
         }
         
-        const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}/dashboard`;
-
-        const embed = new EmbedBuilder()
-            .setColor(0x3498db)
-            .setTitle('🖥️ ウェルカム設定はWebダッシュボードへ')
-            .setDescription(
-                '現在、ウェルカムメッセージや参加・退出に関するすべての設定は、Webダッシュボードから行うことを推奨しています。\n\n' +
-                'より直感的で詳細なカスタマイズが可能です。'
-            )
-            .addFields(
-                { name: 'ダッシュボードへのアクセス方法', value: '`/login` コマンドを実行し、発行されたトークンを使ってログインしてください。' },
-                { name: 'ダッシュボード URL', value: `[こちらをクリック](${loginUrl})` }
-            )
-            .setTimestamp();
+        const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}dashboard`;
+        const embed = createStandardEmbed({
+            title: '[WEB] ダッシュボードへ',
+            description: 'ウェルカムメッセージ等の設定は、Webダッシュボードから行えます。',
+            color: COLORS.PRIMARY,
+            fields: [
+                { name: 'アクセス方法', value: '`/login` コマンドでログインしてください。' },
+                { name: 'URL', value: `[ダッシュボード](${loginUrl})` }
+            ]
+        });
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
     },

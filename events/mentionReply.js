@@ -10,7 +10,7 @@ const CONVERSATION_TIMEOUT = 10 * 60 * 1000; // 10分間
 const MAX_HISTORY_LENGTH = 10; // 最大10往復分の履歴を保持
 
 /**
- * 🗂️ 会話履歴を取得または初期化
+ * 会話履歴を取得または初期化
  * @param {string} userId - ユーザーID
  * @param {string} channelId - チャンネルID
  * @returns {Array} - 会話履歴
@@ -35,7 +35,7 @@ function getConversationHistory(userId, channelId) {
 }
 
 /**
- * 💾 会話履歴を保存
+ * 会話履歴を保存
  * @param {string} userId - ユーザーID
  * @param {string} channelId - チャンネルID
  * @param {string} userMessage - ユーザーメッセージ
@@ -69,7 +69,7 @@ function saveConversationHistory(userId, channelId, userMessage, aiResponse) {
 }
 
 /**
- * 🧹 会話履歴をクリア
+ * 会話履歴をクリア
  * @param {string} userId - ユーザーID
  * @param {string} channelId - チャンネルID
  */
@@ -80,7 +80,7 @@ function clearConversationHistory(userId, channelId) {
 }
 
 /**
- * 🕒 定期的に古い会話履歴をクリーンアップ
+ * 定期的に古い会話履歴をクリーンアップ
  */
 setInterval(() => {
     const now = Date.now();
@@ -99,7 +99,7 @@ setInterval(() => {
 }, 5 * 60 * 1000); // 5分ごとにクリーンアップ
 
 /**
- * 🔍 軽量HTTPリクエストでDuckDuckGoを検索(Playwright不要)
+ * 軽量HTTPリクエストでDuckDuckGoを検索(Playwright不要)
  * @param {string} query - 検索クエリ
  * @returns {Promise<Array>} - 検索結果の配列 [{title, snippet, url}]
  */
@@ -195,14 +195,14 @@ async function performWebSearch(query) {
             });
             
         } catch (err) {
-            console.error(chalk.red('❌ Web検索エラー:'), err.message);
+            console.error(chalk.red('[ERROR] Web検索エラー:'), err.message);
             resolve([]);
         }
     });
 }
 
 /**
- * 🔄 フォールバック検索: HTMLページから直接スクレイピング
+ * フォールバック検索: HTMLページから直接スクレイピング
  * @param {string} query - 検索クエリ
  * @returns {Promise<Array>} - 検索結果の配列
  */
@@ -254,7 +254,7 @@ async function performFallbackSearch(query) {
 }
 
 /**
- * 📄 HTMLから検索結果をパース(正規表現ベース)
+ * HTMLから検索結果をパース(正規表現ベース)
  * @param {string} html - HTMLコンテンツ
  * @returns {Array} - 検索結果の配列
  */
@@ -312,7 +312,7 @@ function parseHTMLResults(html) {
 }
 
 /**
- * 🔤 HTMLエンティティをデコード
+ * HTMLエンティティをデコード
  * @param {string} text - エンコードされたテキスト
  * @returns {string} - デコードされたテキスト
  */
@@ -329,7 +329,7 @@ function decodeHTMLEntities(text) {
 }
 
 /**
- * 📝 検索結果を読みやすい形式にフォーマット
+ * 検索結果を読みやすい形式にフォーマット
  * @param {Array} results - 検索結果
  * @returns {string} - フォーマット済みテキスト
  */
@@ -347,7 +347,7 @@ function formatSearchResults(results) {
 }
 
 /**
- * 🤔 Web検索が必要かどうかを判断
+ * Web検索が必要かどうかを判断
  * @param {string} message - ユーザーメッセージ
  * @returns {boolean}
  */
@@ -397,7 +397,7 @@ function shouldPerformWebSearch(message) {
 }
 
 /**
- * 💬 Gemini AI にチャット応答を生成させる関数(Web検索状態表示付き)
+ * Gemini AI にチャット応答を生成させる関数(Web検索状態表示付き)
  * @param {import('discord.js').Client} client
  * @param {import('discord.js').Message} message
  * @param {object} aiConfig
@@ -421,10 +421,10 @@ async function generateChatResponse(client, message, aiConfig) {
             return '会話履歴をリセットしました!新しい会話を始めましょう。';
         }
 
-        // 🗂️ 会話履歴を取得
+        // 会話履歴を取得
         const conversationHistory = getConversationHistory(message.author.id, message.channel.id);
 
-        // 🔎 Web検索が必要かどうかを判断
+        // Web検索が必要かどうかを判断
         const needsWebSearch = shouldPerformWebSearch(userMessage);
         let webResults = [];
         let searchSummary = '';
@@ -432,10 +432,10 @@ async function generateChatResponse(client, message, aiConfig) {
         if (needsWebSearch) {
             console.log(chalk.cyan('[AI] Web search triggered'));
             
-            // 🔍 Web検索中の状態を表示
+            // Web検索中の状態を表示
             try {
                 statusMessage = await message.reply({
-                    content: '🔍 **Web検索中...**\nインターネットから最新情報を取得しています...',
+                    content: '[SEARCH] **Web検索中...**\nインターネットから最新情報を取得しています...',
                     allowedMentions: { repliedUser: false }
                 });
             } catch (err) {
@@ -449,7 +449,7 @@ async function generateChatResponse(client, message, aiConfig) {
             if (statusMessage) {
                 try {
                     await statusMessage.edit({
-                        content: '🧠 **AI回答生成中...**\n検索結果を分析しています...'
+                        content: '[THINK] **AI回答生成中...**\n検索結果を分析しています...'
                     });
                 } catch (err) {
                     console.error(chalk.yellow('[Status] Failed to update status message:'), err.message);
@@ -489,6 +489,7 @@ async function generateChatResponse(client, message, aiConfig) {
 ### 応答ルール
 - 会話は自然でフレンドリーに
 - 200文字以内に収めてください
+- **絶対に絵文字を使用しないでください。**
 - **最新のユーザーメッセージに最優先で応答してください**
 - 過去の会話は参考程度にし、話題が変わったら新しい話題に切り替えてください
 - Web検索結果がある場合は、その情報を最優先で活用してください
@@ -507,7 +508,7 @@ ${searchSummary ? '\n### 最新のウェブ検索結果（最優先で参照）\
         const result = await client.geminiModel.generateContent(prompt);
         const text = result.response.text().trim().replace(/```/g, '');
 
-        // 💾 会話履歴を保存
+        // 会話履歴を保存
         saveConversationHistory(message.author.id, message.channel.id, userMessage, text);
 
         // 状態メッセージを削除
@@ -523,7 +524,7 @@ ${searchSummary ? '\n### 最新のウェブ検索結果（最優先で参照）\
         return text;
         
     } catch (error) {
-        console.error(chalk.red('❌ Gemini APIでの応答生成失敗:'), error);
+        console.error(chalk.red('[ERROR] Gemini APIでの応答生成失敗:'), error);
         
         // エラー時も状態メッセージを削除
         if (statusMessage) {
@@ -539,7 +540,7 @@ ${searchSummary ? '\n### 最新のウェブ検索結果（最優先で参照）\
 }
 
 /**
- * 👋 メンション応答メイン関数
+ * メンション応答メイン関数
  * @param {import('discord.js').Message} message
  * @param {import('discord.js').Client} client
  */
@@ -586,7 +587,7 @@ async function handleMention(message, client) {
         });
         
     } catch (error) {
-        console.error(chalk.red('❌ メンション応答処理中にエラー:'), error);
+        console.error(chalk.red('[ERROR] メンション応答処理中にエラー:'), error);
         
         // タイピングインジケータを停止
         if (typingInterval) {
@@ -599,7 +600,7 @@ async function handleMention(message, client) {
                 allowedMentions: { repliedUser: false }
             });
         } catch (replyError) {
-            console.error(chalk.red('❌ エラーメッセージ送信にも失敗:'), replyError);
+            console.error(chalk.red('[ERROR] エラーメッセージ送信にも失敗:'), replyError);
         }
     }
 }
