@@ -148,7 +148,6 @@ body {
     padding: 12px 20px;
     color: var(--text-muted-color);
     text-decoration: none;
-    transition: all 0.3s;
     border-left: 3px solid transparent;
 }
 
@@ -234,12 +233,6 @@ body {
     height: 8px;
     background-color: var(--success-color);
     border-radius: 50%;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
 }
 
 #page-content-wrapper {
@@ -260,12 +253,6 @@ body {
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 25px;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .card-header {

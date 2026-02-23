@@ -92,7 +92,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 warnings: '警告データ',
                 audit_logs: '監査ログ',
                 quotes: '引用データ',
-                roleboards: 'ロールボード'
+                roleboards: 'ロールボード',
+                tickets: 'チケット'
             };
 
             collectionsOverview.innerHTML = Object.entries(data).map(([name, count]) => `

@@ -495,7 +495,7 @@ router.delete('/roleboards/:id', isAuthenticated, isGuildAdmin, async (req, res)
 router.get('/data-manager/collections', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const guildId = req.session.guildId;
-        const collections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        const collections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards', 'tickets'];
         const result = {};
         for (const collectionName of collections) {
             const collectionRef = collection(db, collectionName);
@@ -515,7 +515,7 @@ router.get('/data-manager/:collection', isAuthenticated, isGuildAdmin, async (re
         const { collection: collectionName } = req.params;
         const guildId = req.session.guildId;
         const { page = 1, limit: pageLimit = 20 } = req.query;
-        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards', 'tickets'];
         if (!validCollections.includes(collectionName)) {
             return res.status(400).json({ error: 'Invalid collection name.' });
         }
@@ -542,7 +542,7 @@ router.delete('/data-manager/:collection/:id', isAuthenticated, isGuildAdmin, as
     try {
         const { collection: collectionName, id } = req.params;
         const guildId = req.session.guildId;
-        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards', 'tickets'];
         if (!validCollections.includes(collectionName)) {
             return res.status(400).json({ error: 'Invalid collection name.' });
         }
@@ -563,7 +563,7 @@ router.delete('/data-manager/:collection', isAuthenticated, isGuildAdmin, async 
     try {
         const { collection: collectionName } = req.params;
         const guildId = req.session.guildId;
-        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards'];
+        const validCollections = ['levels', 'warnings', 'audit_logs', 'quotes', 'roleboards', 'tickets'];
         if (!validCollections.includes(collectionName)) {
             return res.status(400).json({ error: 'Invalid collection name.' });
         }
