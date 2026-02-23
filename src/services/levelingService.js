@@ -23,8 +23,10 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
     * **絶対に絵文字を使用しないでください。**`;
 
         const result = await client.geminiModel.generateContent(prompt);
-        const text = result.response.text().trim().replace(/[\n*「」]/g, '').split('。')[0];
-        return text;
+        const rawText = result.response.text().trim();
+        // 改行、アスタリスク、カギカッコを除去し、最初の文章のみを取得
+        const text = rawText.replace(/[\n*「」]/g, '').split(/[。！？!?. \n]/)[0];
+        return text || `**${user.displayName} が新たな境地へ到達しました！**`;
     } catch (error) {
         console.error(chalk.red('[ERROR] Gemini APIでのコメント生成に失敗:'), error.message);
         return `**${user.displayName} が新たな境地へ到達しました！**`;
