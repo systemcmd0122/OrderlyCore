@@ -180,43 +180,241 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('isDirty reset to false.');
     };
 
-    // --- Page Rendering ---
-    const renderers = {
-        dashboard: async () => {
+    // --- Dashboard Application Module ---
+    const App = {
+        state: {
+            currentPage: 'dashboard',
+            isInitialLoad: true
+        },
+
+        init: async () => {
+            try {
+                guildInfo = await api.get('/api/guild-info');
+                document.getElementById('server-icon').src = guildInfo.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+                document.getElementById('server-name').textContent = guildInfo.name;
+
+                loader.style.display = 'none';
+                dashboardWrapper.style.display = 'flex';
+
+                window.addEventListener('hashchange', App.handleRoute, false);
+                await App.handleRoute();
+
+                App.bindGlobalEvents();
+            } catch (error) {
+                console.error('App init error:', error);
+                loader.innerHTML = `<p class="message error" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
+            }
+        },
+
+        handleRoute: async (event) => {
+            const proceed = async () => {
+                resetDirtyState();
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('is-open');
+                }
+
+                const page = window.location.hash.substring(1) || 'dashboard';
+                App.state.currentPage = page;
+
+                navItems.forEach(item => item.classList.toggle('active', item.dataset.page === page));
+                pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
+
+                if (App.renderers[page]) {
+                    try {
+                        await App.renderers[page]();
+                    } catch (error) {
+                        console.error(`Render error on ${page}:`, error);
+                        pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`;
+                    }
+                } else {
+                    pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページが見つかりません。</p>`;
+                }
+
+                feather.replace();
+                window.scrollTo(0, 0);
+            };
+
+            if (isDirty) {
+                if (event && event.type === 'hashchange') {
+                    event.preventDefault();
+                    const oldHash = event.oldURL.split('#')[1] || 'dashboard';
+                    history.pushState(null, null, `#${oldHash}`);
+                }
+
+                createModal('未保存の変更があります',
+                    '<p>ページを移動すると、保存されていない変更は失われます。本当に移動しますか？</p>',
+                    [
+                        { id: 'cancel-nav', text: 'キャンセル', class: 'btn-secondary' },
+                        { id: 'confirm-nav', text: '移動する', class: 'btn-danger' }
+                    ]
+                );
+                document.getElementById('cancel-nav').onclick = closeModal;
+                document.getElementById('confirm-nav').onclick = () => {
+                    closeModal();
+                    if (event) {
+                        const newHash = new URL(event.newURL).hash;
+                        window.location.hash = newHash;
+                    }
+                    proceed();
+                };
+            } else {
+                proceed();
+            }
+        },
+
+        bindGlobalEvents: () => {
+            logoutBtn.addEventListener('click', () => {
+                createModal('ログアウトの確認',
+                    '<p>本当にログアウトしますか？</p>',
+                    [
+                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
+                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
+                    ]
+                );
+                document.getElementById('cancel-logout').onclick = closeModal;
+                document.getElementById('confirm-logout').onclick = async () => {
+                    try {
+                        isDirty = false;
+                        await api.post('/api/logout');
+                        window.location.href = '/login';
+                    } catch (err) {
+                        showMessage('ログアウトに失敗しました', 'error');
+                    }
+                };
+            });
+
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('is-open');
+            });
+
+            window.addEventListener('beforeunload', (e) => {
+                if (isDirty) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                }
+            });
+        },
+
+        renderers: {
+            dashboard: async () => {
             pageTitle.textContent = 'ダッシュボード';
-            const settings = await api.get('/api/settings/guilds');
+            const [settings, trends] = await Promise.all([
+                api.get('/api/settings/guilds'),
+                api.get('/api/analytics/trends')
+            ]);
+
+            const recentLogs = await api.get('/api/audit-logs?limit=5');
+
             pageContent.innerHTML = `
                 <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-                    <div class="card stat-card">
+                    <div class="card stat-card glass">
                         <div class="stat-icon"><i data-feather="users"></i></div>
                         <div class="stat-info">
                             <div class="stat-label">メンバー数</div>
                             <div class="stat-value">${(guildInfo.memberCount || 0).toLocaleString()}</div>
                         </div>
                     </div>
-                    <div class="card stat-card">
+                    <div class="card stat-card glass">
                         <div class="stat-icon"><i data-feather="cpu"></i></div>
                         <div class="stat-info">
                             <div class="stat-label">ボット数</div>
                             <div class="stat-value">${(guildInfo.botCount || 0).toLocaleString()}</div>
                         </div>
                     </div>
-                    <div class="card stat-card">
+                    <div class="card stat-card glass">
                         <div class="stat-icon"><i data-feather="trending-up"></i></div>
                         <div class="stat-info">
                             <div class="stat-label">総参加者数</div>
                             <div class="stat-value">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
                         </div>
                     </div>
-                    <div class="card stat-card">
+                    <div class="card stat-card glass">
                         <div class="stat-icon"><i data-feather="trending-down"></i></div>
                         <div class="stat-info">
                             <div class="stat-label">総退出者数</div>
                             <div class="stat-value">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
                         </div>
                     </div>
-                </div>`;
+                </div>
+
+                <div class="grid-container" style="grid-template-columns: 2fr 1fr; margin-top: 24px;">
+                    <div class="card glass">
+                        <div class="card-header"><h3>サーバー成長トレンド (直近30日)</h3></div>
+                        <div class="chart-container" style="height: 300px;"><canvas id="trendChart"></canvas></div>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-header"><h3>クイックアクション</h3></div>
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <button class="btn btn-secondary" onclick="window.location.hash='#announcements'"><i data-feather="bell"></i>お知らせ設定</button>
+                            <button class="btn btn-secondary" onclick="window.location.hash='#tickets'"><i data-feather="life-buoy"></i>チケット設定</button>
+                            <button class="btn btn-secondary" onclick="window.location.hash='#commands'"><i data-feather="toggle-left"></i>コマンド管理</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card glass" style="margin-top: 24px;">
+                    <div class="card-header"><h3>最近のアクティビティ</h3></div>
+                    <div class="table-container">
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>日時</th>
+                                    <th>イベント</th>
+                                    <th>ユーザー</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${recentLogs.logs.slice(0, 5).map(log => `
+                                    <tr>
+                                        <td>${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
+                                        <td>${log.eventType}</td>
+                                        <td>${log.executorTag || 'System'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
             feather.replace();
+
+            // Render Trend Chart
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const dates = Object.keys(trends);
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: '参加者',
+                            data: dates.map(d => trends[d].joins),
+                            borderColor: '#00e676',
+                            tension: 0.4,
+                            fill: true,
+                            backgroundColor: 'rgba(0, 230, 118, 0.1)'
+                        },
+                        {
+                            label: '退出者',
+                            data: dates.map(d => trends[d].leaves),
+                            borderColor: '#ff5252',
+                            tension: 0.4,
+                            fill: true,
+                            backgroundColor: 'rgba(255, 82, 82, 0.1)'
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#b4b9d6' } } },
+                    scales: {
+                        x: { ticks: { color: '#b4b9d6' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#b4b9d6' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
         },
 
         // =====【ここから変更】=====
@@ -1002,6 +1200,119 @@ document.addEventListener('DOMContentLoaded', async () => {
             trackChanges('#leveling-form');
         },
 
+        tickets: async () => {
+            pageTitle.textContent = 'チケットシステム設定';
+            const settings = await api.get('/api/settings/tickets');
+
+            pageContent.innerHTML = `
+                <form id="tickets-form">
+                    <div class="card glass">
+                        <div class="card-header"><h3>基本設定</h3></div>
+                        <div class="form-group">
+                            <label>チケットシステムを有効化</label>
+                            <label class="switch"><input type="checkbox" id="ticket-enabled" ${settings.enabled ? 'checked' : ''}><span class="slider"></span></label>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="ticket-category">チケット作成カテゴリ</label>
+                                <select id="ticket-category" placeholder="カテゴリを選択...">
+                                    <option value="">選択しない</option>
+                                    ${guildInfo.channels.filter(c => c.type === 4).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="ticket-role">サポート担当ロール</label>
+                                <select id="ticket-role" placeholder="ロールを選択...">
+                                    <option value="">選択しない</option>
+                                    ${guildInfo.roles.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-header"><h3>メッセージ設定</h3></div>
+                        <div class="form-group">
+                            <label for="ticket-title">チケットパネルのタイトル</label>
+                            <input type="text" id="ticket-title" value="${settings.title || 'お問い合わせ'}">
+                        </div>
+                        <div class="form-group">
+                            <label for="ticket-desc">チケットパネルの説明</label>
+                            <textarea id="ticket-desc" rows="4">${settings.description || '下のボタンをクリックしてチケットを作成してください。'}</textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>
+            `;
+
+            initializeTomSelect('#ticket-category', { items: [settings.categoryId] });
+            initializeTomSelect('#ticket-role', { items: [settings.supportRoleId] });
+
+            document.getElementById('tickets-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const data = {
+                    enabled: document.getElementById('ticket-enabled').checked,
+                    categoryId: document.getElementById('ticket-category').value,
+                    supportRoleId: document.getElementById('ticket-role').value,
+                    title: document.getElementById('ticket-title').value,
+                    description: document.getElementById('ticket-desc').value
+                };
+                await api.post('/api/settings/tickets', data);
+                showMessage('チケット設定を保存しました。');
+                resetDirtyState();
+            };
+            trackChanges('#tickets-form');
+        },
+
+        commands: async () => {
+            pageTitle.textContent = 'コマンド管理';
+            const disabledCommands = await api.get('/api/settings/commands');
+
+            // コマンドリスト (本来はAPIから取得すべきだが、固定でも可)
+            const commands = [
+                { id: 'ping', name: 'Ping', category: 'General' },
+                { id: 'help', name: 'Help', category: 'General' },
+                { id: 'rank', name: 'Rank', category: 'Leveling' },
+                { id: 'profile-card', name: 'Profile Card', category: 'Leveling' },
+                { id: 'warn', name: 'Warn', category: 'Moderation' },
+                { id: 'roleboard', name: 'Roleboard', category: 'Utility' },
+                { id: 'feedback', name: 'Feedback', category: 'Utility' }
+            ];
+
+            pageContent.innerHTML = `
+                <div class="card glass">
+                    <div class="card-header"><h3>コマンドの有効/無効化</h3></div>
+                    <p class="form-hint" style="margin-bottom: 20px;">無効化したコマンドはサーバー内で使用できなくなります。</p>
+                    <div class="command-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+                        ${commands.map(cmd => `
+                            <div class="glass-card" style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 600;">/${cmd.id}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">${cmd.category}</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="command-toggle" data-command="${cmd.id}" ${!disabledCommands.includes(cmd.id) ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button id="save-commands-btn" class="btn" style="margin-top: 32px;">設定を保存</button>
+                </div>
+            `;
+
+            document.getElementById('save-commands-btn').onclick = async () => {
+                const disabled = Array.from(document.querySelectorAll('.command-toggle'))
+                    .filter(i => !i.checked)
+                    .map(i => i.dataset.command);
+
+                await api.post('/api/settings/commands', { disabledCommands: disabled });
+                showMessage('コマンド設定を保存しました。');
+                resetDirtyState();
+            };
+
+            document.querySelectorAll('.command-toggle').forEach(el => el.onchange = () => isDirty = true);
+        },
+
         ai: async () => {
             pageTitle.textContent = 'AI設定';
             const settings = await api.get('/api/settings/guild_settings');
@@ -1089,8 +1400,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
             trackChanges('#ai-form');
-        },
-    };
+        }
+    }
+};
 
     // --- Roleboard Functions ---
     const renderRoleboardList = async () => {
@@ -1459,58 +1771,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // --- Navigation ---
-    const navigate = async (event) => {
-        const proceed = async () => {
-            resetDirtyState();
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('is-open');
-            }
-
-            const page = window.location.hash.substring(1) || 'dashboard';
-            navItems.forEach(item => item.classList.toggle('active', item.dataset.page === page));
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
-
-            if (renderers[page]) {
-                try {
-                    await renderers[page]();
-                } catch (error) {
-                    pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`;
-                }
-            } else {
-                pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページが見つかりません。</p>`;
-            }
-
-            feather.replace();
-        };
-        
-        if (isDirty) {
-             if (event && event.type === 'hashchange') {
-                event.preventDefault();
-                const oldHash = event.oldURL.split('#')[1] || 'dashboard';
-                history.pushState(null, null, `#${oldHash}`);
-            }
-
-            createModal('未保存の変更があります',
-                '<p>ページを移動すると、保存されていない変更は失われます。本当に移動しますか？</p>',
-                [
-                    { id: 'cancel-nav', text: 'キャンセル', class: 'btn-secondary' },
-                    { id: 'confirm-nav', text: '移動する', class: 'btn-danger' }
-                ]
-            );
-            document.getElementById('cancel-nav').onclick = closeModal;
-            document.getElementById('confirm-nav').onclick = () => {
-                closeModal();
-                if (event) {
-                    const newHash = new URL(event.newURL).hash;
-                    window.location.hash = newHash;
-                }
-                proceed();
-            };
-        } else {
-            proceed();
-        }
-    };
 
     // --- Member Actions ---
     const addMemberActionListeners = () => {
@@ -1601,55 +1861,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
 
-    // --- Initialization ---
-    const init = async () => {
-        try {
-            guildInfo = await api.get('/api/guild-info');
-            document.getElementById('server-icon').src = guildInfo.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
-            document.getElementById('server-name').textContent = guildInfo.name;
-
-            loader.style.display = 'none';
-            dashboardWrapper.style.display = 'flex';
-            
-            window.addEventListener('hashchange', navigate, false);
-            await navigate();
-
-            logoutBtn.addEventListener('click', () => {
-                createModal('ログアウトの確認',
-                    '<p>本当にログアウトしますか？</p>',
-                    [
-                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
-                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
-                    ]
-                );
-                document.getElementById('cancel-logout').onclick = closeModal;
-                document.getElementById('confirm-logout').onclick = async () => {
-                    try {
-                        isDirty = false;
-                        await api.post('/api/logout');
-                        window.location.href = '/login';
-                    } catch (err) {
-                        showMessage('ログアウトに失敗しました', 'error');
-                    }
-                };
-            });
-
-            menuToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('is-open');
-            });
-
-            window.addEventListener('beforeunload', (e) => {
-                if (isDirty) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                    return '';
-                }
-            });
-
-        } catch (error) {
-            loader.innerHTML = `<p class="message error" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
-        }
-    };
-
-    init();
+    App.init();
 });

@@ -122,4 +122,95 @@ router.post('/statuses', isAdminAuthenticated, async (req, res) => {
     }
 });
 
+router.get('/maintenance', isAdminAuthenticated, async (req, res) => {
+    try {
+        const docRef = doc(db, 'bot_settings', 'maintenance');
+        const snap = await getDoc(docRef);
+        res.json(snap.exists() ? snap.data() : { enabled: false });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch maintenance status.' });
+    }
+});
+
+router.post('/maintenance', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { enabled, reason } = req.body;
+        const docRef = doc(db, 'bot_settings', 'maintenance');
+        await setDoc(docRef, { enabled, reason, updatedAt: new Date().toISOString() });
+        res.status(200).json({ message: 'Maintenance status updated.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update maintenance status.' });
+    }
+});
+
+router.get('/blacklist', isAdminAuthenticated, async (req, res) => {
+    try {
+        const docRef = doc(db, 'bot_settings', 'blacklist');
+        const snap = await getDoc(docRef);
+        res.json(snap.exists() ? snap.data().users || [] : []);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch blacklist.' });
+    }
+});
+
+router.post('/blacklist', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { userId, action } = req.body; // action: 'add' or 'remove'
+        const docRef = doc(db, 'bot_settings', 'blacklist');
+        const snap = await getDoc(docRef);
+        let users = snap.exists() ? snap.data().users || [] : [];
+
+        if (action === 'add') {
+            if (!users.includes(userId)) users.push(userId);
+        } else {
+            users = users.filter(id => id !== userId);
+        }
+
+        await setDoc(docRef, { users, updatedAt: new Date().toISOString() });
+        res.status(200).json({ message: `User ${action === 'add' ? 'added to' : 'removed from'} blacklist.` });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update blacklist.' });
+    }
+});
+
+router.get('/health/history', isAdminAuthenticated, async (req, res) => {
+    try {
+        // Since we don't have a background task to record history,
+        // we'll return current stats and let the frontend track it.
+        // We could also try to find health logs if we had them.
+        res.json({
+            timestamp: new Date().toISOString(),
+            memory: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
+            ping: client.ws.ping
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch health data.' });
+    }
+});
+
+router.get('/user-search', isAdminAuthenticated, async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+    try {
+        const user = await client.users.fetch(userId).catch(() => null);
+        if (!user) return res.status(404).json({ error: 'User not found in Discord.' });
+
+        const guilds = [];
+        for (const guild of client.guilds.cache.values()) {
+            if (guild.members.cache.has(userId)) {
+                guilds.push({ id: guild.id, name: guild.name });
+            }
+        }
+
+        res.json({
+            id: user.id,
+            tag: user.tag,
+            avatar: user.displayAvatarURL(),
+            guilds: guilds
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to search user.' });
+    }
+});
+
 module.exports = router;

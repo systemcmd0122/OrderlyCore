@@ -87,9 +87,125 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // Page Renderers
-    const renderers = {
-        servers: async () => {
+    // --- Admin Application Module ---
+    const App = {
+        init: async () => {
+            try {
+                const stats = await api.get('/api/admin/stats');
+                statsData = stats;
+
+                botAvatar.src = stats.bot.avatar;
+                botName.textContent = stats.bot.username;
+                guildCount.textContent = stats.guildCount;
+                userCount.textContent = stats.userCount.toLocaleString();
+
+                loader.style.display = 'none';
+                dashboardWrapper.style.display = 'flex';
+
+                App.bindEvents();
+
+                const hash = window.location.hash.slice(1) || 'servers';
+                await App.loadPage(hash);
+            } catch (error) {
+                console.error('App init error:', error);
+                loader.innerHTML = `<p class="error">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/admin-login.html" class="btn" style="margin-top:20px;">ログインページへ</a>`;
+            }
+        },
+
+        loadPage: async (pageName) => {
+            try {
+                navItems.forEach(item => item.classList.remove('active'));
+                const activeItem = document.querySelector(`[data-page="${pageName}"]`);
+                if (activeItem) activeItem.classList.add('active');
+
+                pageContent.innerHTML = '<div class="loader-ring" style="margin: 50px auto;"></div>';
+
+                if (App.renderers[pageName]) {
+                    await App.renderers[pageName]();
+                } else {
+                    pageContent.innerHTML = '<p>ページが見つかりません</p>';
+                }
+                feather.replace();
+            } catch (error) {
+                pageContent.innerHTML = `<div class="card"><p class="error">エラー: ${error.message}</p></div>`;
+            }
+        },
+
+        bindEvents: () => {
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const page = item.dataset.page;
+                    App.loadPage(page);
+                    window.location.hash = page;
+                });
+            });
+
+            logoutBtn.addEventListener('click', async () => {
+                createModal('ログアウトの確認',
+                    '<p>本当にログアウトしますか？</p>',
+                    [
+                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
+                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
+                    ]
+                );
+                document.getElementById('cancel-logout').onclick = closeModal;
+                document.getElementById('confirm-logout').onclick = async () => {
+                    try {
+                        await api.post('/api/admin/logout');
+                        window.location.href = '/admin-login.html';
+                    } catch (err) {
+                        showMessage('ログアウトに失敗しました', 'error');
+                    }
+                };
+            });
+
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('is-open');
+            });
+
+            document.getElementById('global-user-search').addEventListener('keypress', async (e) => {
+                if (e.key === 'Enter') {
+                    const userId = e.target.value.trim();
+                    if (!userId) return;
+                    try {
+                        showMessage(`ユーザーID ${userId} を検索中...`, 'info');
+                        const data = await api.get(`/api/admin/user-search?userId=${userId}`);
+
+                        createModal('ユーザー検索結果', `
+                            <div style="text-align: center; padding: 20px;">
+                                <img src="${data.avatar}" style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 10px;">
+                                <div style="font-size: 1.2rem; font-weight: 600;">${data.tag}</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted-color);">ID: ${data.id}</div>
+                                <p style="margin-top: 15px;">所属サーバー (${data.guilds.length}):</p>
+                                <ul style="list-style: none; padding: 0; margin-top: 5px; max-height: 100px; overflow-y: auto;">
+                                    ${data.guilds.map(g => `<li style="font-size: 0.9rem;">${g.name}</li>`).join('') || 'なし'}
+                                </ul>
+                                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                                    <button class="btn btn-danger btn-small" onclick="App.blacklistUser('${data.id}')">ブラックリストに追加</button>
+                                </div>
+                            </div>
+                        `, [{ id: 'close-search', text: '閉じる', class: 'btn' }]);
+                        document.getElementById('close-search').onclick = closeModal;
+                    } catch (err) {
+                        showMessage('ユーザーが見つかりません。', 'error');
+                    }
+                }
+            });
+        },
+
+        blacklistUser: async (userId) => {
+            try {
+                await api.post('/api/admin/blacklist', { userId, action: 'add' });
+                showMessage(`ユーザー ${userId} をブラックリストに追加しました。`);
+                closeModal();
+            } catch (err) {
+                showMessage('追加に失敗しました', 'error');
+            }
+        },
+
+        renderers: {
+            servers: async () => {
             pageTitle.textContent = 'サーバー管理';
             pageSubtitle.textContent = 'ボットが参加している全サーバーの管理';
 
@@ -471,6 +587,135 @@ document.addEventListener('DOMContentLoaded', async () => {
             feather.replace();
         },
 
+        maintenance: async () => {
+            pageTitle.textContent = 'メンテナンス設定';
+            pageSubtitle.textContent = 'ボット全体のメンテナンスモードを管理';
+
+            const status = await api.get('/api/admin/maintenance');
+
+            pageContent.innerHTML = `
+                <div class="card glass">
+                    <div class="card-header"><h3>メンテナンスモード設定</h3></div>
+                    <div class="form-group">
+                        <label>ステータス</label>
+                        <label class="switch">
+                            <input type="checkbox" id="maintenance-toggle" ${status.enabled ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="maintenance-reason">理由</label>
+                        <textarea id="maintenance-reason" placeholder="メンテナンス中の理由を入力してください">${status.reason || ''}</textarea>
+                    </div>
+                    <button id="save-maintenance" class="btn"><i data-feather="save"></i>保存</button>
+                </div>
+            `;
+
+            document.getElementById('save-maintenance').onclick = async () => {
+                const enabled = document.getElementById('maintenance-toggle').checked;
+                const reason = document.getElementById('maintenance-reason').value;
+                await api.post('/api/admin/maintenance', { enabled, reason });
+                showMessage('メンテナンス設定を更新しました。');
+            };
+        },
+
+        blacklist: async () => {
+            pageTitle.textContent = 'ブラックリスト管理';
+            pageSubtitle.textContent = 'ボットの使用を制限されたユーザー一覧';
+
+            const users = await api.get('/api/admin/blacklist');
+
+            pageContent.innerHTML = `
+                <div class="card glass">
+                    <div class="card-header">
+                        <h3>ブラックリスト (${users.length})</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="add-blacklist-id" placeholder="ユーザーIDを入力..." style="width: 200px;">
+                            <button id="add-blacklist-btn" class="btn btn-small">追加</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="styled-table" style="width: 100%;">
+                            <thead><tr><th>ユーザーID</th><th>アクション</th></tr></thead>
+                            <tbody>
+                                ${users.length ? users.map(id => `
+                                    <tr>
+                                        <td>${id}</td>
+                                        <td><button class="btn btn-danger btn-small" onclick="App.removeBlacklist('${id}')">解除</button></td>
+                                    </tr>
+                                `).join('') : '<tr><td colspan="2" style="text-align:center;">ブラックリストは空です。</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('add-blacklist-btn').onclick = async () => {
+                const userId = document.getElementById('add-blacklist-id').value.trim();
+                if (!userId) return;
+                await api.post('/api/admin/blacklist', { userId, action: 'add' });
+                showMessage('追加しました。');
+                App.loadPage('blacklist');
+            };
+        },
+
+        removeBlacklist: async (userId) => {
+            await api.post('/api/admin/blacklist', { userId, action: 'remove' });
+            showMessage('解除しました。');
+            App.loadPage('blacklist');
+        },
+
+        health: async () => {
+            pageTitle.textContent = 'システム状態';
+            pageSubtitle.textContent = 'ボットの稼働状況とパフォーマンス';
+
+            pageContent.innerHTML = `
+                <div class="grid-container" style="grid-template-columns: 1fr 1fr;">
+                    <div class="card glass">
+                        <div class="card-header"><h3>メモリ使用量 (MB)</h3></div>
+                        <canvas id="memoryChart" style="height: 250px;"></canvas>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-header"><h3>WebSocket Ping (ms)</h3></div>
+                        <canvas id="pingChart" style="height: 250px;"></canvas>
+                    </div>
+                </div>
+            `;
+
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            const pingCtx = document.getElementById('pingChart').getContext('2d');
+
+            const createChart = (ctx, label, color) => new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label, data: [], borderColor: color, tension: 0.4, fill: true, backgroundColor: color + '22' }] },
+                options: { maintainAspectRatio: false, scales: { x: { display: false }, y: { beginAtZero: false } } }
+            });
+
+            const memoryChart = createChart(memoryCtx, 'Memory Usage', '#00e5ff');
+            const pingChart = createChart(pingCtx, 'Ping', '#7c4dff'); // Secondary purple
+
+            const updateHealth = async () => {
+                if (window.location.hash !== '#health') return;
+                try {
+                    const health = await api.get('/api/admin/health/history');
+                    const time = new Date().toLocaleTimeString();
+
+                    [memoryChart, pingChart].forEach((chart, i) => {
+                        chart.data.labels.push(time);
+                        chart.data.datasets[0].data.push(i === 0 ? health.memory : health.ping);
+                        if (chart.data.labels.length > 20) {
+                            chart.data.labels.shift();
+                            chart.data.datasets[0].data.shift();
+                        }
+                        chart.update();
+                    });
+                } catch (e) {}
+            };
+
+            setInterval(updateHealth, 5000);
+            updateHealth();
+        },
+
         analytics: async () => {
             pageTitle.textContent = '統計分析';
             pageSubtitle.textContent = 'ボット使用状況の詳細分析';
@@ -627,82 +872,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             feather.replace();
         }
-    };
+    }
+};
 
-    // Navigation
-    const loadPage = async (pageName) => {
-        try {
-            navItems.forEach(item => item.classList.remove('active'));
-            const activeItem = document.querySelector(`[data-page="${pageName}"]`);
-            if (activeItem) activeItem.classList.add('active');
-
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 50px auto;"></div>';
-
-            if (renderers[pageName]) {
-                await renderers[pageName]();
-            } else {
-                pageContent.innerHTML = '<p>ページが見つかりません</p>';
-            }
-        } catch (error) {
-            pageContent.innerHTML = `<div class="card"><p class="error">エラー: ${error.message}</p></div>`;
-        }
-    };
-
-    // Init
-    const init = async () => {
-        try {
-            const stats = await api.get('/api/admin/stats');
-            statsData = stats;
-
-            botAvatar.src = stats.bot.avatar;
-            botName.textContent = stats.bot.username;
-            guildCount.textContent = stats.guildCount;
-            userCount.textContent = stats.userCount.toLocaleString();
-
-            loader.style.display = 'none';
-            dashboardWrapper.style.display = 'flex';
-
-            // Event listeners
-            navItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const page = item.dataset.page;
-                    loadPage(page);
-                    window.location.hash = page;
-                });
-            });
-
-            logoutBtn.addEventListener('click', async () => {
-                createModal('ログアウトの確認',
-                    '<p>本当にログアウトしますか？</p>',
-                    [
-                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
-                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
-                    ]
-                );
-                document.getElementById('cancel-logout').onclick = closeModal;
-                document.getElementById('confirm-logout').onclick = async () => {
-                    try {
-                        await api.post('/api/admin/logout');
-                        window.location.href = '/admin-login.html';
-                    } catch (err) {
-                        showMessage('ログアウトに失敗しました', 'error');
-                    }
-                };
-            });
-
-            menuToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('is-open');
-            });
-
-            // Load initial page
-            const hash = window.location.hash.slice(1) || 'servers';
-            loadPage(hash);
-
-        } catch (error) {
-            loader.innerHTML = `<p class="error">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/admin-login.html" class="btn" style="margin-top:20px;">ログインページへ</a>`;
-        }
-    };
-
-    init();
+    App.init();
 });

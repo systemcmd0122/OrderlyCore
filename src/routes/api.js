@@ -310,6 +310,81 @@ router.post('/settings/welcome-message', isAuthenticated, isGuildAdmin, async (r
     }
 });
 
+router.get('/settings/commands', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const docSnap = await getDoc(settingsRef);
+        res.json(docSnap.exists() ? (docSnap.data().disabledCommands || []) : []);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch command settings.' });
+    }
+});
+
+router.post('/settings/commands', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        await setDoc(settingsRef, { disabledCommands: req.body.disabledCommands }, { merge: true });
+        res.status(200).json({ message: 'Command settings updated.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update command settings.' });
+    }
+});
+
+router.get('/settings/tickets', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const docSnap = await getDoc(settingsRef);
+        res.json(docSnap.exists() ? (docSnap.data().ticketSystem || {}) : {});
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch ticket settings.' });
+    }
+});
+
+router.post('/settings/tickets', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        await setDoc(settingsRef, { ticketSystem: req.body }, { merge: true });
+        res.status(200).json({ message: 'Ticket settings updated.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update ticket settings.' });
+    }
+});
+
+router.get('/analytics/trends', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const guildId = req.session.guildId;
+        const logsRef = collection(db, 'audit_logs');
+
+        // 直近30日間のデータを取得
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const q = query(
+            logsRef,
+            where('guildId', '==', guildId),
+            where('eventType', 'in', ['MemberJoin', 'MemberLeave']),
+            where('timestamp', '>=', thirtyDaysAgo),
+            orderBy('timestamp', 'asc')
+        );
+
+        const snapshot = await getDocs(q);
+        const trends = {};
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const date = data.timestamp.toDate().toLocaleDateString('ja-JP');
+            if (!trends[date]) trends[date] = { joins: 0, leaves: 0 };
+            if (data.eventType === 'MemberJoin') trends[date].joins++;
+            else trends[date].leaves++;
+        });
+
+        res.json(trends);
+    } catch (error) {
+        console.error('Error fetching trends:', error);
+        res.status(500).json({ error: 'Failed to fetch trend data.' });
+    }
+});
+
 router.get('/settings/:collection', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const { collection: collectionName } = req.params;
