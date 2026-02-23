@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OrderlyCore - ダッシュボード</title>
+    <title>OrderlyCore — ダッシュボード</title>
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
-    <link rel="stylesheet" href="/filter-styles.css">
     <link rel="stylesheet" href="/tom-select-custom.css">
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
@@ -18,52 +19,55 @@
         <p>サーバー情報を読み込み中...</p>
     </div>
 
-    <div class="dashboard-wrapper" style="display: none;">
+    <div class="dashboard-wrapper" style="display:none;">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="logo">[O] OrderlyCore</div>
+                <a href="#dashboard" class="logo">
+                    <i data-feather="cpu" style="width:18px;height:18px;"></i>
+                    OrderlyCore
+                </a>
             </div>
-            
+
             <div class="server-info">
                 <img id="server-icon" src="" alt="Server Icon" class="server-icon">
-                <h2 id="server-name">サーバー名</h2>
+                <h2 id="server-name">読み込み中...</h2>
             </div>
-            
+
             <nav class="sidebar-nav">
-                <div class="nav-category">管理</div>
-                <a href="#dashboard" class="nav-item active" data-page="dashboard"><i data-feather="grid"></i><span>ダッシュボード</span></a>
-                <a href="#members" class="nav-item" data-page="members"><i data-feather="users"></i><span>メンバー管理</span></a>
-                <a href="#auditLog" class="nav-item" data-page="auditLog"><i data-feather="archive"></i><span>監査ログ</span></a>
-                <a href="#analytics" class="nav-item" data-page="analytics"><i data-feather="bar-chart-2"></i><span>アナリティクス</span></a>
+                <div class="nav-category">OVERVIEW</div>
+                <a href="#dashboard"     class="nav-item active" data-page="dashboard"><i data-feather="activity"></i><span>ダッシュボード</span></a>
+                <a href="#members"       class="nav-item" data-page="members"><i data-feather="users"></i><span>メンバー</span></a>
+                <a href="#auditLog"      class="nav-item" data-page="auditLog"><i data-feather="list"></i><span>監査ログ</span></a>
+                <a href="#analytics"     class="nav-item" data-page="analytics"><i data-feather="pie-chart"></i><span>アナリティクス</span></a>
 
-                <div class="nav-category">機能設定</div>
-                <a href="#welcome" class="nav-item" data-page="welcome"><i data-feather="user-plus"></i><span>参加・退出設定</span></a>
-                <a href="#welcome-message" class="nav-item" data-page="welcome-message"><i data-feather="mail"></i><span>ウェルカムメッセージ</span></a>
-                <a href="#roleboard" class="nav-item" data-page="roleboard"><i data-feather="trello"></i><span>ロールボード</span></a>
-                <a href="#automod" class="nav-item" data-page="automod"><i data-feather="shield"></i><span>オートモッド</span></a>
-                <a href="#leveling" class="nav-item" data-page="leveling"><i data-feather="trending-up"></i><span>レベリング</span></a>
-                <a href="#ai" class="nav-item" data-page="ai"><i data-feather="cpu"></i><span>AI設定</span></a>
+                <div class="nav-category">CONFIGURATION</div>
+                <a href="#welcome"        class="nav-item" data-page="welcome"><i data-feather="user-plus"></i><span>参加設定</span></a>
+                <a href="#welcome-message" class="nav-item" data-page="welcome-message"><i data-feather="message-circle"></i><span>歓迎メッセージ</span></a>
+                <a href="#roleboard"      class="nav-item" data-page="roleboard"><i data-feather="grid"></i><span>ロールボード</span></a>
+                <a href="#automod"        class="nav-item" data-page="automod"><i data-feather="shield"></i><span>オートモッド</span></a>
+                <a href="#leveling"       class="nav-item" data-page="leveling"><i data-feather="trending-up"></i><span>レベリング</span></a>
+                <a href="#tickets"        class="nav-item" data-page="tickets"><i data-feather="life-buoy"></i><span>チケット</span></a>
+                <a href="#commands"       class="nav-item" data-page="commands"><i data-feather="settings"></i><span>コマンド</span></a>
+                <a href="#ai"             class="nav-item" data-page="ai"><i data-feather="cpu"></i><span>AI設定</span></a>
 
-                <div class="nav-category">ログ設定</div>
-                <a href="#logging" class="nav-item" data-page="logging"><i data-feather="edit-3"></i><span>サーバーログ設定</span></a>
-                <a href="#vc-log" class="nav-item" data-page="vc-log"><i data-feather="mic"></i><span>VCログ設定</span></a>
-                
-                <div class="nav-category">その他</div>
-                <a href="#announcements" class="nav-item" data-page="announcements"><i data-feather="bell"></i><span>お知らせ設定</span></a>
-                <a href="#autorole" class="nav-item" data-page="autorole"><i data-feather="user-check"></i><span>Bot 自動ロール</span></a>
-                
-                <div class="nav-category">データ管理</div>
-                <a href="/data-manager" class="nav-item"><i data-feather="database"></i><span>データ管理</span></a>
+                <div class="nav-category">LOGGING</div>
+                <a href="#logging"  class="nav-item" data-page="logging"><i data-feather="file-text"></i><span>基本ログ</span></a>
+                <a href="#vc-log"   class="nav-item" data-page="vc-log"><i data-feather="mic"></i><span>VCログ</span></a>
+
+                <div class="nav-category">OTHERS</div>
+                <a href="#announcements" class="nav-item" data-page="announcements"><i data-feather="bell"></i><span>お知らせ</span></a>
+                <a href="#autorole"      class="nav-item" data-page="autorole"><i data-feather="user-check"></i><span>自動ロール</span></a>
+                <a href="/data-manager"  class="nav-item"><i data-feather="database"></i><span>データ管理</span></a>
             </nav>
-            
+
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-secondary">
+                <button id="logout-btn" class="btn btn-secondary" style="width:100%;">
                     <i data-feather="log-out"></i>
                     <span>ログアウト</span>
                 </button>
             </div>
         </aside>
-        
+
         <main class="main-content">
             <header class="main-header">
                 <button id="menu-toggle" class="menu-toggle-btn">
@@ -71,10 +75,9 @@
                 </button>
                 <h1 id="page-title">ダッシュボード</h1>
             </header>
-            
+
             <div id="page-content-wrapper">
-                <div id="page-content" class="page-content">
-                    </div>
+                <div id="page-content" class="page-content"></div>
             </div>
         </main>
     </div>
@@ -83,10 +86,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script src="/client.js"></script>
-    
-    <script>
-        // Initial call to render icons
-        feather.replace();
-    </script>
+    <script>feather.replace();</script>
 </body>
 </html>

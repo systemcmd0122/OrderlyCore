@@ -3,58 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OrderlyCore - Admin Panel</title>
+    <title>OrderlyCore — Admin Panel</title>
+    <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/admin.css">
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="loader" class="loader-container">
         <div class="loader-ring"></div>
-        <p class="glitch" data-text="管理者情報を読み込み中...">管理者情報を読み込み中...</p>
+        <p>管理者情報を読み込み中...</p>
     </div>
 
-    <div class="dashboard-wrapper" style="display: none;">
+    <div class="dashboard-wrapper" style="display:none;">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="logo" data-text="[O] Admin_Panel">[O] Admin_Panel</div>
+                <a href="#servers" class="logo" data-text="[O] Admin_Panel">
+                    <i data-feather="shield" style="width:18px;height:18px;color:var(--violet);"></i>
+                    Admin Panel
+                </a>
             </div>
-            <div class="server-info">
-                <img id="bot-avatar" src="" alt="Bot Avatar" class="server-icon">
+
+            <div class="server-info" style="flex-direction:column;align-items:center;text-align:center;gap:8px;">
+                <img id="bot-avatar" src="" alt="Bot Avatar" class="server-icon" style="width:64px;height:64px;border-radius:50%;">
                 <h2 id="bot-name" class="glitch" data-text="OrderlyCore">OrderlyCore</h2>
                 <div class="bot-stats">
                     <div class="stat-item">
                         <i data-feather="server"></i>
-                        <span id="guild-count">0</span> サーバー
+                        <span id="guild-count">0</span>
+                        <span style="font-size:0.72rem;color:var(--text-muted);">サーバー</span>
                     </div>
                     <div class="stat-item">
                         <i data-feather="users"></i>
-                        <span id="user-count">0</span> ユーザー
+                        <span id="user-count">0</span>
+                        <span style="font-size:0.72rem;color:var(--text-muted);">ユーザー</span>
                     </div>
                 </div>
             </div>
+
             <nav class="sidebar-nav">
                 <div class="nav-category">MANAGEMENT</div>
-                <a href="#servers" class="nav-item active" data-page="servers">
-                    <i data-feather="server"></i><span>サーバー管理</span>
-                </a>
-                <a href="#announcements" class="nav-item" data-page="announcements">
-                    <i data-feather="send"></i><span>お知らせ送信</span>
-                </a>
-                <a href="#status" class="nav-item" data-page="status">
-                    <i data-feather="zap"></i><span>ステータス管理</span>
-                </a>
+                <a href="#servers"       class="nav-item active" data-page="servers"><i data-feather="server"></i><span>サーバー管理</span></a>
+                <a href="#announcements" class="nav-item" data-page="announcements"><i data-feather="send"></i><span>お知らせ送信</span></a>
+                <a href="#status"        class="nav-item" data-page="status"><i data-feather="zap"></i><span>ステータス管理</span></a>
+                <a href="#maintenance"   class="nav-item" data-page="maintenance"><i data-feather="tool"></i><span>メンテナンス設定</span></a>
+                <a href="#blacklist"     class="nav-item" data-page="blacklist"><i data-feather="user-x"></i><span>ブラックリスト</span></a>
+
                 <div class="nav-category">MONITORING</div>
-                <a href="#logs" class="nav-item" data-page="logs">
-                    <i data-feather="file-text"></i><span>システムログ</span>
-                </a>
-                <a href="#analytics" class="nav-item" data-page="analytics">
-                    <i data-feather="bar-chart-2"></i><span>統計分析</span>
-                </a>
+                <a href="#health"     class="nav-item" data-page="health"><i data-feather="activity"></i><span>システム状態</span></a>
+                <a href="#logs"       class="nav-item" data-page="logs"><i data-feather="file-text"></i><span>システムログ</span></a>
+                <a href="#analytics"  class="nav-item" data-page="analytics"><i data-feather="bar-chart-2"></i><span>統計分析</span></a>
             </nav>
+
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-secondary">
+                <button id="logout-btn" class="btn btn-secondary" style="width:100%;">
                     <i data-feather="log-out"></i><span>ログアウト</span>
                 </button>
             </div>
@@ -70,12 +75,14 @@
                     <p id="page-subtitle" class="subtitle"></p>
                 </div>
                 <div class="header-actions">
+                    <input id="global-user-search" type="text" placeholder="ユーザーIDで検索... (Enter)">
                     <div class="status-indicator">
                         <span class="status-dot"></span>
                         <span>オンライン</span>
                     </div>
                 </div>
             </header>
+
             <div id="page-content-wrapper">
                 <div id="page-content" class="page-content"></div>
             </div>
@@ -85,8 +92,6 @@
     <div id="modal-container"></div>
 
     <script src="/admin.js"></script>
-    <script>
-        feather.replace();
-    </script>
+    <script>feather.replace();</script>
 </body>
 </html>

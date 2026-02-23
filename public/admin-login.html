@@ -3,181 +3,266 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OrderlyCore - Admin Login</title>
+    <title>OrderlyCore — Admin Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <style>
+        /* Inline design system for standalone page */
         :root {
-            --primary-color: #00e5ff;
-            --background-color: #0d1117;
-            --surface-color: #161b22;
-            --text-color: #e6edf3;
-            --text-muted-color: #848d97;
-            --border-color: #30363d;
-            --error-color: #f85149;
-            --success-color: #2ea043;
-            --font-mono: 'Share Tech Mono', monospace;
+            --cyan: #00d9f5;
+            --violet: #7c4dff;
+            --bg-void: #070b1a;
+            --bg-deep: #0b1025;
+            --bg-base: #0f1535;
+            --bg-raised: #141c40;
+            --bg-float: #1a2350;
+            --text-primary: #f0f3ff;
+            --text-secondary: #a0a8cc;
+            --text-muted: #5d6490;
+            --border-subtle: rgba(255,255,255,0.04);
+            --border-base: rgba(255,255,255,0.08);
+            --border-strong: rgba(255,255,255,0.14);
+            --success: #00e676;
+            --error: #ff4d6a;
+            --font-sans: 'Inter', 'Noto Sans JP', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --r-xs: 6px; --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
+            --shadow-xl: 0 16px 64px rgba(0,0,0,0.65);
         }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes blink { 50% { opacity: 0; } }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
+            font-family: var(--font-sans);
+            background: var(--bg-void);
+            color: var(--text-primary);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            padding: 20px;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .login-container {
-            width: 100%;
-            max-width: 500px;
-            animation: fadeIn 0.7s ease-out;
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 20% 0%, rgba(124,77,255,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 80% at 85% 90%, rgba(0,217,245,0.08) 0%, transparent 60%);
+            pointer-events: none;
         }
+
+        .login-container { width: 100%; max-width: 460px; position: relative; z-index: 1; }
 
         .terminal {
-            background-color: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: rgba(11, 16, 37, 0.92);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow-xl);
             overflow: hidden;
         }
 
         .terminal-header {
             display: flex;
             align-items: center;
-            padding: 10px 15px;
-            background: var(--surface-color);
-            border-bottom: 1px solid var(--border-color);
+            padding: 14px 18px;
+            background: var(--bg-raised);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .dot-red { background: #ff5f57; }
+        .dot-yellow { background: #febc2e; }
+        .dot-green { background: #28c840; }
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            letter-spacing: 0.06em;
         }
 
-        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
-        .dot-red { background: #ff5f56; }
-        .dot-yellow { background: #ffbd2e; }
-        .dot-green { background: #27c93f; }
-        .terminal-title { flex-grow: 1; text-align: center; color: var(--text-muted-color); font-family: var(--font-mono); }
-
-        .terminal-body { padding: 30px; }
+        .terminal-body { padding: 36px 32px 32px; }
 
         .login-title {
+            font-size: 1.6rem;
+            font-weight: 700;
             font-family: var(--font-mono);
-            font-size: 2rem;
-            color: var(--primary-color);
-            text-shadow: 0 0 8px var(--primary-color);
-            margin-bottom: 10px;
+            color: var(--cyan);
+            text-shadow: 0 0 20px rgba(0,217,245,0.4);
+            margin-bottom: 8px;
             text-align: center;
+        }
+
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(124,77,255,0.12);
+            border: 1px solid rgba(124,77,255,0.25);
+            border-radius: 100px;
+            padding: 3px 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #a07aff;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin: 0 auto 16px;
+            display: flex;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .login-description {
-            color: var(--text-muted-color);
+            color: var(--text-secondary);
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 28px;
+            font-size: 0.88rem;
+            line-height: 1.6;
         }
 
-        .form-group { margin-bottom: 25px; }
-        .prompt { color: var(--primary-color); font-family: var(--font-mono); }
-        .prompt:after { content: ' _'; animation: blink 1.2s infinite steps(1); }
+        .form-group { margin-bottom: 22px; }
+        .prompt {
+            display: block;
+            color: var(--cyan);
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            margin-bottom: 10px;
+        }
+        .prompt::after { content: ' _'; animation: blink 1.2s steps(1) infinite; }
 
         .input-with-icon { position: relative; }
-        .input-with-icon i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted-color); }
-        
-        input[type="password"] {
-            width: 100%;
-            padding: 12px 12px 12px 45px;
-            background-color: #010409;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-color);
-            font-size: 1em;
-            font-family: var(--font-mono);
-            transition: all 0.3s;
+        .input-with-icon i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
         }
 
+        input[type="password"] {
+            width: 100%;
+            padding: 11px 14px 11px 44px;
+            background: var(--bg-raised);
+            border: 1px solid var(--border-base);
+            border-radius: var(--r-sm);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: var(--font-mono);
+            transition: all 0.15s ease;
+            appearance: none;
+        }
         input[type="password"]:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 3px rgba(0,217,245,0.12);
+            background: var(--bg-float);
         }
+        input[type="password"]::placeholder { color: var(--text-muted); font-size: 0.87rem; }
 
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            padding: 12px;
+            padding: 13px;
             width: 100%;
-            background-color: var(--primary-color);
-            color: var(--background-color);
-            border: 1px solid var(--primary-color);
-            border-radius: 6px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            font-family: var(--font-mono);
+            background: linear-gradient(135deg, rgba(0,217,245,0.9), rgba(124,77,255,0.9));
+            border: none;
+            border-radius: var(--r-sm);
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: var(--font-sans);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.15s ease;
+            min-height: 48px;
+            position: relative;
+            overflow: hidden;
         }
-
-        .btn:hover:not(:disabled) {
-            background-color: transparent;
-            color: var(--primary-color);
-            box-shadow: 0 0 10px var(--primary-color);
+        .btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.1);
+            opacity: 0;
+            transition: opacity 0.12s;
         }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn:hover:not(:disabled)::after { opacity: 1; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .loader-ring-small {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--background-color);
-            border-top-color: transparent;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
         }
 
-        #message-container { margin-top: 20px; text-align: center; min-height: 20px; font-weight: bold; }
-        #message.success { color: var(--success-color); }
-        #message.error { color: var(--error-color); }
+        #message-container { margin-top: 18px; text-align: center; min-height: 22px; }
+        #message { font-weight: 600; font-size: 0.87rem; }
+        #message.success { color: var(--success); }
+        #message.error   { color: var(--error); }
 
-        .back-to-home { display: inline-flex; align-items: center; gap: 8px; text-align: center; margin-top: 20px; color: var(--text-muted-color); text-decoration: none; transition: color 0.3s ease; width: 100%; justify-content: center; }
-        .back-to-home:hover { color: var(--primary-color); }
+        .back-to-home {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .back-to-home:hover { color: var(--cyan); transform: translateX(-2px); }
+        .back-to-home i { width: 15px; height: 15px; }
     </style>
 </head>
-<body class="login-page-body">
-
+<body>
     <div class="login-container">
         <div class="terminal">
             <div class="terminal-header">
                 <div class="terminal-dot dot-red"></div>
                 <div class="terminal-dot dot-yellow"></div>
                 <div class="terminal-dot dot-green"></div>
-                <div class="terminal-title">OrderlyCore-admin-auth</div>
+                <div class="terminal-title">OrderlyCore — admin-auth</div>
             </div>
             <div class="terminal-body">
-                <h1 class="login-title">[O] OrderlyCore Admin Panel</h1>
+                <h1 class="login-title">[O] Admin Panel</h1>
+                <div class="admin-badge">
+                    <i data-feather="shield" style="width:10px;height:10px;"></i>
+                    RESTRICTED ACCESS
+                </div>
                 <p class="login-description">管理者パスワードを入力して認証してください。</p>
+
                 <form id="login-form">
                     <div class="form-group">
                         <label for="password" class="prompt">admin@OrderlyCore:~$ sudo login</label>
                         <div class="input-with-icon">
                             <i data-feather="lock"></i>
-                            <input type="password" id="password" name="password" required placeholder="[Password]" autocomplete="current-password">
+                            <input type="password" id="password" name="password" required placeholder="管理者パスワード" autocomplete="current-password">
                         </div>
                     </div>
-                    <button type="submit" class="btn login-btn" id="submit-btn">
+                    <button type="submit" class="btn" id="submit-btn">
                         <span class="btn-text">Authenticate</span>
-                        <div class="loader-ring-small" style="display: none;"></div>
+                        <div class="loader-ring-small" style="display:none;"></div>
                     </button>
                 </form>
-                <div id="message-container">
+                <div id="message-container" style="display:none;">
                     <p id="message"></p>
                 </div>
             </div>
@@ -189,62 +274,55 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            feather.replace();
+    document.addEventListener('DOMContentLoaded', () => {
+        feather.replace();
 
-            const form = document.getElementById('login-form');
-            const passwordInput = document.getElementById('password');
-            const messageEl = document.getElementById('message');
-            const messageContainer = document.getElementById('message-container');
-            const submitBtn = document.getElementById('submit-btn');
-            const btnText = submitBtn.querySelector('.btn-text');
-            const btnLoader = submitBtn.querySelector('.loader-ring-small');
+        const form       = document.getElementById('login-form');
+        const passwordEl = document.getElementById('password');
+        const messageEl  = document.getElementById('message');
+        const msgWrap    = document.getElementById('message-container');
+        const submitBtn  = document.getElementById('submit-btn');
+        const btnText    = submitBtn.querySelector('.btn-text');
+        const btnLoader  = submitBtn.querySelector('.loader-ring-small');
 
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const password = passwordInput.value;
+        const showMsg = (text, type) => {
+            msgWrap.style.display = 'block';
+            messageEl.textContent = text;
+            messageEl.className = type;
+        };
 
-                if (!password) {
-                    showMessage('パスワードを入力してください。', 'error');
-                    return;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = passwordEl.value;
+            if (!password) { showMsg('パスワードを入力してください。', 'error'); return; }
+
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'block';
+            msgWrap.style.display = 'none';
+
+            try {
+                const res  = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    showMsg('認証成功！管理パネルに移動します...', 'success');
+                    setTimeout(() => { window.location.href = '/admin.html'; }, 1400);
+                } else {
+                    throw new Error(data.error || '不明なエラー');
                 }
-
-                submitBtn.disabled = true;
-                btnText.style.display = 'none';
-                btnLoader.style.display = 'block';
-                messageContainer.style.display = 'none';
-
-                try {
-                    const response = await fetch('/api/admin/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ password })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        showMessage('認証成功！管理パネルに移動します...', 'success');
-                        setTimeout(() => {
-                             window.location.href = '/admin.html';
-                        }, 1500);
-                    } else {
-                        throw new Error(data.error || '不明なエラー');
-                    }
-                } catch (error) {
-                    showMessage(`エラー: ${error.message}`, 'error');
-                    submitBtn.disabled = false;
-                    btnText.style.display = 'inline';
-                    btnLoader.style.display = 'none';
-                }
-            });
-
-            const showMessage = (text, type) => {
-                messageContainer.style.display = 'block';
-                messageEl.textContent = text;
-                messageEl.className = type;
-            };
+            } catch (err) {
+                showMsg(`エラー: ${err.message}`, 'error');
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
         });
+    });
     </script>
 </body>
 </html>

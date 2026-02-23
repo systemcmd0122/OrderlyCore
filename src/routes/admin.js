@@ -14,13 +14,28 @@ router.get('/stats', isAdminAuthenticated, async (_req, res) => {
         const hours = Math.floor((uptimeSeconds % 86400) / 3600);
         const minutes = Math.floor((uptimeSeconds % 3600) / 60);
 
-        const recentGuilds = client.guilds.cache.sort((a, b) => b.joinedTimestamp - a.joinedTimestamp).first(5);
+        const recentGuilds = client.guilds.cache
+            .sort((a, b) => b.joinedTimestamp - a.joinedTimestamp)
+            .first(5);
+
+        // トップサーバー（メンバー数上位10）
+        const topGuilds = client.guilds.cache
+            .sort((a, b) => b.memberCount - a.memberCount)
+            .first(10)
+            .map(g => ({
+                id: g.id,
+                name: g.name,
+                memberCount: g.memberCount,
+                joinedTimestamp: g.joinedTimestamp,
+                icon: g.iconURL()
+            }));
 
         res.json({
             guildCount: client.guilds.cache.size,
             userCount: client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0),
             uptime: `${days}d ${hours}h ${minutes}m`,
             memoryUsage: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
+            ping: client.ws.ping,
             bot: {
                 username: client.user.username,
                 avatar: client.user.displayAvatarURL(),
@@ -30,11 +45,94 @@ router.get('/stats', isAdminAuthenticated, async (_req, res) => {
                 name: g.name,
                 memberCount: g.memberCount,
                 joinedTimestamp: g.joinedTimestamp
-            }))
+            })),
+            topGuilds
         });
     } catch (error) {
         console.error("Error fetching admin stats:", error);
         res.status(500).json({ error: 'Failed to fetch bot statistics.' });
+    }
+});
+
+// ─── サーバー一覧エンドポイント（新規追加） ───────────────────────
+router.get('/guilds', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { page = 1, limit: pageLimit = 20, search = '' } = req.query;
+        const parsedPage  = Math.max(1, parseInt(page));
+        const parsedLimit = Math.min(100, Math.max(1, parseInt(pageLimit)));
+
+        let guilds = Array.from(client.guilds.cache.values()).map(g => ({
+            id:              g.id,
+            name:            g.name,
+            memberCount:     g.memberCount,
+            joinedTimestamp: g.joinedTimestamp,
+            icon:            g.iconURL({ size: 64 }) || null,
+            ownerId:         g.ownerId
+        }));
+
+        // 検索フィルタ
+        if (search) {
+            const lc = search.toLowerCase();
+            guilds = guilds.filter(g =>
+                g.name.toLowerCase().includes(lc) ||
+                g.id.includes(lc)
+            );
+        }
+
+        // メンバー数順でソート
+        guilds.sort((a, b) => b.memberCount - a.memberCount);
+
+        const totalGuilds = guilds.length;
+        const totalPages  = Math.max(1, Math.ceil(totalGuilds / parsedLimit));
+        const startIndex  = (parsedPage - 1) * parsedLimit;
+        const paginatedGuilds = guilds.slice(startIndex, startIndex + parsedLimit);
+
+        res.json({
+            guilds: paginatedGuilds,
+            totalGuilds,
+            totalPages,
+            currentPage: parsedPage
+        });
+    } catch (error) {
+        console.error("Error fetching guild list:", error);
+        res.status(500).json({ error: 'Failed to fetch guild list.' });
+    }
+});
+
+// ─── 特定サーバー情報 ────────────────────────────────────────────
+router.get('/guilds/:guildId', isAdminAuthenticated, async (req, res) => {
+    try {
+        const guild = await client.guilds.fetch(req.params.guildId).catch(() => null);
+        if (!guild) return res.status(404).json({ error: 'Guild not found.' });
+
+        res.json({
+            id:              guild.id,
+            name:            guild.name,
+            memberCount:     guild.memberCount,
+            joinedTimestamp: guild.joinedTimestamp,
+            icon:            guild.iconURL({ size: 128 }) || null,
+            ownerId:         guild.ownerId,
+            description:     guild.description || null,
+            premiumTier:     guild.premiumTier,
+            channels:        guild.channels.cache.size,
+            roles:           guild.roles.cache.size
+        });
+    } catch (error) {
+        console.error("Error fetching guild:", error);
+        res.status(500).json({ error: 'Failed to fetch guild.' });
+    }
+});
+
+// ─── サーバーからボットを退出させる ─────────────────────────────
+router.post('/guilds/:guildId/leave', isAdminAuthenticated, async (req, res) => {
+    try {
+        const guild = client.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ error: 'Guild not found.' });
+        await guild.leave();
+        res.status(200).json({ message: `Left guild: ${guild.name}` });
+    } catch (error) {
+        console.error("Error leaving guild:", error);
+        res.status(500).json({ error: 'Failed to leave guild.' });
     }
 });
 
@@ -119,6 +217,94 @@ router.post('/statuses', isAdminAuthenticated, async (req, res) => {
     } catch (error) {
         console.error("Error updating statuses:", error);
         res.status(500).json({ error: 'Failed to update statuses.' });
+    }
+});
+
+router.get('/maintenance', isAdminAuthenticated, async (req, res) => {
+    try {
+        const docRef = doc(db, 'bot_settings', 'maintenance');
+        const snap = await getDoc(docRef);
+        res.json(snap.exists() ? snap.data() : { enabled: false });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch maintenance status.' });
+    }
+});
+
+router.post('/maintenance', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { enabled, reason } = req.body;
+        const docRef = doc(db, 'bot_settings', 'maintenance');
+        await setDoc(docRef, { enabled, reason, updatedAt: new Date().toISOString() });
+        res.status(200).json({ message: 'Maintenance status updated.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update maintenance status.' });
+    }
+});
+
+router.get('/blacklist', isAdminAuthenticated, async (req, res) => {
+    try {
+        const docRef = doc(db, 'bot_settings', 'blacklist');
+        const snap = await getDoc(docRef);
+        res.json(snap.exists() ? snap.data().users || [] : []);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch blacklist.' });
+    }
+});
+
+router.post('/blacklist', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { userId, action } = req.body; // action: 'add' or 'remove'
+        const docRef = doc(db, 'bot_settings', 'blacklist');
+        const snap = await getDoc(docRef);
+        let users = snap.exists() ? snap.data().users || [] : [];
+
+        if (action === 'add') {
+            if (!users.includes(userId)) users.push(userId);
+        } else {
+            users = users.filter(id => id !== userId);
+        }
+
+        await setDoc(docRef, { users, updatedAt: new Date().toISOString() });
+        res.status(200).json({ message: `User ${action === 'add' ? 'added to' : 'removed from'} blacklist.` });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update blacklist.' });
+    }
+});
+
+router.get('/health/history', isAdminAuthenticated, async (req, res) => {
+    try {
+        res.json({
+            timestamp: new Date().toISOString(),
+            memory: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
+            ping: client.ws.ping
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch health data.' });
+    }
+});
+
+router.get('/user-search', isAdminAuthenticated, async (req, res) => {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+    try {
+        const user = await client.users.fetch(userId).catch(() => null);
+        if (!user) return res.status(404).json({ error: 'User not found in Discord.' });
+
+        const guilds = [];
+        for (const guild of client.guilds.cache.values()) {
+            if (guild.members.cache.has(userId)) {
+                guilds.push({ id: guild.id, name: guild.name });
+            }
+        }
+
+        res.json({
+            id: user.id,
+            tag: user.tag,
+            avatar: user.displayAvatarURL(),
+            guilds: guilds
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to search user.' });
     }
 });
 

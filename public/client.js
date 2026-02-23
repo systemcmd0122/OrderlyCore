@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
             el.classList.remove('show');
             setTimeout(() => el.remove(), 300);
-        }, 3000);
+        }, 3200);
     };
 
     // Modal creation function
@@ -180,82 +180,314 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('isDirty reset to false.');
     };
 
-    // --- Page Rendering ---
-    const renderers = {
-        dashboard: async () => {
+    // --- Dashboard Application Module ---
+    const escapeHTML = (str) => {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
+    const App = {
+        state: {
+            currentPage: 'dashboard',
+            isInitialLoad: true
+        },
+
+        init: async () => {
+            try {
+                guildInfo = await api.get('/api/guild-info');
+                document.getElementById('server-icon').src = guildInfo.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+                document.getElementById('server-name').textContent = guildInfo.name;
+
+                loader.style.display = 'none';
+                dashboardWrapper.style.display = 'flex';
+                
+                window.addEventListener('hashchange', App.handleRoute, false);
+                await App.handleRoute();
+
+                App.bindGlobalEvents();
+            } catch (error) {
+                console.error('App init error:', error);
+                loader.innerHTML = `<p class="message error" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
+            }
+        },
+
+        handleRoute: async (event) => {
+            const proceed = async () => {
+                resetDirtyState();
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('is-open');
+                }
+
+                const page = window.location.hash.substring(1) || 'dashboard';
+                App.state.currentPage = page;
+                
+                navItems.forEach(item => item.classList.toggle('active', item.dataset.page === page));
+                pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
+
+                if (App.renderers[page]) {
+                    try {
+                        await App.renderers[page]();
+                    } catch (error) {
+                        console.error(`Render error on ${page}:`, error);
+                        pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`;
+                    }
+                } else {
+                    pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページが見つかりません。</p>`;
+                }
+
+                feather.replace();
+                window.scrollTo(0, 0);
+            };
+
+            if (isDirty) {
+                if (event && event.type === 'hashchange') {
+                    event.preventDefault();
+                    const oldHash = event.oldURL.split('#')[1] || 'dashboard';
+                    history.pushState(null, null, `#${oldHash}`);
+                }
+
+                createModal('未保存の変更があります',
+                    '<p>ページを移動すると、保存されていない変更は失われます。本当に移動しますか？</p>',
+                    [
+                        { id: 'cancel-nav', text: 'キャンセル', class: 'btn-secondary' },
+                        { id: 'confirm-nav', text: '移動する', class: 'btn-danger' }
+                    ]
+                );
+                document.getElementById('cancel-nav').onclick = closeModal;
+                document.getElementById('confirm-nav').onclick = () => {
+                    closeModal();
+                    if (event) {
+                        const newHash = new URL(event.newURL).hash;
+                        window.location.hash = newHash;
+                    }
+                    proceed();
+                };
+            } else {
+                proceed();
+            }
+        },
+
+        bindGlobalEvents: () => {
+            logoutBtn.addEventListener('click', () => {
+                createModal('ログアウトの確認',
+                    '<p>本当にログアウトしますか？</p>',
+                    [
+                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
+                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
+                    ]
+                );
+                document.getElementById('cancel-logout').onclick = closeModal;
+                document.getElementById('confirm-logout').onclick = async () => {
+                    try {
+                        isDirty = false;
+                        await api.post('/api/logout');
+                        window.location.href = '/login';
+                    } catch (err) {
+                        showMessage('ログアウトに失敗しました', 'error');
+                    }
+                };
+            });
+
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('is-open');
+            });
+
+            window.addEventListener('beforeunload', (e) => {
+                if (isDirty) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                }
+            });
+        },
+
+        renderers: {
+            dashboard: async () => {
             pageTitle.textContent = 'ダッシュボード';
-            const settings = await api.get('/api/settings/guilds');
+            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
+            const [settings, trends] = await Promise.all([
+                api.get('/api/settings/guilds'),
+                api.get('/api/analytics/trends')
+            ]);
+            
+            const recentLogs = await api.get('/api/audit-logs?limit=5');
+
             pageContent.innerHTML = `
-                <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-                    <div class="card stat-card">
+                <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="stat-card">
                         <div class="stat-icon"><i data-feather="users"></i></div>
                         <div class="stat-info">
-                            <div class="stat-label">メンバー数</div>
-                            <div class="stat-value">${(guildInfo.memberCount || 0).toLocaleString()}</div>
+                            <div class="stat-value text-primary">${(guildInfo.memberCount || 0).toLocaleString()}</div>
+                            <div class="stat-label">メンバー</div>
                         </div>
                     </div>
-                    <div class="card stat-card">
-                        <div class="stat-icon"><i data-feather="cpu"></i></div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:rgba(124,77,255,0.1);color:var(--violet);"><i data-feather="cpu"></i></div>
                         <div class="stat-info">
-                            <div class="stat-label">ボット数</div>
-                            <div class="stat-value">${(guildInfo.botCount || 0).toLocaleString()}</div>
+                            <div class="stat-value text-secondary">${(guildInfo.botCount || 0).toLocaleString()}</div>
+                            <div class="stat-label">ボット</div>
                         </div>
                     </div>
-                    <div class="card stat-card">
-                        <div class="stat-icon"><i data-feather="trending-up"></i></div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:rgba(0,230,118,0.1);color:var(--success);"><i data-feather="user-plus"></i></div>
                         <div class="stat-info">
-                            <div class="stat-label">総参加者数</div>
-                            <div class="stat-value">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
+                            <div class="stat-value text-success">${(settings.statistics?.totalJoins || 0).toLocaleString()}</div>
+                            <div class="stat-label">合計参加数</div>
                         </div>
                     </div>
-                    <div class="card stat-card">
-                        <div class="stat-icon"><i data-feather="trending-down"></i></div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:rgba(255,77,106,0.1);color:var(--error);"><i data-feather="user-minus"></i></div>
                         <div class="stat-info">
-                            <div class="stat-label">総退出者数</div>
-                            <div class="stat-value">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
+                            <div class="stat-value text-danger">${(settings.statistics?.totalLeaves || 0).toLocaleString()}</div>
+                            <div class="stat-label">合計退出数</div>
                         </div>
                     </div>
-                </div>`;
+                </div>
+
+                <div class="grid-container" style="grid-template-columns: 2fr 1fr; margin-top: 24px; gap: 24px;">
+                    <div class="card glass no-border shadow-md">
+                        <div class="card-header"><h3>サーバー成長トレンド</h3></div>
+                        <div style="height: 300px; position: relative; padding: 10px;">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card glass no-border shadow-md">
+                        <div class="card-header"><h3>クイックメニュー</h3></div>
+                        <div style="display: flex; flex-direction: column; gap: 12px; padding: 5px;">
+                            <a href="#announcements" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="bell" style="width:16px;"></i> お知らせ設定</a>
+                            <a href="#tickets" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="life-buoy" style="width:16px;"></i> チケット管理</a>
+                            <a href="#commands" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="settings" style="width:16px;"></i> コマンド設定</a>
+                            <a href="#members" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="users" style="width:16px;"></i> メンバーリスト</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card glass no-border shadow-md" style="margin-top: 24px;">
+                    <div class="card-header"><h3>最新の監査ログ</h3></div>
+                    <div class="table-container" style="background: transparent; border: none;">
+                        <table class="styled-table">
+                            <thead>
+                                <tr style="background: rgba(0,0,0,0.1);">
+                                    <th>日時</th>
+                                    <th>アクション</th>
+                                    <th>ユーザー</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${recentLogs.logs.slice(0, 5).map(log => `
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                                        <td style="color: var(--text-secondary); font-size: 0.9em;">${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
+                                        <td style="font-weight: 500;">${escapeHTML(log.eventType)}</td>
+                                        <td style="color: var(--primary-light);">${escapeHTML(log.executorTag || 'System')}</td>
+                                    </tr>
+                                `).join('') || '<tr><td colspan="3" style="text-align:center;">表示可能なログはありません。</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
             feather.replace();
+
+            // Render Trend Chart
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const dates = Object.keys(trends);
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: '参加者',
+                            data: dates.map(d => trends[d].joins),
+                            borderColor: '#00e676',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#00e676',
+                            tension: 0.4,
+                            fill: true,
+                            backgroundColor: 'rgba(0, 230, 118, 0.06)'
+                        },
+                        {
+                            label: '退出者',
+                            data: dates.map(d => trends[d].leaves),
+                            borderColor: '#ff4d6a',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#ff4d6a',
+                            tension: 0.4,
+                            fill: true,
+                            backgroundColor: 'rgba(255, 77, 106, 0.06)'
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { 
+                        legend: { 
+                            display: true,
+                            position: 'top',
+                            labels: { color: 'rgba(160,168,204,0.85)', boxWidth: 10, usePointStyle: true, font: { size: 11 } }
+                        } 
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: 'rgba(93,100,144,0.9)', maxRotation: 0, font: { size: 10 } },
+                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }
+                        },
+                        y: { 
+                            ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 10 } }, 
+                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
         },
 
         // =====【ここから変更】=====
         members: async () => {
             pageTitle.textContent = 'メンバー管理';
             pageContent.innerHTML = `
-                <div class="card">
-                    <div class="card-header"><h3>メンバー一覧</h3></div>
-                    <div class="filter-bar">
+                <div class="card glass no-border shadow-md">
+                    <div class="card-header"><h3>サーバーメンバー</h3></div>
+                    <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
                         <div class="form-group">
-                             <label for="member-search">ユーザー検索</label>
-                            <input type="text" id="member-search" placeholder="名前で検索...">
+                             <label for="member-search">検索</label>
+                            <input type="text" id="member-search" placeholder="名前やユーザーID...">
                         </div>
                         <div class="form-group">
-                             <label for="role-filter">ロールで絞り込み</label>
-                            <select id="role-filter" placeholder="ロールを選択...">
+                             <label for="role-filter">ロール絞り込み</label>
+                            <select id="role-filter" placeholder="すべてのロール">
                                 <option value="">すべてのロール</option>
                                 ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
                             </select>
                         </div>
                     </div>
-                    <div class="table-container">
+                    <div class="table-container" style="background: transparent; border: none;">
                         <table class="styled-table">
                             <thead>
-                                <tr>
+                                <tr style="background: rgba(0,0,0,0.1);">
                                     <th data-sort="displayName">ユーザー <span class="sort-indicator"></span></th>
                                     <th>ロール</th>
                                     <th data-sort="joinedAt">参加日 <span class="sort-indicator"></span></th>
                                     <th data-sort="messageCount">統計 <span class="sort-indicator"></span></th>
-                                    <th>アクション</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="members-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="pagination-controls">
-                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                    <div class="pagination-controls glass" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前</button>
                         <span id="page-info" class="page-info"></span>
-                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
                     </div>
                 </div>`;
             initializeTomSelect('#role-filter');
@@ -281,12 +513,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="user-cell">
                                     <img src="${member.avatar}" alt="avatar">
                                     <div class="user-details">
-                                        <span class="display-name">${member.displayName}</span>
-                                        <span class="username">${member.username}</span>
+                                        <span class="display-name">${escapeHTML(member.displayName)}</span>
+                                        <span class="username">${escapeHTML(member.username)}</span>
                                     </div>
                                 </div>
                             </td>
-                            <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${r.name}</span>`).join('')}</td>
+                            <td>${member.roles.map(r => `<span class="role-tag" style="border-left: 3px solid ${r.color};">${escapeHTML(r.name)}</span>`).join('')}</td>
                             <td>${new Date(member.joinedAt).toLocaleDateString()}</td>
                             <td>
                                 <div><i data-feather="message-square" style="width:1em;height:1em;"></i> ${member.messageCount.toLocaleString()}</div>
@@ -354,11 +586,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
 
             pageContent.innerHTML = `
-                <div class="card">
-                    <div class="card-header"><h3>監査ログビューア</h3></div>
-                     <div class="filter-bar">
+                <div class="card glass no-border shadow-md">
+                    <div class="card-header"><h3>操作履歴</h3></div>
+                     <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
                          <div class="form-group">
-                            <input type="text" id="log-user-search" placeholder="ユーザー名/タグで検索...">
+                            <input type="text" id="log-user-search" placeholder="ユーザー名やタグ...">
                         </div>
                         <div class="form-group">
                             <select id="log-type-filter">
@@ -371,10 +603,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </div>
                     </div>
-                     <div class="table-container">
+                     <div class="table-container" style="background: transparent; border: none;">
                         <table class="styled-table">
                             <thead>
-                                <tr>
+                                <tr style="background: rgba(0,0,0,0.1);">
                                     <th>日時</th>
                                     <th>アクション</th>
                                     <th>実行者</th>
@@ -385,10 +617,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <tbody id="logs-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="pagination-controls">
-                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前へ</button>
+                    <div class="pagination-controls glass" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
+                        <button id="prev-page" class="btn btn-secondary btn-small" disabled>前</button>
                         <span id="page-info" class="page-info"></span>
-                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次へ</button>
+                        <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
                     </div>
                 </div>`;
             initializeTomSelect('#log-type-filter');
@@ -474,12 +706,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     datasets: [{
                         label: 'メッセージ数',
                         data: data.activityByHour,
-                        backgroundColor: 'rgba(0, 229, 255, 0.6)',
-                        borderColor: 'rgba(0, 229, 255, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(0, 217, 245, 0.45)',
+                        borderColor: '#00d9f5',
+                        borderWidth: 1,
+                        borderRadius: 3
                     }]
                 },
-                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                options: { maintainAspectRatio: false, scales: {
+                    y: { beginAtZero: true, ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false } },
+                    x: { ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 9 } }, grid: { display: false } }
+                }, plugins: { legend: { display: false } } }
             });
 
             // Role Chart
@@ -492,10 +728,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         label: 'メンバー数',
                         data: data.roleDistribution.map(r => r.count),
                         backgroundColor: data.roleDistribution.map(r => r.color),
-                        borderWidth: 1
+                        borderWidth: 2,
+                        borderColor: 'rgba(7,11,26,0.8)'
                     }]
                 },
-                options: { maintainAspectRatio: false }
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'rgba(160,168,204,0.85)', font: { size: 10 }, boxWidth: 10 } } } }
             });
         },
         // =====【ここまで変更】=====
@@ -503,7 +740,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         roleboard: async () => {
             pageTitle.textContent = 'ロールボード管理';
             pageContent.innerHTML = `
-                <div class="card">
+                <div class="card glass">
                     <div class="card-header">
                         <h3>ロールボード一覧</h3>
                         <button id="add-roleboard-btn" class="btn">新規作成</button>
@@ -521,7 +758,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="announcements-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header">
                             <h3>ボットからのお知らせ受信</h3>
                         </div>
@@ -554,7 +791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="welcome-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>チャンネル設定</h3></div>
                         <div class="form-grid">
                             <div class="form-group">
@@ -580,7 +817,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>機能設定</h3></div>
                         <div class="form-group">
                             <label for="welcomeRoleId">ウェルカムロール</label>
@@ -589,19 +826,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 ${createSelectOptions(guildInfo.roles)}
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>ウェルカム時メンション</label>
-                            <label class="switch">
-                                <input type="checkbox" id="mentionOnWelcome" ${settings.mentionOnWelcome ? 'checked' : ''}>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>退出時DM送信</label>
-                            <label class="switch">
-                                <input type="checkbox" id="sendGoodbyeDM" ${settings.sendGoodbyeDM !== false ? 'checked' : ''}>
-                                <span class="slider"></span>
-                            </label>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>参加時メンション</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="mentionOnWelcome" ${settings.mentionOnWelcome ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>退出時DM送信</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="sendGoodbyeDM" ${settings.sendGoodbyeDM !== false ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
@@ -748,7 +987,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             settingsCache['guild_settings'] = settings;
             pageContent.innerHTML = `
                 <form id="autorole-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>Bot用ロール</h3></div>
                         <div class="form-group">
                             <label for="botAutoroleId">自動付与ロール</label>
@@ -773,14 +1012,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const automod = settings.automod || { ngWords: [], blockInvites: true };
             pageContent.innerHTML = `
                 <form id="automod-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>NGワードフィルター</h3></div>
                         <div class="form-group">
                             <label for="ngWords">NGワード (カンマ区切り)</label>
                             <textarea id="ngWords" rows="4" placeholder="word1,word2">${(automod.ngWords || []).join(',')}</textarea>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>招待リンクフィルター</h3></div>
                         <div class="form-group">
                             <label>招待リンクをブロック</label>
@@ -802,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             settingsCache['guild_settings'] = settings;
             pageContent.innerHTML = `
                 <form id="logging-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>監査ログ</h3></div>
                         <div class="form-group">
                             <label for="auditLogChannel">監査ログチャンネル</label>
@@ -834,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 listEl.innerHTML = Object.entries(mappings).map(([vcId, tcId]) => {
                     const vc = guildInfo.channels.find(c => c.id === vcId);
                     const tc = guildInfo.channels.find(c => c.id === tcId);
-                    if (!vc || !tc) return ''; // チャンネルが存在しない場合は表示しない
+                    if (!vc || !tc) return ''; 
                     return `
                         <div class="vc-log-mapping-item" data-vc-id="${vcId}">
                             <div class="vc-log-mapping-channels">
@@ -859,11 +1098,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="vc-log-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>現在の設定</h3></div>
                         <div id="vc-log-mapping-list" class="vc-log-mapping-list"></div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>新しい設定を追加</h3></div>
                         <div class="form-grid">
                             <div class="form-group">
@@ -920,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const levelingSettings = settings.leveling || { roleRewards: [] };
             pageContent.innerHTML = `
                 <form id="leveling-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>レベルアップ通知</h3></div>
                         <div class="form-group">
                             <label for="levelUpChannel">通知チャンネル</label>
@@ -930,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>ロール報酬</h3></div>
                         <div id="role-rewards-list"></div>
                         <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
@@ -1002,6 +1241,119 @@ document.addEventListener('DOMContentLoaded', async () => {
             trackChanges('#leveling-form');
         },
 
+        tickets: async () => {
+            pageTitle.textContent = 'チケットシステム設定';
+            const settings = await api.get('/api/settings/tickets');
+            
+            pageContent.innerHTML = `
+                <form id="tickets-form">
+                    <div class="card glass">
+                        <div class="card-header"><h3>基本設定</h3></div>
+                        <div class="form-group">
+                            <label>チケットシステムを有効化</label>
+                            <label class="switch"><input type="checkbox" id="ticket-enabled" ${settings.enabled ? 'checked' : ''}><span class="slider"></span></label>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="ticket-category">チケット作成カテゴリ</label>
+                                <select id="ticket-category" placeholder="カテゴリを選択...">
+                                    <option value="">選択しない</option>
+                                    ${guildInfo.channels.filter(c => c.type === 4).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="ticket-role">サポート担当ロール</label>
+                                <select id="ticket-role" placeholder="ロールを選択...">
+                                    <option value="">選択しない</option>
+                                    ${guildInfo.roles.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card glass">
+                        <div class="card-header"><h3>メッセージ設定</h3></div>
+                        <div class="form-group">
+                            <label for="ticket-title">チケットパネルのタイトル</label>
+                            <input type="text" id="ticket-title" value="${settings.title || 'お問い合わせ'}">
+                        </div>
+                        <div class="form-group">
+                            <label for="ticket-desc">チケットパネルの説明</label>
+                            <textarea id="ticket-desc" rows="4">${settings.description || '下のボタンをクリックしてチケットを作成してください。'}</textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>
+            `;
+            
+            initializeTomSelect('#ticket-category', { items: [settings.categoryId] });
+            initializeTomSelect('#ticket-role', { items: [settings.supportRoleId] });
+            
+            document.getElementById('tickets-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const data = {
+                    enabled: document.getElementById('ticket-enabled').checked,
+                    categoryId: document.getElementById('ticket-category').value,
+                    supportRoleId: document.getElementById('ticket-role').value,
+                    title: document.getElementById('ticket-title').value,
+                    description: document.getElementById('ticket-desc').value
+                };
+                await api.post('/api/settings/tickets', data);
+                showMessage('チケット設定を保存しました。');
+                resetDirtyState();
+            };
+            trackChanges('#tickets-form');
+        },
+
+        commands: async () => {
+            pageTitle.textContent = 'コマンド管理';
+            const disabledCommands = await api.get('/api/settings/commands');
+            
+            // コマンドリスト (本来はAPIから取得すべきだが、固定でも可)
+            const commands = [
+                { id: 'ping', name: 'Ping', category: 'General' },
+                { id: 'help', name: 'Help', category: 'General' },
+                { id: 'rank', name: 'Rank', category: 'Leveling' },
+                { id: 'profile-card', name: 'Profile Card', category: 'Leveling' },
+                { id: 'warn', name: 'Warn', category: 'Moderation' },
+                { id: 'roleboard', name: 'Roleboard', category: 'Utility' },
+                { id: 'feedback', name: 'Feedback', category: 'Utility' }
+            ];
+
+            pageContent.innerHTML = `
+                <div class="card glass">
+                    <div class="card-header"><h3>コマンドの有効/無効化</h3></div>
+                    <p class="form-hint" style="margin-bottom: 20px;">無効化したコマンドはサーバー内で使用できなくなります。</p>
+                    <div class="command-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+                        ${commands.map(cmd => `
+                            <div class="glass-card" style="padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 600;">/${cmd.id}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">${cmd.category}</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="command-toggle" data-command="${cmd.id}" ${!disabledCommands.includes(cmd.id) ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button id="save-commands-btn" class="btn" style="margin-top: 32px;">設定を保存</button>
+                </div>
+            `;
+            
+            document.getElementById('save-commands-btn').onclick = async () => {
+                const disabled = Array.from(document.querySelectorAll('.command-toggle'))
+                    .filter(i => !i.checked)
+                    .map(i => i.dataset.command);
+                
+                await api.post('/api/settings/commands', { disabledCommands: disabled });
+                showMessage('コマンド設定を保存しました。');
+                resetDirtyState();
+            };
+            
+            document.querySelectorAll('.command-toggle').forEach(el => el.onchange = () => isDirty = true);
+        },
+
         ai: async () => {
             pageTitle.textContent = 'AI設定';
             const settings = await api.get('/api/settings/guild_settings');
@@ -1048,7 +1400,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             pageContent.innerHTML = `
                 <form id="ai-form">
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>メンション応答機能</h3></div>
                         <div class="form-group">
                             <label>メンションへの自動応答</label>
@@ -1059,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <p class="form-hint">BotにメンションするとAIが返信します。</p>
                         </div>
                     </div>
-                    <div class="card">
+                    <div class="card glass">
                         <div class="card-header"><h3>AIのペルソナ設定</h3></div>
                         <div class="form-group">
                             <label for="aiPersonalityPrompt">AIへの指示（プロンプト）</label>
@@ -1089,8 +1441,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
             trackChanges('#ai-form');
-        },
-    };
+        }
+    }
+};
 
     // --- Roleboard Functions ---
     const renderRoleboardList = async () => {
@@ -1103,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             listEl.innerHTML = boards.map(board => `
-                <div class="card">
+                <div class="card glass">
                     <div class="card-header">
                         <h3>${board.title}</h3>
                         <div>
@@ -1459,58 +1812,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // --- Navigation ---
-    const navigate = async (event) => {
-        const proceed = async () => {
-            resetDirtyState();
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('is-open');
-            }
-
-            const page = window.location.hash.substring(1) || 'dashboard';
-            navItems.forEach(item => item.classList.toggle('active', item.dataset.page === page));
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
-
-            if (renderers[page]) {
-                try {
-                    await renderers[page]();
-                } catch (error) {
-                    pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`;
-                }
-            } else {
-                pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページが見つかりません。</p>`;
-            }
-
-            feather.replace();
-        };
-        
-        if (isDirty) {
-             if (event && event.type === 'hashchange') {
-                event.preventDefault();
-                const oldHash = event.oldURL.split('#')[1] || 'dashboard';
-                history.pushState(null, null, `#${oldHash}`);
-            }
-
-            createModal('未保存の変更があります',
-                '<p>ページを移動すると、保存されていない変更は失われます。本当に移動しますか？</p>',
-                [
-                    { id: 'cancel-nav', text: 'キャンセル', class: 'btn-secondary' },
-                    { id: 'confirm-nav', text: '移動する', class: 'btn-danger' }
-                ]
-            );
-            document.getElementById('cancel-nav').onclick = closeModal;
-            document.getElementById('confirm-nav').onclick = () => {
-                closeModal();
-                if (event) {
-                    const newHash = new URL(event.newURL).hash;
-                    window.location.hash = newHash;
-                }
-                proceed();
-            };
-        } else {
-            proceed();
-        }
-    };
 
     // --- Member Actions ---
     const addMemberActionListeners = () => {
@@ -1601,55 +1902,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
 
-    // --- Initialization ---
-    const init = async () => {
-        try {
-            guildInfo = await api.get('/api/guild-info');
-            document.getElementById('server-icon').src = guildInfo.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
-            document.getElementById('server-name').textContent = guildInfo.name;
-
-            loader.style.display = 'none';
-            dashboardWrapper.style.display = 'flex';
-            
-            window.addEventListener('hashchange', navigate, false);
-            await navigate();
-
-            logoutBtn.addEventListener('click', () => {
-                createModal('ログアウトの確認',
-                    '<p>本当にログアウトしますか？</p>',
-                    [
-                        { id: 'cancel-logout', text: 'キャンセル', class: 'btn-secondary' },
-                        { id: 'confirm-logout', text: 'ログアウト', class: 'btn-danger' }
-                    ]
-                );
-                document.getElementById('cancel-logout').onclick = closeModal;
-                document.getElementById('confirm-logout').onclick = async () => {
-                    try {
-                        isDirty = false;
-                        await api.post('/api/logout');
-                        window.location.href = '/login';
-                    } catch (err) {
-                        showMessage('ログアウトに失敗しました', 'error');
-                    }
-                };
-            });
-
-            menuToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('is-open');
-            });
-
-            window.addEventListener('beforeunload', (e) => {
-                if (isDirty) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                    return '';
-                }
-            });
-
-        } catch (error) {
-            loader.innerHTML = `<p class="message error" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
-        }
-    };
-
-    init();
+    App.init();
 });
