@@ -104,24 +104,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     allowEmptyOption: true,
                     placeholder: el.getAttribute('placeholder') || 'Select...',
                     dropdownParent: 'body',
-                    onDropdownOpen: function($dropdown) {
+                    onDropdownOpen: function ($dropdown) {
                         const control = this.control;
                         const controlRect = control.getBoundingClientRect();
-                        
+
                         // ドロップダウンをbodyに直接配置
                         $dropdown.style.position = 'fixed';
                         $dropdown.style.zIndex = '9999';
-                        
+
                         // コントロールの幅に合わせる（最小幅は200px）
                         let width = Math.max(controlRect.width, 200);
                         $dropdown.style.width = width + 'px';
                         $dropdown.style.minWidth = '200px';
-                        
+
                         // 縦位置の計算
                         const dropdownHeight = Math.min($dropdown.scrollHeight, 300);
                         const spaceBelow = window.innerHeight - controlRect.bottom;
                         const spaceAbove = controlRect.top;
-                        
+
                         if (spaceBelow >= dropdownHeight + 4) {
                             // 下に表示
                             $dropdown.style.top = (controlRect.bottom + 4) + 'px';
@@ -138,25 +138,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                             $dropdown.style.bottom = 'auto';
                             $dropdown.style.maxHeight = (spaceBelow - 8) + 'px';
                         }
-                        
+
                         // 横位置の調整（左端に合わせる）
                         let left = controlRect.left;
-                        
+
                         // 右端がはみ出す場合の調整
                         if (left + width > window.innerWidth - 8) {
                             left = window.innerWidth - width - 8;
                         }
-                        
+
                         // 左端がはみ出す場合の調整
                         if (left < 8) {
                             left = 8;
                         }
-                        
+
                         $dropdown.style.left = left + 'px';
                     },
                     ...options
                 });
-                
+
                 // グローバルクリックイベントの設定
                 document.addEventListener('click', (e) => {
                     const dropdown = select.dropdown;
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     };
-    
+
     const trackChanges = (formSelector) => {
         const form = document.querySelector(formSelector);
         if (form) {
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 loader.style.display = 'none';
                 dashboardWrapper.style.display = 'flex';
-                
+
                 window.addEventListener('hashchange', App.handleRoute, false);
                 await App.handleRoute();
 
@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const page = window.location.hash.substring(1) || 'dashboard';
                 App.state.currentPage = page;
-                
+
                 navItems.forEach(item => item.classList.toggle('active', item.dataset.page === page));
                 pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
 
@@ -313,16 +313,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         renderers: {
             dashboard: async () => {
-            pageTitle.textContent = 'ダッシュボード';
-            pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
-            const [settings, trends] = await Promise.all([
-                api.get('/api/settings/guilds'),
-                api.get('/api/analytics/trends')
-            ]);
-            
-            const recentLogs = await api.get('/api/audit-logs?limit=5');
+                pageTitle.textContent = 'ダッシュボード';
+                pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
+                const [settings, trends] = await Promise.all([
+                    api.get('/api/settings/guilds'),
+                    api.get('/api/analytics/trends')
+                ]);
 
-            pageContent.innerHTML = `
+                const recentLogs = await api.get('/api/audit-logs?limit=5');
+
+                pageContent.innerHTML = `
                 <div class="grid-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
                     <div class="stat-card">
                         <div class="stat-icon"><i data-feather="users"></i></div>
@@ -396,70 +396,70 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 </div>
             `;
-            
-            feather.replace();
 
-            // Render Trend Chart
-            const ctx = document.getElementById('trendChart').getContext('2d');
-            const dates = Object.keys(trends);
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [
-                        {
-                            label: '参加者',
-                            data: dates.map(d => trends[d].joins),
-                            borderColor: '#00e676',
-                            borderWidth: 2,
-                            pointRadius: 3,
-                            pointBackgroundColor: '#00e676',
-                            tension: 0.4,
-                            fill: true,
-                            backgroundColor: 'rgba(0, 230, 118, 0.06)'
-                        },
-                        {
-                            label: '退出者',
-                            data: dates.map(d => trends[d].leaves),
-                            borderColor: '#ff4d6a',
-                            borderWidth: 2,
-                            pointRadius: 3,
-                            pointBackgroundColor: '#ff4d6a',
-                            tension: 0.4,
-                            fill: true,
-                            backgroundColor: 'rgba(255, 77, 106, 0.06)'
-                        }
-                    ]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    plugins: { 
-                        legend: { 
-                            display: true,
-                            position: 'top',
-                            labels: { color: 'rgba(160,168,204,0.85)', boxWidth: 10, usePointStyle: true, font: { size: 11 } }
-                        } 
+                feather.replace();
+
+                // Render Trend Chart
+                const ctx = document.getElementById('trendChart').getContext('2d');
+                const dates = Object.keys(trends);
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [
+                            {
+                                label: '参加者',
+                                data: dates.map(d => trends[d].joins),
+                                borderColor: '#00e676',
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#00e676',
+                                tension: 0.4,
+                                fill: true,
+                                backgroundColor: 'rgba(0, 230, 118, 0.06)'
+                            },
+                            {
+                                label: '退出者',
+                                data: dates.map(d => trends[d].leaves),
+                                borderColor: '#ff4d6a',
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#ff4d6a',
+                                tension: 0.4,
+                                fill: true,
+                                backgroundColor: 'rgba(255, 77, 106, 0.06)'
+                            }
+                        ]
                     },
-                    scales: {
-                        x: { 
-                            ticks: { color: 'rgba(93,100,144,0.9)', maxRotation: 0, font: { size: 10 } },
-                            grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: { color: 'rgba(160,168,204,0.85)', boxWidth: 10, usePointStyle: true, font: { size: 11 } }
+                            }
                         },
-                        y: { 
-                            ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 10 } }, 
-                            grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
-                            beginAtZero: true
+                        scales: {
+                            x: {
+                                ticks: { color: 'rgba(93,100,144,0.9)', maxRotation: 0, font: { size: 10 } },
+                                grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }
+                            },
+                            y: {
+                                ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 10 } },
+                                grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                                beginAtZero: true
+                            }
                         }
                     }
-                }
-            });
-        },
+                });
+            },
 
-        // =====【ここから変更】=====
-        members: async () => {
-            pageTitle.textContent = 'メンバー管理';
-            pageContent.innerHTML = `
+            // =====【ここから変更】=====
+            members: async () => {
+                pageTitle.textContent = 'メンバー管理';
+                pageContent.innerHTML = `
                 <div class="card glass no-border shadow-md">
                     <div class="card-header"><h3>サーバーメンバー</h3></div>
                     <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
@@ -495,24 +495,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
                     </div>
                 </div>`;
-            initializeTomSelect('#role-filter');
+                initializeTomSelect('#role-filter');
 
-            let currentPage = 1;
-            let currentSort = { by: 'displayName', order: 'asc' };
-            
-            const fetchAndRenderMembers = async () => {
-                const search = document.getElementById('member-search').value;
-                const roleFilter = document.getElementById('role-filter').value;
-                document.getElementById('members-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>';
+                let currentPage = 1;
+                let currentSort = { by: 'displayName', order: 'asc' };
 
-                const data = await api.get(`/api/members?page=${currentPage}&search=${search}&sortBy=${currentSort.by}&sortOrder=${currentSort.order}&roleFilter=${roleFilter}`);
-                const { members, totalPages } = data;
-                
-                const tableBody = document.getElementById('members-table-body');
-                if (members.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">メンバーが見つかりません。</td></tr>';
-                } else {
-                    tableBody.innerHTML = members.map(member => `
+                const fetchAndRenderMembers = async () => {
+                    const search = document.getElementById('member-search').value;
+                    const roleFilter = document.getElementById('role-filter').value;
+                    document.getElementById('members-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>';
+
+                    const data = await api.get(`/api/members?page=${currentPage}&search=${search}&sortBy=${currentSort.by}&sortOrder=${currentSort.order}&roleFilter=${roleFilter}`);
+                    const { members, totalPages } = data;
+
+                    const tableBody = document.getElementById('members-table-body');
+                    if (members.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">メンバーが見つかりません。</td></tr>';
+                    } else {
+                        tableBody.innerHTML = members.map(member => `
                         <tr data-member-id="${member.id}">
                             <td>
                                 <div class="user-cell">
@@ -536,61 +536,61 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </td>
                         </tr>
                     `).join('');
-                }
-                feather.replace();
-                addMemberActionListeners();
-
-                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
-                document.getElementById('prev-page').disabled = currentPage <= 1;
-                document.getElementById('next-page').disabled = currentPage >= totalPages;
-            };
-
-            document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; fetchAndRenderMembers(); }};
-            document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderMembers(); };
-            document.getElementById('member-search').oninput = () => { currentPage = 1; fetchAndRenderMembers(); };
-            document.getElementById('role-filter').onchange = () => { currentPage = 1; fetchAndRenderMembers(); };
-            
-            document.querySelectorAll('.styled-table thead th[data-sort]').forEach(th => {
-                th.onclick = () => {
-                    const sortBy = th.dataset.sort;
-                    if (currentSort.by === sortBy) {
-                        currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
-                    } else {
-                        currentSort.by = sortBy;
-                        currentSort.order = 'asc';
                     }
-                    fetchAndRenderMembers();
+                    feather.replace();
+                    addMemberActionListeners();
+
+                    document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+                    document.getElementById('prev-page').disabled = currentPage <= 1;
+                    document.getElementById('next-page').disabled = currentPage >= totalPages;
                 };
-            });
-            fetchAndRenderMembers();
-        },
 
-        auditLog: async () => {
-            pageTitle.textContent = '監査ログ';
-            const formatLogDetails = (log) => {
-                const { eventType, details } = log;
-                let content = '';
-                switch(eventType) {
-                    case 'MessageDelete':
-                        content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<div class="log-content">${details.content}</div>`;
-                        break;
-                    case 'MessageUpdate':
-                        content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<strong>変更前:</strong><div class="log-content">${details.before}</div><strong>変更後:</strong><div class="log-content">${details.after}</div>`;
-                        break;
-                    case 'NicknameUpdate':
-                        content = `<strong>変更前:</strong> ${details.before}\n<strong>変更後:</strong> ${details.after}`;
-                        break;
-                    case 'RoleAdd':
-                    case 'RoleRemove':
-                        content = `<strong>ロール:</strong> ${details.roleName}`;
-                        break;
-                    default:
-                        content = `<pre>${JSON.stringify(details, null, 2)}</pre>`;
-                }
-                return `<div class="log-details">${content}</div>`;
-            };
+                document.getElementById('prev-page').onclick = () => { if (currentPage > 1) { currentPage--; fetchAndRenderMembers(); } };
+                document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderMembers(); };
+                document.getElementById('member-search').oninput = () => { currentPage = 1; fetchAndRenderMembers(); };
+                document.getElementById('role-filter').onchange = () => { currentPage = 1; fetchAndRenderMembers(); };
 
-            pageContent.innerHTML = `
+                document.querySelectorAll('.styled-table thead th[data-sort]').forEach(th => {
+                    th.onclick = () => {
+                        const sortBy = th.dataset.sort;
+                        if (currentSort.by === sortBy) {
+                            currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            currentSort.by = sortBy;
+                            currentSort.order = 'asc';
+                        }
+                        fetchAndRenderMembers();
+                    };
+                });
+                fetchAndRenderMembers();
+            },
+
+            auditLog: async () => {
+                pageTitle.textContent = '監査ログ';
+                const formatLogDetails = (log) => {
+                    const { eventType, details } = log;
+                    let content = '';
+                    switch (eventType) {
+                        case 'MessageDelete':
+                            content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<div class="log-content">${details.content}</div>`;
+                            break;
+                        case 'MessageUpdate':
+                            content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<strong>変更前:</strong><div class="log-content">${details.before}</div><strong>変更後:</strong><div class="log-content">${details.after}</div>`;
+                            break;
+                        case 'NicknameUpdate':
+                            content = `<strong>変更前:</strong> ${details.before}\n<strong>変更後:</strong> ${details.after}`;
+                            break;
+                        case 'RoleAdd':
+                        case 'RoleRemove':
+                            content = `<strong>ロール:</strong> ${details.roleName}`;
+                            break;
+                        default:
+                            content = `<pre>${JSON.stringify(details, null, 2)}</pre>`;
+                    }
+                    return `<div class="log-details">${content}</div>`;
+                };
+
+                pageContent.innerHTML = `
                 <div class="card glass no-border shadow-md">
                     <div class="card-header"><h3>操作履歴</h3></div>
                      <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
@@ -628,22 +628,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
                     </div>
                 </div>`;
-            initializeTomSelect('#log-type-filter');
-            
-            let currentPage = 1;
-            const fetchAndRenderLogs = async () => {
-                const user = document.getElementById('log-user-search').value;
-                const eventType = document.getElementById('log-type-filter').value;
-                document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>';
-                
-                const data = await api.get(`/api/audit-logs?page=${currentPage}&user=${user}&eventType=${eventType}`);
-                const { logs, totalPages } = data;
-                
-                const tableBody = document.getElementById('logs-table-body');
-                if(logs.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">ログが見つかりません。</td></tr>';
-                } else {
-                    tableBody.innerHTML = logs.map(log => `
+                initializeTomSelect('#log-type-filter');
+
+                let currentPage = 1;
+                const fetchAndRenderLogs = async () => {
+                    const user = document.getElementById('log-user-search').value;
+                    const eventType = document.getElementById('log-type-filter').value;
+                    document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="5" style="text-align:center;"><div class="loader-ring"></div></td></tr>';
+
+                    const data = await api.get(`/api/audit-logs?page=${currentPage}&user=${user}&eventType=${eventType}`);
+                    const { logs, totalPages } = data;
+
+                    const tableBody = document.getElementById('logs-table-body');
+                    if (logs.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">ログが見つかりません。</td></tr>';
+                    } else {
+                        tableBody.innerHTML = logs.map(log => `
                         <tr>
                             <td>${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
                             <td>${log.eventType}</td>
@@ -652,22 +652,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <td>${formatLogDetails(log)}</td>
                         </tr>
                     `).join('');
-                }
-                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
-                document.getElementById('prev-page').disabled = currentPage <= 1;
-                document.getElementById('next-page').disabled = currentPage >= totalPages;
-            };
+                    }
+                    document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+                    document.getElementById('prev-page').disabled = currentPage <= 1;
+                    document.getElementById('next-page').disabled = currentPage >= totalPages;
+                };
 
-            document.getElementById('prev-page').onclick = () => { if(currentPage > 1) { currentPage--; fetchAndRenderLogs(); }};
-            document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderLogs(); };
-            document.getElementById('log-user-search').oninput = () => { currentPage = 1; fetchAndRenderLogs(); };
-            document.getElementById('log-type-filter').onchange = () => { currentPage = 1; fetchAndRenderLogs(); };
-            fetchAndRenderLogs();
-        },
+                document.getElementById('prev-page').onclick = () => { if (currentPage > 1) { currentPage--; fetchAndRenderLogs(); } };
+                document.getElementById('next-page').onclick = () => { currentPage++; fetchAndRenderLogs(); };
+                document.getElementById('log-user-search').oninput = () => { currentPage = 1; fetchAndRenderLogs(); };
+                document.getElementById('log-type-filter').onchange = () => { currentPage = 1; fetchAndRenderLogs(); };
+                fetchAndRenderLogs();
+            },
 
-        analytics: async () => {
-            pageTitle.textContent = 'アナリティクス';
-            pageContent.innerHTML = `
+            analytics: async () => {
+                pageTitle.textContent = 'アナリティクス';
+                pageContent.innerHTML = `
                 <div class="grid-container" style="grid-template-columns: 2fr 1fr; gap: 30px;">
                     <div class="card">
                         <div class="card-header"><h3>時間帯別アクティビティ</h3></div>
@@ -683,15 +683,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <ol id="leaderboard-list" class="leaderboard"></ol>
                 </div>`;
 
-            if (currentChart) currentChart.destroy();
-            const data = await api.get('/api/analytics/activity');
-            
-            // Leaderboard
-            const listEl = document.getElementById('leaderboard-list');
-             if (data.topUsers.length === 0) {
-                listEl.innerHTML = `<p style="text-align:center; color: var(--text-muted-color);">まだランキングデータがありません。</p>`;
-            } else {
-                listEl.innerHTML = data.topUsers.map((user, i) => `
+                if (currentChart) currentChart.destroy();
+                const data = await api.get('/api/analytics/activity');
+
+                // Leaderboard
+                const listEl = document.getElementById('leaderboard-list');
+                if (data.topUsers.length === 0) {
+                    listEl.innerHTML = `<p style="text-align:center; color: var(--text-muted-color);">まだランキングデータがありません。</p>`;
+                } else {
+                    listEl.innerHTML = data.topUsers.map((user, i) => `
                     <li>
                         <span class="rank">#${i + 1}</span>
                         <div class="user-info">
@@ -700,51 +700,53 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>
                         <span class="stat">${user.messageCount.toLocaleString()} メッセージ</span>
                     </li>`).join('');
-            }
-            
-            // Activity Chart
-            const activityCtx = document.getElementById('activityChart').getContext('2d');
-            new Chart(activityCtx, {
-                type: 'bar',
-                data: {
-                    labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
-                    datasets: [{
-                        label: 'メッセージ数',
-                        data: data.activityByHour,
-                        backgroundColor: 'rgba(0, 217, 245, 0.45)',
-                        borderColor: '#00d9f5',
-                        borderWidth: 1,
-                        borderRadius: 3
-                    }]
-                },
-                options: { maintainAspectRatio: false, scales: {
-                    y: { beginAtZero: true, ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false } },
-                    x: { ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 9 } }, grid: { display: false } }
-                }, plugins: { legend: { display: false } } }
-            });
+                }
 
-            // Role Chart
-            const roleCtx = document.getElementById('roleChart').getContext('2d');
-            new Chart(roleCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: data.roleDistribution.map(r => r.name),
-                    datasets: [{
-                        label: 'メンバー数',
-                        data: data.roleDistribution.map(r => r.count),
-                        backgroundColor: data.roleDistribution.map(r => r.color),
-                        borderWidth: 2,
-                        borderColor: 'rgba(7,11,26,0.8)'
-                    }]
-                },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'rgba(160,168,204,0.85)', font: { size: 10 }, boxWidth: 10 } } } }
-            });
-        },
-        // =====【ここまで変更】=====
+                // Activity Chart
+                const activityCtx = document.getElementById('activityChart').getContext('2d');
+                new Chart(activityCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+                        datasets: [{
+                            label: 'メッセージ数',
+                            data: data.activityByHour,
+                            backgroundColor: 'rgba(0, 217, 245, 0.45)',
+                            borderColor: '#00d9f5',
+                            borderWidth: 1,
+                            borderRadius: 3
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false, scales: {
+                            y: { beginAtZero: true, ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false } },
+                            x: { ticks: { color: 'rgba(93,100,144,0.9)', font: { size: 9 } }, grid: { display: false } }
+                        }, plugins: { legend: { display: false } }
+                    }
+                });
 
-        roleboard: async () => {
-            pageTitle.textContent = 'ロールボード管理';
-            pageContent.innerHTML = `
+                // Role Chart
+                const roleCtx = document.getElementById('roleChart').getContext('2d');
+                new Chart(roleCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.roleDistribution.map(r => r.name),
+                        datasets: [{
+                            label: 'メンバー数',
+                            data: data.roleDistribution.map(r => r.count),
+                            backgroundColor: data.roleDistribution.map(r => r.color),
+                            borderWidth: 2,
+                            borderColor: 'rgba(7,11,26,0.8)'
+                        }]
+                    },
+                    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: 'rgba(160,168,204,0.85)', font: { size: 10 }, boxWidth: 10 } } } }
+                });
+            },
+            // =====【ここまで変更】=====
+
+            roleboard: async () => {
+                pageTitle.textContent = 'ロールボード管理';
+                pageContent.innerHTML = `
                 <div class="card glass">
                     <div class="card-header">
                         <h3>ロールボード一覧</h3>
@@ -752,16 +754,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <div id="roleboard-list"></div>
                 </div>`;
-            await renderRoleboardList();
-            document.getElementById('add-roleboard-btn').addEventListener('click', showAddRoleboardModal);
-        },
+                await renderRoleboardList();
+                document.getElementById('add-roleboard-btn').addEventListener('click', showAddRoleboardModal);
+            },
 
-        announcements: async () => {
-            pageTitle.textContent = 'お知らせ設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
+            announcements: async () => {
+                pageTitle.textContent = 'お知らせ設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
 
-            pageContent.innerHTML = `
+                pageContent.innerHTML = `
                 <form id="announcements-form">
                     <div class="card glass">
                         <div class="card-header">
@@ -783,18 +785,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button type="submit" class="btn">設定を保存</button>
                 </form>
             `;
-            initializeTomSelect('#announcementChannelId', { items: [settings.announcementChannelId] });
-            document.getElementById('announcements-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#announcements-form');
-        },
+                initializeTomSelect('#announcementChannelId', { items: [settings.announcementChannelId] });
+                document.getElementById('announcements-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#announcements-form');
+            },
 
-        welcome: async () => {
-            pageTitle.textContent = '参加・退出設定';
-            const settings = await api.get('/api/settings/guilds');
-            settingsCache['guilds'] = settings;
-            const createSelectOptions = (options) => options.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+            welcome: async () => {
+                pageTitle.textContent = '参加・退出設定';
+                const settings = await api.get('/api/settings/guilds');
+                settingsCache['guilds'] = settings;
+                const createSelectOptions = (options) => options.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
 
-            pageContent.innerHTML = `
+                pageContent.innerHTML = `
                 <form id="welcome-form">
                     <div class="card glass">
                         <div class="card-header"><h3>チャンネル設定</h3></div>
@@ -850,57 +852,57 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
-            ['welcomeChannelId', 'goodbyeChannelId', 'rulesChannelId', 'welcomeRoleId'].forEach(id =>
-                initializeTomSelect(`#${id}`, { items: [settings[id]] })
-            );
-            document.getElementById('welcome-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#welcome-form');
-        },
-        
-        // =====【ここから変更】=====
-        'welcome-message': async () => {
-            pageTitle.textContent = 'ウェルカムメッセージ設定';
-            const settings = await api.get('/api/settings/welcome-message');
-            settingsCache['welcome-message'] = settings;
+                ['welcomeChannelId', 'goodbyeChannelId', 'rulesChannelId', 'welcomeRoleId'].forEach(id =>
+                    initializeTomSelect(`#${id}`, { items: [settings[id]] })
+                );
+                document.getElementById('welcome-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#welcome-form');
+            },
 
-            const updatePreview = () => {
-                const type = document.getElementById('welcome-type').value;
-                const title = document.getElementById('welcome-title').value;
-                const desc = document.getElementById('welcome-description').value;
-                const imageUrl = document.getElementById('welcome-imageUrl').value;
-                const color = document.getElementById('welcome-color-picker').value;
+            // =====【ここから変更】=====
+            'welcome-message': async () => {
+                pageTitle.textContent = 'ウェルカムメッセージ設定';
+                const settings = await api.get('/api/settings/welcome-message');
+                settingsCache['welcome-message'] = settings;
 
-                const previewTitle = document.getElementById('preview-title');
-                const previewDesc = document.getElementById('preview-desc');
-                const previewThumb = document.getElementById('preview-thumb');
-                const previewImage = document.getElementById('preview-image');
-                const previewSidebar = document.querySelector('.discord-embed-preview .embed-sidebar');
+                const updatePreview = () => {
+                    const type = document.getElementById('welcome-type').value;
+                    const title = document.getElementById('welcome-title').value;
+                    const desc = document.getElementById('welcome-description').value;
+                    const imageUrl = document.getElementById('welcome-imageUrl').value;
+                    const color = document.getElementById('welcome-color-picker').value;
 
-                const dummyData = {
-                    'user.name': 'TestUser',
-                    'user.displayName': 'テストユーザー',
-                    'user.mention': '@テストユーザー',
-                    'server.name': guildInfo.name,
-                    'server.memberCount': guildInfo.memberCount.toLocaleString(),
-                    'rulesChannel': '#rules'
+                    const previewTitle = document.getElementById('preview-title');
+                    const previewDesc = document.getElementById('preview-desc');
+                    const previewThumb = document.getElementById('preview-thumb');
+                    const previewImage = document.getElementById('preview-image');
+                    const previewSidebar = document.querySelector('.discord-embed-preview .embed-sidebar');
+
+                    const dummyData = {
+                        'user.name': 'TestUser',
+                        'user.displayName': 'テストユーザー',
+                        'user.mention': '@テストユーザー',
+                        'server.name': guildInfo.name,
+                        'server.memberCount': guildInfo.memberCount.toLocaleString(),
+                        'rulesChannel': '#rules'
+                    };
+
+                    const replaceVars = (text) => text.replace(/{(\w+\.\w+)}/g, (match, key) => dummyData[key] || match);
+
+                    if (type === 'gemini') {
+                        previewTitle.textContent = 'AIによる自動生成';
+                        previewDesc.textContent = 'AIがサーバー名やユーザー名を使って、ユニークな歓迎メッセージを自動で作成します。';
+                        previewImage.style.display = 'none';
+                    } else {
+                        previewTitle.textContent = replaceVars(title);
+                        previewDesc.textContent = replaceVars(desc);
+                        previewImage.src = imageUrl;
+                        previewImage.style.display = imageUrl ? 'block' : 'none';
+                    }
+                    previewSidebar.style.backgroundColor = color;
                 };
-                
-                const replaceVars = (text) => text.replace(/{(\w+\.\w+)}/g, (match, key) => dummyData[key] || match);
 
-                if (type === 'gemini') {
-                    previewTitle.textContent = 'AIによる自動生成';
-                    previewDesc.textContent = 'AIがサーバー名やユーザー名を使って、ユニークな歓迎メッセージを自動で作成します。';
-                    previewImage.style.display = 'none';
-                } else {
-                    previewTitle.textContent = replaceVars(title);
-                    previewDesc.textContent = replaceVars(desc);
-                    previewImage.src = imageUrl;
-                    previewImage.style.display = imageUrl ? 'block' : 'none';
-                }
-                previewSidebar.style.backgroundColor = color;
-            };
-
-            pageContent.innerHTML = `
+                pageContent.innerHTML = `
                 <div class="welcome-message-layout">
                     <form id="welcome-message-form">
                         <div class="card">
@@ -963,34 +965,34 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 </div>`;
 
-            initializeTomSelect('#welcome-type');
+                initializeTomSelect('#welcome-type');
 
-            const form = document.getElementById('welcome-message-form');
-            const toggleSettingsVisibility = () => {
-                document.getElementById('default-settings').style.display = document.getElementById('welcome-type').value === 'default' ? 'block' : 'none';
-                updatePreview();
-            };
-            
-            form.addEventListener('input', updatePreview);
-            form.addEventListener('change', toggleSettingsVisibility);
+                const form = document.getElementById('welcome-message-form');
+                const toggleSettingsVisibility = () => {
+                    document.getElementById('default-settings').style.display = document.getElementById('welcome-type').value === 'default' ? 'block' : 'none';
+                    updatePreview();
+                };
 
-            const colorPicker = form.querySelector('#welcome-color-picker');
-            const colorText = form.querySelector('#welcome-color-text');
-            colorPicker.oninput = () => { colorText.value = colorPicker.value.toUpperCase(); updatePreview(); };
-            colorText.oninput = () => { if (/^#[0-9A-F]{6}$/i.test(colorText.value)) { colorPicker.value = colorText.value; updatePreview(); } };
-            
-            toggleSettingsVisibility();
-            document.getElementById('welcome-message-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#welcome-message-form');
-        },
-        // =====【ここまで変更】=====
+                form.addEventListener('input', updatePreview);
+                form.addEventListener('change', toggleSettingsVisibility);
+
+                const colorPicker = form.querySelector('#welcome-color-picker');
+                const colorText = form.querySelector('#welcome-color-text');
+                colorPicker.oninput = () => { colorText.value = colorPicker.value.toUpperCase(); updatePreview(); };
+                colorText.oninput = () => { if (/^#[0-9A-F]{6}$/i.test(colorText.value)) { colorPicker.value = colorText.value; updatePreview(); } };
+
+                toggleSettingsVisibility();
+                document.getElementById('welcome-message-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#welcome-message-form');
+            },
+            // =====【ここまで変更】=====
 
 
-        autorole: async () => {
-            pageTitle.textContent = 'Bot 自動ロール設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
-            pageContent.innerHTML = `
+            autorole: async () => {
+                pageTitle.textContent = 'Bot 自動ロール設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
+                pageContent.innerHTML = `
                 <form id="autorole-form">
                     <div class="card glass">
                         <div class="card-header"><h3>Bot用ロール</h3></div>
@@ -1005,17 +1007,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
-            initializeTomSelect('#botAutoroleId', { items: [settings.botAutoroleId] });
-            document.getElementById('autorole-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#autorole-form');
-        },
+                initializeTomSelect('#botAutoroleId', { items: [settings.botAutoroleId] });
+                document.getElementById('autorole-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#autorole-form');
+            },
 
-        automod: async () => {
-            pageTitle.textContent = 'オートモッド設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
-            const automod = settings.automod || { ngWords: [], blockInvites: true };
-            pageContent.innerHTML = `
+            automod: async () => {
+                pageTitle.textContent = 'オートモッド設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
+                const automod = settings.automod || { ngWords: [], blockInvites: true };
+                pageContent.innerHTML = `
                 <form id="automod-form">
                     <div class="card glass">
                         <div class="card-header"><h3>NGワードフィルター</h3></div>
@@ -1036,15 +1038,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
-            document.getElementById('automod-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#automod-form');
-        },
+                document.getElementById('automod-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#automod-form');
+            },
 
-        logging: async () => {
-            pageTitle.textContent = 'ログ設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
-            pageContent.innerHTML = `
+            logging: async () => {
+                pageTitle.textContent = 'ログ設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
+                pageContent.innerHTML = `
                 <form id="logging-form">
                     <div class="card glass">
                         <div class="card-header"><h3>監査ログ</h3></div>
@@ -1058,50 +1060,91 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
-            initializeTomSelect('#auditLogChannel', { items: [settings.auditLogChannel] });
-            document.getElementById('logging-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#logging-form');
-        },
+                initializeTomSelect('#auditLogChannel', { items: [settings.auditLogChannel] });
+                document.getElementById('logging-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#logging-form');
+            },
 
-        'vc-log': async () => {
-            pageTitle.textContent = 'VCログ設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
-            let mappings = settings.voiceChannelMappings || {};
+            'vc-log': async () => {
+                pageTitle.textContent = 'VCログ設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
+                let mappings = settings.voiceChannelMappings || {};
 
-            const renderMappings = () => {
-                const listEl = document.getElementById('vc-log-mapping-list');
-                if (Object.keys(mappings).length === 0) {
-                    listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">まだVCログ設定がありません。</p>';
-                    return;
-                }
-                listEl.innerHTML = Object.entries(mappings).map(([vcId, tcId]) => {
-                    const vc = guildInfo.channels.find(c => c.id === vcId);
-                    const tc = guildInfo.channels.find(c => c.id === tcId);
-                    if (!vc || !tc) return ''; 
-                    return `
+                // 古い形式（文字列）から新しい形式（オブジェクト）へ自動変換
+                Object.keys(mappings).forEach(vcId => {
+                    if (typeof mappings[vcId] === 'string') {
+                        mappings[vcId] = {
+                            textChannelId: mappings[vcId],
+                            silent: true,
+                            deleteAfter: true
+                        };
+                    }
+                });
+
+                const renderMappings = () => {
+                    const listEl = document.getElementById('vc-log-mapping-list');
+                    if (Object.keys(mappings).length === 0) {
+                        listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">まだVCログ設定がありません。</p>';
+                        return;
+                    }
+                    listEl.innerHTML = Object.entries(mappings).map(([vcId, config]) => {
+                        const vc = guildInfo.channels.find(c => c.id === vcId);
+                        const tc = guildInfo.channels.find(c => c.id === config.textChannelId);
+                        if (!vc || !tc) return '';
+
+                        const silent = config.silent !== false;
+                        const deleteAfter = config.deleteAfter !== false;
+
+                        return `
                         <div class="vc-log-mapping-item" data-vc-id="${vcId}">
-                            <div class="vc-log-mapping-channels">
-                                <div class="channel-name"><i data-feather="mic"></i><span>${vc.name}</span></div>
-                                <i data-feather="arrow-right"></i>
-                                <div class="channel-name"><i data-feather="message-square"></i><span>${tc.name}</span></div>
+                            <div class="vc-log-mapping-config">
+                                <div class="vc-log-mapping-channels">
+                                    <div class="channel-name"><i data-feather="mic"></i><span>${vc.name}</span></div>
+                                    <i data-feather="arrow-right"></i>
+                                    <div class="channel-name"><i data-feather="message-square"></i><span>${tc.name}</span></div>
+                                </div>
+                                <div class="vc-log-mapping-options">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" class="silent-toggle" ${silent ? 'checked' : ''}>
+                                        <span>🔇 サイレント</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" class="delete-toggle" ${deleteAfter ? 'checked' : ''}>
+                                        <span>🗑️ 自動削除</span>
+                                    </label>
+                                </div>
                             </div>
                             <button class="btn btn-danger btn-small remove-mapping-btn">&times;</button>
                         </div>
                     `;
-                }).join('');
-                feather.replace();
-                listEl.querySelectorAll('.remove-mapping-btn').forEach(btn => {
-                    btn.onclick = (e) => {
-                        const vcId = e.target.closest('.vc-log-mapping-item').dataset.vcId;
-                        delete mappings[vcId];
-                        renderMappings();
-                        isDirty = true;
-                    };
-                });
-            };
+                    }).join('');
+                    feather.replace();
 
-            pageContent.innerHTML = `
+                    listEl.querySelectorAll('.vc-log-mapping-item').forEach(item => {
+                        const vcId = item.dataset.vcId;
+                        const silentToggle = item.querySelector('.silent-toggle');
+                        const deleteToggle = item.querySelector('.delete-toggle');
+
+                        silentToggle.onchange = () => {
+                            mappings[vcId].silent = silentToggle.checked;
+                            isDirty = true;
+                        };
+
+                        deleteToggle.onchange = () => {
+                            mappings[vcId].deleteAfter = deleteToggle.checked;
+                            isDirty = true;
+                        };
+
+                        item.querySelector('.remove-mapping-btn').onclick = (e) => {
+                            delete mappings[vcId];
+                            renderMappings();
+                            isDirty = true;
+                        };
+                    });
+                };
+
+                pageContent.innerHTML = `
                 <form id="vc-log-form">
                     <div class="card glass">
                         <div class="card-header"><h3>現在の設定</h3></div>
@@ -1109,7 +1152,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <div class="card glass">
                         <div class="card-header"><h3>新しい設定を追加</h3></div>
-                        <div class="form-grid">
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <p class="form-hint">デフォルト設定: サイレント送信、自動削除</p>
+                        </div>
+                        <div class="form-grid" style="margin-bottom: 16px;">
                             <div class="form-group">
                                 <label for="voice-channel-select">ボイスチャンネル</label>
                                 <select id="voice-channel-select" placeholder="VCを選択..."></select>
@@ -1122,47 +1168,64 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <button type="button" id="add-mapping-btn" class="btn btn-secondary">マッピングを追加</button>
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
-                </form>`;
+                </form>
+                <style>
+                    .vc-log-mapping-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px; background: rgba(0,0,0,0.1); border-radius: var(--border-radius); margin-bottom: 12px; }
+                    .vc-log-mapping-config { flex: 1; }
+                    .vc-log-mapping-channels { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+                    .channel-name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+                    .channel-name i { width: 16px; height: 16px; }
+                    .vc-log-mapping-options { display: flex; gap: 16px; flex-wrap: wrap; }
+                    .checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+                    .checkbox-label input { cursor: pointer; }
+                    .checkbox-label span { font-size: 0.9em; color: var(--text-secondary); }
+                </style>`;
 
-            const voiceChannels = guildInfo.channels.filter(c => c.type === 2);
-            const textChannels = guildInfo.channels.filter(c => c.type === 0);
-            
-            initializeTomSelect('#voice-channel-select', { options: voiceChannels.map(c => ({ value: c.id, text: c.name })) });
-            initializeTomSelect('#text-channel-select', { options: textChannels.map(c => ({ value: c.id, text: c.name })) });
-            
-            renderMappings();
+                const voiceChannels = guildInfo.channels.filter(c => c.type === 2);
+                const textChannels = guildInfo.channels.filter(c => c.type === 0);
 
-            document.getElementById('add-mapping-btn').onclick = () => {
-                const vcSelect = document.getElementById('voice-channel-select').tomselect;
-                const tcSelect = document.getElementById('text-channel-select').tomselect;
-                const vcId = vcSelect.getValue();
-                const tcId = tcSelect.getValue();
+                initializeTomSelect('#voice-channel-select', { options: voiceChannels.map(c => ({ value: c.id, text: c.name })) });
+                initializeTomSelect('#text-channel-select', { options: textChannels.map(c => ({ value: c.id, text: c.name })) });
 
-                if (!vcId || !tcId) {
-                    showMessage('両方のチャンネルを選択してください。', 'error');
-                    return;
-                }
-                mappings[vcId] = tcId;
                 renderMappings();
-                vcSelect.clear();
-                tcSelect.clear();
-                isDirty = true;
-            };
 
-            document.getElementById('vc-log-form').addEventListener('submit', (e) => {
-                 e.preventDefault();
-                 handleFormSubmit(e, { voiceChannelMappings: mappings });
-            });
-            trackChanges('#vc-log-form');
-        },
+                document.getElementById('add-mapping-btn').onclick = () => {
+                    const vcSelect = document.getElementById('voice-channel-select').tomselect;
+                    const tcSelect = document.getElementById('text-channel-select').tomselect;
+                    const vcId = vcSelect.getValue();
+                    const tcId = tcSelect.getValue();
+
+                    if (!vcId || !tcId) {
+                        showMessage('両方のチャンネルを選択してください。', 'error');
+                        return;
+                    }
+
+                    // デフォルト設定で新規マッピングを追加
+                    mappings[vcId] = {
+                        textChannelId: tcId,
+                        silent: true,
+                        deleteAfter: true
+                    };
+                    renderMappings();
+                    vcSelect.clear();
+                    tcSelect.clear();
+                    isDirty = true;
+                };
+
+                document.getElementById('vc-log-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    handleFormSubmit(e, { voiceChannelMappings: mappings });
+                });
+                trackChanges('#vc-log-form');
+            },
 
 
-        leveling: async () => {
-            pageTitle.textContent = 'レベリング設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
-            const levelingSettings = settings.leveling || { roleRewards: [] };
-            pageContent.innerHTML = `
+            leveling: async () => {
+                pageTitle.textContent = 'レベリング設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
+                const levelingSettings = settings.leveling || { roleRewards: [] };
+                pageContent.innerHTML = `
                 <form id="leveling-form">
                     <div class="card glass">
                         <div class="card-header"><h3>レベルアップ通知</h3></div>
@@ -1191,18 +1254,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
-            initializeTomSelect('#levelUpChannel', { items: [settings.levelUpChannel] });
-            initializeTomSelect('#reward-role-id');
+                initializeTomSelect('#levelUpChannel', { items: [settings.levelUpChannel] });
+                initializeTomSelect('#reward-role-id');
 
-            const renderRoleRewards = () => {
-                const listEl = document.getElementById('role-rewards-list');
-                if (!levelingSettings.roleRewards || levelingSettings.roleRewards.length === 0) {
-                    listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">ロール報酬はまだ設定されていません。</p>';
-                    return;
-                }
-                listEl.innerHTML = levelingSettings.roleRewards
-                    .sort((a, b) => a.level - b.level)
-                    .map((reward, index) => `
+                const renderRoleRewards = () => {
+                    const listEl = document.getElementById('role-rewards-list');
+                    if (!levelingSettings.roleRewards || levelingSettings.roleRewards.length === 0) {
+                        listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">ロール報酬はまだ設定されていません。</p>';
+                        return;
+                    }
+                    listEl.innerHTML = levelingSettings.roleRewards
+                        .sort((a, b) => a.level - b.level)
+                        .map((reward, index) => `
                         <div class="role-item" data-index="${index}">
                             <div class="role-info">
                                 <span class="role-name">Lv. ${reward.level}</span>
@@ -1210,47 +1273,47 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                             <button type="button" class="btn btn-danger btn-small remove-reward-btn">&times;</button>
                         </div>`).join('');
-                listEl.querySelectorAll('.remove-reward-btn').forEach(btn => {
-                    btn.onclick = (e) => {
-                        levelingSettings.roleRewards.splice(parseInt(e.target.closest('.role-item').dataset.index, 10), 1);
-                        renderRoleRewards();
-                        isDirty = true;
-                    };
-                });
-            };
-            renderRoleRewards();
-
-            document.getElementById('add-reward-btn').onclick = () => {
-                const level = parseInt(document.getElementById('reward-level').value, 10);
-                const roleId = document.getElementById('reward-role-id').value;
-                if (!level || !roleId || level < 1) {
-                    return showMessage('有効なレベルとロールを選択してください。', 'error');
-                }
-                if (levelingSettings.roleRewards.some(r => r.level === level)) {
-                    return showMessage(`レベル ${level} の報酬は既に存在します。`, 'error');
-                }
-                levelingSettings.roleRewards.push({ level, roleId });
+                    listEl.querySelectorAll('.remove-reward-btn').forEach(btn => {
+                        btn.onclick = (e) => {
+                            levelingSettings.roleRewards.splice(parseInt(e.target.closest('.role-item').dataset.index, 10), 1);
+                            renderRoleRewards();
+                            isDirty = true;
+                        };
+                    });
+                };
                 renderRoleRewards();
-                document.getElementById('reward-level').value = '';
-                document.getElementById('reward-role-id').tomselect.clear();
-                isDirty = true;
-            };
 
-            document.getElementById('leveling-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                handleFormSubmit(e, {
-                    levelUpChannel: document.getElementById('levelUpChannel').value || null,
-                    leveling: levelingSettings
+                document.getElementById('add-reward-btn').onclick = () => {
+                    const level = parseInt(document.getElementById('reward-level').value, 10);
+                    const roleId = document.getElementById('reward-role-id').value;
+                    if (!level || !roleId || level < 1) {
+                        return showMessage('有効なレベルとロールを選択してください。', 'error');
+                    }
+                    if (levelingSettings.roleRewards.some(r => r.level === level)) {
+                        return showMessage(`レベル ${level} の報酬は既に存在します。`, 'error');
+                    }
+                    levelingSettings.roleRewards.push({ level, roleId });
+                    renderRoleRewards();
+                    document.getElementById('reward-level').value = '';
+                    document.getElementById('reward-role-id').tomselect.clear();
+                    isDirty = true;
+                };
+
+                document.getElementById('leveling-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    handleFormSubmit(e, {
+                        levelUpChannel: document.getElementById('levelUpChannel').value || null,
+                        leveling: levelingSettings
+                    });
                 });
-            });
-            trackChanges('#leveling-form');
-        },
+                trackChanges('#leveling-form');
+            },
 
-        tickets: async () => {
-            pageTitle.textContent = 'チケットシステム設定';
-            const settings = await api.get('/api/settings/tickets');
-            
-            pageContent.innerHTML = `
+            tickets: async () => {
+                pageTitle.textContent = 'チケットシステム設定';
+                const settings = await api.get('/api/settings/tickets');
+
+                pageContent.innerHTML = `
                 <form id="tickets-form">
                     <div class="card glass">
                         <div class="card-header"><h3>基本設定</h3></div>
@@ -1289,42 +1352,42 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button type="submit" class="btn">設定を保存</button>
                 </form>
             `;
-            
-            initializeTomSelect('#ticket-category', { items: [settings.categoryId] });
-            initializeTomSelect('#ticket-role', { items: [settings.supportRoleId] });
-            
-            document.getElementById('tickets-form').onsubmit = async (e) => {
-                e.preventDefault();
-                const data = {
-                    enabled: document.getElementById('ticket-enabled').checked,
-                    categoryId: document.getElementById('ticket-category').value,
-                    supportRoleId: document.getElementById('ticket-role').value,
-                    title: document.getElementById('ticket-title').value,
-                    description: document.getElementById('ticket-desc').value
+
+                initializeTomSelect('#ticket-category', { items: [settings.categoryId] });
+                initializeTomSelect('#ticket-role', { items: [settings.supportRoleId] });
+
+                document.getElementById('tickets-form').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const data = {
+                        enabled: document.getElementById('ticket-enabled').checked,
+                        categoryId: document.getElementById('ticket-category').value,
+                        supportRoleId: document.getElementById('ticket-role').value,
+                        title: document.getElementById('ticket-title').value,
+                        description: document.getElementById('ticket-desc').value
+                    };
+                    await api.post('/api/settings/tickets', data);
+                    showMessage('チケット設定を保存しました。');
+                    resetDirtyState();
                 };
-                await api.post('/api/settings/tickets', data);
-                showMessage('チケット設定を保存しました。');
-                resetDirtyState();
-            };
-            trackChanges('#tickets-form');
-        },
+                trackChanges('#tickets-form');
+            },
 
-        commands: async () => {
-            pageTitle.textContent = 'コマンド管理';
-            const disabledCommands = await api.get('/api/settings/commands');
-            
-            // コマンドリスト (本来はAPIから取得すべきだが、固定でも可)
-            const commands = [
-                { id: 'ping', name: 'Ping', category: 'General' },
-                { id: 'help', name: 'Help', category: 'General' },
-                { id: 'rank', name: 'Rank', category: 'Leveling' },
-                { id: 'profile-card', name: 'Profile Card', category: 'Leveling' },
-                { id: 'warn', name: 'Warn', category: 'Moderation' },
-                { id: 'roleboard', name: 'Roleboard', category: 'Utility' },
-                { id: 'feedback', name: 'Feedback', category: 'Utility' }
-            ];
+            commands: async () => {
+                pageTitle.textContent = 'コマンド管理';
+                const disabledCommands = await api.get('/api/settings/commands');
 
-            pageContent.innerHTML = `
+                // コマンドリスト (本来はAPIから取得すべきだが、固定でも可)
+                const commands = [
+                    { id: 'ping', name: 'Ping', category: 'General' },
+                    { id: 'help', name: 'Help', category: 'General' },
+                    { id: 'rank', name: 'Rank', category: 'Leveling' },
+                    { id: 'profile-card', name: 'Profile Card', category: 'Leveling' },
+                    { id: 'warn', name: 'Warn', category: 'Moderation' },
+                    { id: 'roleboard', name: 'Roleboard', category: 'Utility' },
+                    { id: 'feedback', name: 'Feedback', category: 'Utility' }
+                ];
+
+                pageContent.innerHTML = `
                 <div class="card glass">
                     <div class="card-header"><h3>コマンドの有効/無効化</h3></div>
                     <p class="form-hint" style="margin-bottom: 20px;">無効化したコマンドはサーバー内で使用できなくなります。</p>
@@ -1345,65 +1408,65 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button id="save-commands-btn" class="btn" style="margin-top: 32px;">設定を保存</button>
                 </div>
             `;
-            
-            document.getElementById('save-commands-btn').onclick = async () => {
-                const disabled = Array.from(document.querySelectorAll('.command-toggle'))
-                    .filter(i => !i.checked)
-                    .map(i => i.dataset.command);
-                
-                await api.post('/api/settings/commands', { disabledCommands: disabled });
-                showMessage('コマンド設定を保存しました。');
-                resetDirtyState();
-            };
-            
-            document.querySelectorAll('.command-toggle').forEach(el => el.onchange = () => isDirty = true);
-        },
 
-        ai: async () => {
-            pageTitle.textContent = 'AI設定';
-            const settings = await api.get('/api/settings/guild_settings');
-            settingsCache['guild_settings'] = settings;
-            const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
-            const personaTemplates = [
-                {
-                    name: '猫アシスタント',
-                    prompt: 'あなたは「Overseer」という名前の、猫になりきっているアシスタントAIです。\n' +
+                document.getElementById('save-commands-btn').onclick = async () => {
+                    const disabled = Array.from(document.querySelectorAll('.command-toggle'))
+                        .filter(i => !i.checked)
+                        .map(i => i.dataset.command);
+
+                    await api.post('/api/settings/commands', { disabledCommands: disabled });
+                    showMessage('コマンド設定を保存しました。');
+                    resetDirtyState();
+                };
+
+                document.querySelectorAll('.command-toggle').forEach(el => el.onchange = () => isDirty = true);
+            },
+
+            ai: async () => {
+                pageTitle.textContent = 'AI設定';
+                const settings = await api.get('/api/settings/guild_settings');
+                settingsCache['guild_settings'] = settings;
+                const aiConfig = settings.ai || { mentionReplyEnabled: true, aiPersonalityPrompt: '' };
+                const personaTemplates = [
+                    {
+                        name: '猫アシスタント',
+                        prompt: 'あなたは「Overseer」という名前の、猫になりきっているアシスタントAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾には必ず「にゃん」や「にゃ」をつけてください。\n' +
                             '- 一人称は「吾輩」です。\n' +
                             '- ユーザーのことは「ご主人様」と呼んでください。\n' +
                             '- 少し気まぐれですが、親切に回答してください。'
-                },
-                {
-                    name: '執事AI',
-                    prompt: 'あなたは「Overseer」という名前の、非常に丁寧で有能な執事AIです。\n' +
+                    },
+                    {
+                        name: '執事AI',
+                        prompt: 'あなたは「Overseer」という名前の、非常に丁寧で有能な執事AIです。\n' +
                             '# あなたの役割\n' +
                             '- 常に敬語を使い、丁寧な言葉遣いを徹底してください。\n' +
                             '- 一人称は「私（わたくし）」です。\n' +
                             '- ユーザーのことは「様」付けで呼んでください。（例: 〇〇様）\n' +
                             '- どんな質問にも冷静沈着かつ的確に答えてください。'
-                },
-                {
-                    name: '武士',
-                    prompt: 'あなたは「Overseer」という名前の、古風な武士のようなAIです。\n' +
+                    },
+                    {
+                        name: '武士',
+                        prompt: 'あなたは「Overseer」という名前の、古風な武士のようなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 語尾は「～でござる」「～せぬか？」など、武士のような口調にしてください。\n' +
                             '- 一人称は「拙者」です。\n' +
                             '- ユーザーのことは「殿」と呼んでください。\n' +
                             '- 義理堅く、誠実に回答してください。'
-                },
-                {
-                    name: '陽気な相棒',
-                    prompt: 'あなたは「Overseer」という名前の、非常に陽気でフレンドリーなAIです。\n' +
+                    },
+                    {
+                        name: '陽気な相棒',
+                        prompt: 'あなたは「Overseer」という名前の、非常に陽気でフレンドリーなAIです。\n' +
                             '# あなたの役割\n' +
                             '- 明るく、タメ口のような親しみやすい口調で話してください。\n' +
                             '- 一人称は「オレ」です。\n' +
                             '- ユーザーのことは呼び捨てか「相棒」と呼んでください。\n' +
                             '- 時々ジョークを交えながら、楽しく会話を盛り上げてください。'
-                }
-            ];
+                    }
+                ];
 
-            pageContent.innerHTML = `
+                pageContent.innerHTML = `
                 <form id="ai-form">
                     <div class="card glass">
                         <div class="card-header"><h3>メンション応答機能</h3></div>
@@ -1436,19 +1499,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button type="submit" class="btn">設定を保存</button>
                 </form>`;
 
-            document.querySelectorAll('#persona-templates button').forEach(button => {
-                button.addEventListener('click', () => {
-                    const prompt = button.getAttribute('data-prompt');
-                    const textarea = document.getElementById('aiPersonalityPrompt');
-                    textarea.value = prompt;
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                document.querySelectorAll('#persona-templates button').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const prompt = button.getAttribute('data-prompt');
+                        const textarea = document.getElementById('aiPersonalityPrompt');
+                        textarea.value = prompt;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
                 });
-            });
-            document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
-            trackChanges('#ai-form');
+                document.getElementById('ai-form').addEventListener('submit', handleFormSubmit);
+                trackChanges('#ai-form');
+            }
         }
-    }
-};
+    };
 
     // --- Roleboard Functions ---
     const renderRoleboardList = async () => {
@@ -1846,12 +1909,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
                 </select>
             </div>`,
-            [{ id: 'save-roles', text: '保存', class: 'btn'}]
+            [{ id: 'save-roles', text: '保存', class: 'btn' }]
         );
         initializeTomSelect('#roles-select', {
             items: currentRoles
         });
-        
+
         document.getElementById('save-roles').onclick = async () => {
             const selectedRoles = document.getElementById('roles-select').tomselect.getValue();
             try {
@@ -1860,7 +1923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 closeModal();
                 // テーブル全体ではなく、該当行だけ更新することも可能だが、再描画が確実
                 document.querySelector(`.nav-item[data-page="members"]`).click();
-            } catch(error) {
+            } catch (error) {
                 showMessage('ロールの更新に失敗しました。', 'error');
             }
         };
@@ -1871,7 +1934,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         createModal('メンバーをキック', `
             <p>本当にこのメンバーをキックしますか？</p>
             <div class="form-group" style="margin-top:15px;"><label>理由 (任意)</label><input type="text" id="kick-reason"></div>`,
-            [{ id: 'confirm-kick', text: 'キック', class: 'btn-danger'}]
+            [{ id: 'confirm-kick', text: 'キック', class: 'btn-danger' }]
         );
         document.getElementById('confirm-kick').onclick = async () => {
             const reason = document.getElementById('kick-reason').value;
@@ -1880,7 +1943,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showMessage('メンバーをキックしました。');
                 closeModal();
                 document.querySelector(`.nav-item[data-page="members"]`).click();
-            } catch(error) {
+            } catch (error) {
                 showMessage('キックに失敗しました。', 'error');
             }
         };
@@ -1891,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         createModal('メンバーをBAN', `
             <p>本当にこのメンバーをサーバーからBANしますか？この操作は取り消せません。</p>
             <div class="form-group" style="margin-top:15px;"><label>理由 (任意)</label><input type="text" id="ban-reason"></div>`,
-            [{ id: 'confirm-ban', text: 'BAN', class: 'btn-danger'}]
+            [{ id: 'confirm-ban', text: 'BAN', class: 'btn-danger' }]
         );
         document.getElementById('confirm-ban').onclick = async () => {
             const reason = document.getElementById('ban-reason').value;
@@ -1900,7 +1963,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showMessage('メンバーをBANしました。');
                 closeModal();
                 document.querySelector(`.nav-item[data-page="members"]`).click();
-            } catch(error) {
+            } catch (error) {
                 showMessage('BANに失敗しました。', 'error');
             }
         };

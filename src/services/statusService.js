@@ -1,6 +1,7 @@
 const { ActivityType } = require('discord.js');
 const { doc, getDoc, setDoc } = require('firebase/firestore');
 const chalk = require('chalk');
+const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require('./aiLimitService');
 
 async function generateAIStatus(client) {
     try {
@@ -16,16 +17,27 @@ async function generateAIStatus(client) {
 
         const result = await client.geminiModel.generateContent(prompt);
         let text = result.response.text().trim();
-        
+
         // JSONを抽出するためのロバストな処理
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             text = jsonMatch[0];
         }
 
+        // 成功時にレート制限情報を記録 (ボットのIDでトラッキング)
+        await recordSuccessRequest(client.rtdb, client.user.id).catch(() => { });
+
         return JSON.parse(text);
     } catch (error) {
         console.error(chalk.red('[ERROR] Geminiによるステータス生成に失敗:'), error);
+
+        // 失敗時にレート制限情報を記録
+        const isRateLimit = isRateLimitError(error);
+        if (isRateLimit) {
+            console.warn(chalk.yellow('[AI Limit] Rate limit reached for bot status generation'));
+        }
+        await recordFailedRequest(client.rtdb, client.user.id, isRateLimit).catch(() => { });
+
         return { emoji: null, state: '[ERROR] AI Status Failure' };
     }
 }

@@ -1,6 +1,7 @@
 const { PermissionsBitField } = require('discord.js');
 const { doc, getDoc, setDoc, collection, query, where, orderBy, getDocs } = require('firebase/firestore');
 const chalk = require('chalk');
+const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require('./aiLimitService');
 
 const calculateRequiredXp = (level) => 5 * (level ** 2) + 50 * level + 100;
 
@@ -26,9 +27,21 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
         const rawText = result.response.text().trim();
         // 改行、アスタリスク、カギカッコを除去し、最初の文章のみを取得
         const text = rawText.replace(/[\n*「」]/g, '').split(/[。！？!?. \n]/)[0];
+
+        // 成功時にレート制限情報を記録
+        await recordSuccessRequest(client.rtdb, user.id).catch(() => { });
+
         return text || `**${user.displayName} が新たな境地へ到達しました！**`;
     } catch (error) {
         console.error(chalk.red('[ERROR] Gemini APIでのコメント生成に失敗:'), error.message);
+
+        // 失敗時にレート制限情報を記録
+        const isRateLimit = isRateLimitError(error);
+        if (isRateLimit) {
+            console.warn(chalk.yellow('[AI Limit] Rate limit reached for user:'), user.id);
+        }
+        await recordFailedRequest(client.rtdb, user.id, isRateLimit).catch(() => { });
+
         return `**${user.displayName} が新たな境地へ到達しました！**`;
     }
 }

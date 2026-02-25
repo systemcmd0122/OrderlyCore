@@ -26,7 +26,28 @@ module.exports = {
         if (docSnap.exists() && docSnap.data().voiceChannelMappings) {
             const mappings = docSnap.data().voiceChannelMappings;
             const description = Object.entries(mappings)
-                .map(([vcId, tcId]) => `[VC] <#${vcId}> -> [LOG] <#${tcId}>`)
+                .map(([vcId, config]) => {
+                    // 後方互換性: 古い形式（tcId が直接配置）と新しい形式（オブジェクト）の両方に対応
+                    let tcId, silent, deleteAfter;
+                    if (typeof config === 'string') {
+                        // 古い形式
+                        tcId = config;
+                        silent = true;
+                        deleteAfter = true;
+                    } else {
+                        // 新しい形式
+                        tcId = config.textChannelId;
+                        silent = config.silent !== false;
+                        deleteAfter = config.deleteAfter !== false;
+                    }
+
+                    const options = [];
+                    if (silent) options.push('🔇 サイレント');
+                    if (deleteAfter) options.push('🗑️ 自動削除');
+                    const optionsStr = options.length > 0 ? ` | ${options.join(' | ')}` : '';
+
+                    return `[VC] <#${vcId}> → [LOG] <#${tcId}>${optionsStr}`;
+                })
                 .join('\n');
             embed.setDescription(description || '設定なし');
         } else {

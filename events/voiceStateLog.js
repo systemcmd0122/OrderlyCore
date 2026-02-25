@@ -41,12 +41,44 @@ async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
         const docSnap = await getDoc(settingsRef);
         if (docSnap.exists()) {
             const mappings = docSnap.data().voiceChannelMappings;
-            return mappings?.[voiceChannelId] || null;
+            const config = mappings?.[voiceChannelId];
+
+            // 後方互換性: 古い形式（文字列）と新しい形式（オブジェクト）の両方に対応
+            if (typeof config === 'string') {
+                return config;
+            } else {
+                return config?.textChannelId || null;
+            }
         }
         return null;
     } catch (error) {
         console.error(chalk.red(`[ERROR] Error fetching log channel for VC ${voiceChannelId}:`), error);
         return null;
+    }
+}
+
+async function getVcLogConfig(db, guildId, voiceChannelId) {
+    if (!guildId || !voiceChannelId) return { silent: true, deleteAfter: true };
+    try {
+        const settingsRef = doc(db, 'guild_settings', guildId);
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists()) {
+            const mappings = docSnap.data().voiceChannelMappings;
+            const config = mappings?.[voiceChannelId];
+
+            // 新しい形式の場合
+            if (config && typeof config === 'object') {
+                return {
+                    silent: config.silent !== false,
+                    deleteAfter: config.deleteAfter !== false
+                };
+            }
+        }
+        // デフォルト設定を返す
+        return { silent: true, deleteAfter: true };
+    } catch (error) {
+        console.error(chalk.red(`[ERROR] Error fetching VC log config for ${voiceChannelId}:`), error);
+        return { silent: true, deleteAfter: true };
     }
 }
 
@@ -83,7 +115,7 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
 
     if (leveledUp) {
         console.log(chalk.green(`[LEVEL UP] ${member.user.tag} reached level ${userData.level} from VC activity!`));
-        
+
         const settingsRef = doc(db, 'guild_settings', guildId);
         const settingsSnap = await getDoc(settingsRef);
         const settings = settingsSnap.exists() ? settingsSnap.data() : {};
@@ -128,7 +160,7 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
                     ],
                     footer: { text: `ボイスチャンネルでの活動、お疲れ様です！ | ${guild.name}`, iconURL: guild.iconURL() }
                 });
-                
+
                 if (awardedRoles && awardedRoles.length > 0) {
                     levelUpEmbed.addFields({
                         name: '[Award] 獲得したロール報酬',
@@ -147,7 +179,6 @@ async function addVcExpAndLevelUp(client, oldState, stayDuration) {
     }
 }
 
-
 async function updateUserStayTime(db, guildId, userId, stayDuration) {
     if (!stayDuration || stayDuration <= 0) return;
     try {
@@ -162,6 +193,33 @@ async function updateUserStayTime(db, guildId, userId, stayDuration) {
     }
 }
 
+async function sendVcLog(logChannel, content, config) {
+    if (!logChannel?.isTextBased()) return null;
+
+    try {
+        // デフォルト設定を適用（新規互換性のため）
+        const silent = config?.silent !== false;
+        const deleteAfter = config?.deleteAfter !== false;
+
+        // log message を送信
+        const flags = silent ? ['SuppressNotifications'] : [];
+        const message = await logChannel.send({
+            content: content,
+            ...(flags.length > 0 && { flags })
+        });
+
+        // deleteAfter が true の場合のみ、60秒後に削除をスケジュール
+        if (deleteAfter) {
+            deleteManager.scheduleDelete(message.id, message);
+        }
+
+        return message;
+    } catch (error) {
+        console.error(chalk.red('[ERROR] Error sending VC log:'), error);
+        return null;
+    }
+}
+
 async function handleVoiceJoin(newState, client) {
     const { guild, channel, member } = newState;
     const { db, rtdb } = client;
@@ -169,18 +227,13 @@ async function handleVoiceJoin(newState, client) {
     const sessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
     await set(sessionRef, { channelId: channel.id, channelName: channel.name, joinedAt: Date.now() });
     console.log(chalk.green(`[SESSION] started for ${member.user.tag} in ${channel.name}`));
-    
+
     const logChannelId = await getLogChannelIdForVc(db, guild.id, channel.id);
     if (logChannelId) {
         try {
             const logChannel = guild.channels.cache.get(logChannelId);
-            if (logChannel?.isTextBased()) {
-                const message = await logChannel.send({ 
-                    content: `[JOIN] **${member.displayName}** が **${channel.name}** に参加しました`,
-                    flags: ['SuppressNotifications']
-                });
-                deleteManager.scheduleDelete(message.id, message);
-            }
+            const config = await getVcLogConfig(db, guild.id, channel.id);
+            await sendVcLog(logChannel, `[JOIN] **${member.displayName}** が **${channel.name}** に参加しました`, config);
         } catch (error) {
             console.error(chalk.red('[ERROR] Error sending join log:'), error);
         }
@@ -193,14 +246,14 @@ async function handleVoiceLeave(oldState, client) {
 
     const sessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
     const sessionSnapshot = await get(sessionRef);
-    
+
     if (sessionSnapshot.exists()) {
         const sessionData = sessionSnapshot.val();
         const stayDuration = Date.now() - sessionData.joinedAt;
-        
+
         await updateUserStayTime(db, guild.id, member.id, stayDuration);
         await addVcExpAndLevelUp(client, oldState, stayDuration);
-        
+
         await remove(sessionRef);
         console.log(chalk.yellow(`[SESSION] ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
     }
@@ -209,13 +262,8 @@ async function handleVoiceLeave(oldState, client) {
     if (logChannelId) {
         try {
             const logChannel = guild.channels.cache.get(logChannelId);
-            if (logChannel?.isTextBased()) {
-                const message = await logChannel.send({ 
-                    content: `[EXIT] **${member.displayName}** が **${channel.name}** から退出しました`,
-                    flags: ['SuppressNotifications']
-                });
-                deleteManager.scheduleDelete(message.id, message);
-            }
+            const config = await getVcLogConfig(db, guild.id, channel.id);
+            await sendVcLog(logChannel, `[EXIT] **${member.displayName}** が **${channel.name}** から退出しました`, config);
         } catch (error) {
             console.error(chalk.red('[ERROR] Error sending leave log:'), error);
         }
@@ -247,14 +295,14 @@ module.exports = {
                 // セッション終了処理（統計のため）
                 const sessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
                 const sessionSnapshot = await get(sessionRef);
-                
+
                 if (sessionSnapshot.exists()) {
                     const sessionData = sessionSnapshot.val();
                     const stayDuration = Date.now() - sessionData.joinedAt;
-                    
+
                     await updateUserStayTime(db, guild.id, member.id, stayDuration);
                     await addVcExpAndLevelUp(client, oldState, stayDuration);
-                    
+
                     await remove(sessionRef);
                     console.log(chalk.yellow(`[SESSION] ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
                 }
@@ -269,14 +317,14 @@ module.exports = {
                 if (logDestId) {
                     try {
                         const logChannel = newState.guild.channels.cache.get(logDestId);
-                        if (logChannel?.isTextBased()) {
-                            const message = await logChannel.send({ 
-                                content: `[MOVE] **${newState.member.displayName}** が **${oldState.channel.name}** から **${newState.channel.name}** に移動しました`,
-                                flags: ['SuppressNotifications']
-                            });
-                            deleteManager.scheduleDelete(message.id, message);
+                        let config;
+                        if (await getLogChannelIdForVc(db, newState.guild.id, newState.channelId) === logDestId) {
+                            config = await getVcLogConfig(db, newState.guild.id, newState.channelId);
+                        } else {
+                            config = await getVcLogConfig(db, oldState.guild.id, oldState.channelId);
                         }
-                    } catch(error) {
+                        await sendVcLog(logChannel, `[MOVE] **${newState.member.displayName}** が **${oldState.channel.name}** から **${newState.channel.name}** に移動しました`, config);
+                    } catch (error) {
                         console.error(chalk.red('[ERROR] Error sending move log:'), error);
                     }
                 }

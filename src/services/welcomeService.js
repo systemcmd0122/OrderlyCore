@@ -1,4 +1,5 @@
 const chalk = require('chalk');
+const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require('./aiLimitService');
 
 async function generateWelcomeWithGemini(client, member) {
     const { user, guild } = member;
@@ -21,9 +22,21 @@ async function generateWelcomeWithGemini(client, member) {
         let text = result.response.text().trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
+
+        // 成功時にレート制限情報を記録
+        await recordSuccessRequest(client.rtdb, user.id).catch(() => { });
+
         return JSON.parse(text);
     } catch (error) {
         console.error('[ERROR] Geminiでのウェルカムメッセージ生成エラー:', error);
+
+        // 失敗時にレート制限情報を記録
+        const isRateLimit = isRateLimitError(error);
+        if (isRateLimit) {
+            console.warn(chalk.yellow('[AI Limit] Rate limit reached for user:'), user.id);
+        }
+        await recordFailedRequest(client.rtdb, user.id, isRateLimit).catch(() => { });
+
         return {
             title: `Welcome to ${guild.name}!`,
             description: `**${user.displayName}**さん、サーバーへのご参加ありがとうございます！これから一緒に楽しみましょう！`
