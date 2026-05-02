@@ -6,7 +6,7 @@ const path = require('node:path');
 const chalk = require('chalk');
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 const client = new Client({
     intents: [

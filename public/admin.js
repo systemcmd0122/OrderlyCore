@@ -329,7 +329,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     const guildName = btn.dataset.guildName;
                                     createModal(
                                         'サーバーから退出',
-                                        `<p><strong>${escapeHTML(guildName)}</strong> からボットを退出させますか？</p><p style="color:var(--error);margin-top:8px;font-size:0.88rem;">⚠️ この操作は元に戻せません。</p>`,
+                                        `<p><strong>${escapeHTML(guildName)}</strong> からボットを退出させますか？</p><p style="color:var(--error);margin-top:8px;font-size:0.88rem;">[WARN] この操作は元に戻せません。</p>`,
                                         [
                                             { id: 'cancel-leave',  text: 'キャンセル', class: 'btn-secondary' },
                                             { id: 'confirm-leave', text: '退出する',   class: 'btn-danger' }
@@ -651,7 +651,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="maintenance-status ${status.enabled ? 'active' : ''}">
                             <div style="flex:1;">
                                 <div style="font-weight:600;margin-bottom:4px;" id="maintenance-status-text">
-                                    ${status.enabled ? '⚠️ メンテナンス中' : '✅ 通常稼働中'}
+                                    ${status.enabled ? '[WARN] メンテナンス中' : '[OK] 通常稼働中'}
                                 </div>
                                 <div style="font-size:0.84rem;color:var(--text-muted);">
                                     メンテナンスモードが有効な場合、全ユーザーのコマンドがブロックされます。
@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const card = e.target.closest('.maintenance-status');
                     card.classList.toggle('active', e.target.checked);
                     document.getElementById('maintenance-status-text').textContent =
-                        e.target.checked ? '⚠️ メンテナンス中' : '✅ 通常稼働中';
+                        e.target.checked ? '[WARN] メンテナンス中' : '[OK] 通常稼働中';
                 });
 
                 document.getElementById('save-maintenance').onclick = async () => {

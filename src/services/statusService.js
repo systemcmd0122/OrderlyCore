@@ -6,14 +6,14 @@ const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require(
 async function generateAIStatus(client) {
     try {
         const userCount = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
-        const prompt = `あなたは「OrderlyCore」という名前のDiscordボットです。あなたの現在のユニークで面白いステータスを生成してください。
+        const prompt = `あなたは「OrderlyCore」という名前のプロフェッショナルなDiscordボットです。現在のステータスメッセージを生成してください。
 
 # 指示
-- サーバー数 (${client.guilds.cache.size}個) や、総ユーザー数 (${userCount}人) などの動的な情報を含めることができます。
-- 短く、キャッチーで、少しユーモラスなものが望ましいです。
-- **絶対に絵文字を使用しないでください。**
+- サーバー数 (${client.guilds.cache.size}個) や、総ユーザー数 (${userCount}人) などの動的な情報を活用してください。
+- 信頼感があり、洗練された、かつ親しみやすいメッセージにしてください。
+- **絶対に絵文字（UTF-8文字、特殊記号、デコレーション等すべて）を使用しないでください。**
 - 必ずJSON形式で {"emoji": null, "state": "ステータスメッセージ"} の形式で出力してください。emojiは必ずnullにしてください。
-- ステータスメッセージは30文字以内にしてください。`;
+- ステータスメッセージは、句読点を含めて30文字以内にしてください。`;
 
         const result = await client.geminiModel.generateContent(prompt);
         let text = result.response.text().trim();

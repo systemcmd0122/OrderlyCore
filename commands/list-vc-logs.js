@@ -42,8 +42,8 @@ module.exports = {
                     }
 
                     const options = [];
-                    if (silent) options.push('🔇 サイレント');
-                    if (deleteAfter) options.push('🗑️ 自動削除');
+                    if (silent) options.push('[SILENT] サイレント');
+                    if (deleteAfter) options.push('[REMOVE] 自動削除');
                     const optionsStr = options.length > 0 ? ` | ${options.join(' | ')}` : '';
 
                     return `[VC] <#${vcId}> → [LOG] <#${tcId}>${optionsStr}`;

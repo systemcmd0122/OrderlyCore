@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     /* ─── Delete actions ──────────────────────────────────────── */
     const deleteItem = async (collectionName, itemId, page = 1) => {
         createModal('削除の確認',
-            '<p>このデータを削除してもよろしいですか？</p><p style="color:var(--error);margin-top:8px;font-size:0.88rem;">⚠️ この操作は取り消せません。</p>',
+            '<p>このデータを削除してもよろしいですか？</p><p style="color:var(--error);margin-top:8px;font-size:0.88rem;">[WARN] この操作は取り消せません。</p>',
             [
                 { id: 'cancel-delete',  text: 'キャンセル', class: 'btn-secondary' },
                 { id: 'confirm-delete', text: '削除する',   class: 'btn-danger' }
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const deleteAllItems = async (collectionName) => {
         const label = COLLECTION_LABELS[collectionName] || collectionName;
         createModal('全削除の確認',
-            `<p><strong>${escapeHTML(label)}</strong> コレクションの<strong>全データ</strong>を削除してもよろしいですか？</p><p style="color:var(--error);margin-top:10px;font-weight:600;">⚠️ この操作は絶対に取り消せません！</p>`,
+            `<p><strong>${escapeHTML(label)}</strong> コレクションの<strong>全データ</strong>を削除してもよろしいですか？</p><p style="color:var(--error);margin-top:10px;font-weight:600;">[WARN] この操作は絶対に取り消せません！</p>`,
             [
                 { id: 'cancel-delete-all',  text: 'キャンセル', class: 'btn-secondary' },
                 { id: 'confirm-delete-all', text: '全て削除',   class: 'btn-danger' }

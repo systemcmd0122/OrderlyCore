@@ -4,18 +4,18 @@ const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require(
 async function generateWelcomeWithGemini(client, member) {
     const { user, guild } = member;
     try {
-        const prompt = `あなたはDiscordサーバーの歓迎担当AIです。新しく参加したユーザーを温かく、そしてクリエイティブに歓迎するメッセージを作成してください。
+        const prompt = `あなたはDiscordサーバーのプロフェッショナルな歓迎担当AIです。新しく参加したユーザーに対する、洗練された歓迎メッセージを作成してください。
 
 # 指示
-- ポジティブで、歓迎の意が伝わるフレンドリーな文章を生成してください。
+- 誠実で、かつ歓迎の意が伝わる丁寧な文章を生成してください。
 - 以下の情報を文章に必ず含めてください。
   - ユーザー名: ${user.displayName}
   - サーバー名: ${guild.name}
   - 現在のメンバー数: ${guild.memberCount}
-- 生成する文章は必ず**タイトル**と**説明文**の2つの部分に分けてください。
-- タイトルは「Welcome!」や「ようこそ！」などの短いフレーズにしてください（20文字以内）。
-- **絶対に絵文字を使用しないでください。**
-- 説明文は、ユーザーへの呼びかけから始まり、サーバーの簡単な紹介や、これから始まる素晴らしい体験への期待感を抱かせるような、少し長めの文章にしてください。（150文字以内）
+- 生成する文章は必ず「タイトル」と「説明文」の2つの部分で構成してください。
+- タイトルは「Welcome to our community」などの短いフレーズにしてください（20文字以内）。
+- **絶対に絵文字（UTF-8文字、特殊記号、デコレーション等すべて）を使用しないでください。**
+- 説明文は、ユーザーへの敬意を表した呼びかけから始め、サーバーのコンセプトに基づいた期待感を抱かせる内容にしてください（150文字以内）。
 - 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式で出力してください。`;
 
         const result = await client.geminiModel.generateContent(prompt);

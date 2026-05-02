@@ -66,7 +66,7 @@ async function showUserLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '⚠️ レート制限情報',
+                    name: '[WARN] レート制限情報',
                     value: [
                         `**制限回数**: ${limitInfo.rateLimitedCount || 0}`,
                         `**最後の制限**: ${limitInfo.lastRateLimitTime ? new Date(limitInfo.lastRateLimitTime).toLocaleString('ja-JP') : 'なし'}`
@@ -74,7 +74,7 @@ async function showUserLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '⏱️ タイムスタンプ',
+                    name: '[TIME] タイムスタンプ',
                     value: [
                         `**最後のリクエスト**: ${limitInfo.lastRequestTime ? new Date(limitInfo.lastRequestTime).toLocaleString('ja-JP') : 'なし'}`,
                         `**最終更新**: ${new Date(limitInfo.updatedAt).toLocaleString('ja-JP')}`
@@ -88,7 +88,7 @@ async function showUserLimit(interaction) {
         // ステータス判定
         if (limitInfo.rateLimitedCount > 5) {
             embed.addFields({
-                name: '⚠️ 警告',
+                name: '[WARN] 警告',
                 value: 'レート制限に複数回到達しています。しばらく時間をおいてからお使いください。',
                 inline: false
             });
@@ -139,7 +139,7 @@ async function showGlobalLimit(interaction) {
                     inline: true
                 },
                 {
-                    name: '⚠️ 制限発生回数',
+                    name: '[WARN] 制限発生回数',
                     value: `**${globalInfo.totalRateLimited}回**`,
                     inline: true
                 }
