@@ -1107,11 +1107,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="vc-log-mapping-options">
                                     <label class="checkbox-label">
                                         <input type="checkbox" class="silent-toggle" ${silent ? 'checked' : ''}>
-                                        <span>🔇 サイレント</span>
+                                        <span>[SILENT] サイレント</span>
                                     </label>
                                     <label class="checkbox-label">
                                         <input type="checkbox" class="delete-toggle" ${deleteAfter ? 'checked' : ''}>
-                                        <span>🗑️ 自動削除</span>
+                                        <span>[REMOVE] 自動削除</span>
                                     </label>
                                 </div>
                             </div>

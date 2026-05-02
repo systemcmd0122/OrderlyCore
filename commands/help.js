@@ -18,35 +18,25 @@ module.exports = {
             general: []
         };
         
-        const commandsPath = __dirname;
-        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+        interaction.client.commands.forEach(command => {
+            if (command.data.name === 'help') return;
 
-        for (const file of commandFiles) {
-            if (file === 'help.js') continue;
+            const commandData = {
+                name: command.data.name,
+                description: command.data.description,
+            };
 
-            const filePath = path.join(commandsPath, file);
-            try {
-                const command = require(filePath);
-                if ('data' in command && 'execute' in command) {
-                    const commandData = {
-                        name: command.data.name,
-                        description: command.data.description,
-                    };
-
-                    if (command.data.name.includes('config') || command.data.name.includes('list') || command.data.name.includes('board') || command.data.name.includes('ticket') || command.data.name.includes('automod')) {
-                        commands.management.push(commandData);
-                    } else if (command.data.name.includes('role')) {
-                        commands.roles.push(commandData);
-                    } else if (command.data.name.includes('vc')) {
-                        commands.voice.push(commandData);
-                    } else {
-                        commands.general.push(commandData);
-                    }
-                }
-            } catch (error) {
-                console.error(`[ERROR] コマンドファイル ${file} の読み込みに失敗しました:`, error);
+            const name = command.data.name;
+            if (name.includes('config') || name.includes('list') || name.includes('board') || name.includes('ticket') || name.includes('automod')) {
+                commands.management.push(commandData);
+            } else if (name.includes('role')) {
+                commands.roles.push(commandData);
+            } else if (name.includes('vc')) {
+                commands.voice.push(commandData);
+            } else {
+                commands.general.push(commandData);
             }
-        }
+        });
 
         const helpEmbed = createStandardEmbed({
             title: '[HELP] OrderlyCore コマンド一覧',

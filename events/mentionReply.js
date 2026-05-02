@@ -573,12 +573,12 @@ async function generateChatResponse(client, message, aiConfig) {
         let searchSummary = '';
 
         if (needsWebSearch) {
-            console.log(chalk.cyan('[AI] 🔍 Web search triggered'));
+            console.log(chalk.cyan('[AI] [SEARCH] Web search triggered'));
 
             // Web検索中の状態を表示
             try {
                 statusMessage = await message.reply({
-                    content: '🔍 **Web検索中...**\n最新情報をインターネットから取得しています...',
+                    content: '[SEARCH] **Web検索中...**\n最新情報をインターネットから取得しています...',
                     allowedMentions: { repliedUser: false }
                 });
             } catch (err) {
@@ -597,14 +597,14 @@ async function generateChatResponse(client, message, aiConfig) {
             if (statusMessage) {
                 try {
                     await statusMessage.edit({
-                        content: `✅ **検索完了!** (${webResults.length}件)\n🤔 **AI回答生成中...**`
+                        content: `[OK] **検索完了!** (${webResults.length}件)\n[WAIT] **AI回答生成中...**`
                     });
                 } catch (err) {
                     console.error(chalk.yellow('[Status] Failed to update status:'), err.message);
                 }
             }
         } else {
-            console.log(chalk.gray('[AI] ⏭️  Skipping web search - not needed'));
+            console.log(chalk.gray('[AI] [SKIP] Skipping web search - not needed'));
             searchSummary = '';
         }
 
@@ -769,8 +769,8 @@ async function handleMention(message, client) {
 
 // イベントリスナーをエクスポート
 module.exports = (client) => {
-    console.log(chalk.green('[MentionReply] 🚀 Module loaded - Enhanced Web Search Engine v2.0'));
-    console.log(chalk.cyan('[MentionReply] 🔍 Multi-source search: DDG-API + DDG-HTML'));
-    console.log(chalk.gray(`[MentionReply] ⏱️  History timeout: ${CONVERSATION_TIMEOUT / 1000 / 60} minutes, Max turns: ${MAX_HISTORY_LENGTH}`));
+    console.log(chalk.green('[MentionReply] [OK] Module loaded - Enhanced Web Search Engine v2.0'));
+    console.log(chalk.cyan('[MentionReply] [SEARCH] Multi-source search: DDG-API + DDG-HTML'));
+    console.log(chalk.gray(`[MentionReply] [TIME] History timeout: ${CONVERSATION_TIMEOUT / 1000 / 60} minutes, Max turns: ${MAX_HISTORY_LENGTH}`));
     client.on(Events.MessageCreate, (message) => handleMention(message, client));
 };
