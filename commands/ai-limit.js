@@ -53,10 +53,10 @@ async function showUserLimit(interaction) {
 
         const embed = new EmbedBuilder()
             .setColor(Colors.Blurple)
-            .setTitle(`📊 ${interaction.user.username} のAIレート制限情報`)
+            .setTitle(`[STATS] ${interaction.user.username} のAIレート制限情報`)
             .addFields(
                 {
-                    name: '📈 リクエスト統計',
+                    name: '[DATA] リクエスト統計',
                     value: [
                         `**総リクエスト**: ${limitInfo.totalRequests || 0}`,
                         `**成功**: ${limitInfo.successRequests || 0}`,
@@ -121,10 +121,10 @@ async function showGlobalLimit(interaction) {
 
         const embed = new EmbedBuilder()
             .setColor(Colors.Gold)
-            .setTitle('🌍 AIレート制限 グローバル情報')
+            .setTitle('[GLOBAL] AIレート制限 グローバル情報')
             .addFields(
                 {
-                    name: '👥 ユーザー統計',
+                    name: '[USERS] ユーザー統計',
                     value: [
                         `**AI使用ユーザー数**: ${globalInfo.totalUsers}`,
                         `**総リクエスト数**: ${globalInfo.totalRequests}`,
@@ -134,7 +134,7 @@ async function showGlobalLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '📊 リクエスト成功率',
+                    name: '[STATS] リクエスト成功率',
                     value: `**${globalInfo.successRate}%**`,
                     inline: true
                 },
@@ -152,7 +152,7 @@ async function showGlobalLimit(interaction) {
                 .join('\n');
 
             embed.addFields({
-                name: '🔴 最近レート制限を受けたユーザー (直近1時間)',
+                name: '[ALERT] 最近レート制限を受けたユーザー (直近1時間)',
                 value: recentlyLimitedText || 'なし',
                 inline: false
             });

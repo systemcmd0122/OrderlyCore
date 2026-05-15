@@ -603,7 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             <td style="font-family:var(--font-mono);font-size:0.82rem;">${new Date(guild.joinedTimestamp).toLocaleString('ja-JP')}</td>
                                             <td style="font-weight:500;">サーバー参加</td>
                                             <td>${escapeHTML(guild.name)}</td>
-                                            <td><span style="color:var(--success);font-size:0.82rem;font-family:var(--font-mono);">✓ 成功</span></td>
+                                            <td><span style="color:var(--success);font-size:0.82rem;font-family:var(--font-mono);">[OK] 成功</span></td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
