@@ -118,11 +118,12 @@ function optimizeSearchQuery(query) {
     optimized = optimized.replace(/\s+/g, ' ').trim();
 
     // 時系列キーワードの追加（最新情報が必要な場合）
-    const timeKeywords = ['最新', '今', '現在', 'latest', 'current', 'now', '2024', '2025', '2026'];
+    const currentYear = new Date().getFullYear();
+    const timeKeywords = ['最新', '今', '現在', 'latest', 'current', 'now', String(currentYear), String(currentYear + 1)];
     const hasTimeKeyword = timeKeywords.some(kw => query.toLowerCase().includes(kw));
 
-    if (hasTimeKeyword && !optimized.includes('2024') && !optimized.includes('2025') && !optimized.includes('2026')) {
-        optimized += ' 2024';
+    if (hasTimeKeyword && !optimized.includes(String(currentYear))) {
+        optimized += ` ${currentYear}`;
     }
 
     console.log(chalk.cyan(`[Search] Optimized query: "${query}" → "${optimized}"`));
@@ -450,13 +451,13 @@ function formatSearchResults(results) {
         return '';
     }
 
-    let formatted = '### 📡 最新のウェブ検索結果\n\n';
+    let formatted = '### [SEARCH_RESULTS] 最新のウェブ検索結果\n\n';
 
     results.forEach((result, index) => {
-        formatted += `**${index + 1}. ${result.title}**\n`;
+        formatted += `**[RESULT_${index + 1}] ${result.title}**\n`;
         formatted += `${result.snippet}\n`;
         if (result.url) {
-            formatted += `🔗 ${result.url}\n`;
+            formatted += `[SOURCE] ${result.url}\n`;
         }
         formatted += '\n';
     });
@@ -531,9 +532,9 @@ function shouldPerformWebSearch(message) {
     const shouldSearch = hasSearchKeyword || (isQuestion && message.length > 10) || hasTimeKeyword;
 
     if (shouldSearch) {
-        console.log(chalk.cyan(`[Search Decision] ✓ Web search enabled for: "${message.substring(0, 50)}..."`));
+        console.log(chalk.cyan(`[Search Decision] [SEARCH] Web search enabled for: "${message.substring(0, 50)}..."`));
     } else {
-        console.log(chalk.gray(`[Search Decision] ✗ Web search skipped for: "${message.substring(0, 50)}..."`));
+        console.log(chalk.gray(`[Search Decision] [SKIP] Web search skipped for: "${message.substring(0, 50)}..."`));
     }
 
     return shouldSearch;
@@ -589,7 +590,7 @@ async function generateChatResponse(client, message, aiConfig) {
             webResults = await performWebSearch(userMessage);
             const searchDuration = ((Date.now() - searchStartTime) / 1000).toFixed(1);
 
-            console.log(chalk.green(`[Search] ✓ Completed in ${searchDuration}s, found ${webResults.length} results`));
+            console.log(chalk.green(`[Search] [OK] Completed in ${searchDuration}s, found ${webResults.length} results`));
 
             searchSummary = formatSearchResults(webResults);
 
@@ -621,7 +622,7 @@ async function generateChatResponse(client, message, aiConfig) {
         // 会話履歴をプロンプトに組み込む
         let conversationContext = '';
         if (conversationHistory.length > 0) {
-            conversationContext = '\n### 📝 過去の会話履歴（参考程度に）\n';
+            conversationContext = '\n### [HISTORY] 過去の会話履歴（参考程度に）\n';
             conversationHistory.forEach((msg) => {
                 if (msg.role === 'user') {
                     conversationContext += `ユーザー: ${msg.content}\n`;
@@ -634,7 +635,7 @@ async function generateChatResponse(client, message, aiConfig) {
 
         const prompt = `${systemPrompt}
 
-### 🎯 応答ルール
+### [RULES] 応答ルール
 - 会話は自然でフレンドリーに
 - 200文字以内に収めてください
 - **絶対に絵文字を使用しないでください。**
@@ -646,13 +647,13 @@ async function generateChatResponse(client, message, aiConfig) {
 - 返答はメッセージ本文のみ
 ${conversationContext}
 
-### 💬 現在の会話情報（最重要）
+### [CONTEXT] 現在の会話情報（最重要）
 - サーバー名: ${server}
 - 発言者: ${user}
 - **ユーザーの最新メッセージ**: "${userMessage}"
 ${searchSummary ? '\n' + searchSummary : ''}
 
-### ✨ あなたの応答（最新メッセージに対する回答）:`;
+### [RESPONSE] あなたの応答（最新メッセージに対する回答）:`;
 
         const result = await client.geminiModel.generateContent(prompt);
         const text = result.response.text().trim().replace(/```/g, '');
@@ -672,7 +673,7 @@ ${searchSummary ? '\n' + searchSummary : ''}
             }
         }
 
-        console.log(chalk.magenta(`[Gemini] User: ${userMessage.substring(0, 50)}... | Response: ${text.substring(0, 50)}... | History: ${conversationHistory.length / 2} turns | Web: ${webResults.length > 0 ? '✓' : '✗'}`));
+        console.log(chalk.magenta(`[Gemini] User: ${userMessage.substring(0, 50)}... | Response: ${text.substring(0, 50)}... | History: ${conversationHistory.length / 2} turns | Web: ${webResults.length > 0 ? '[OK]' : '[SKIP]'}`));
         return text;
 
     } catch (error) {
