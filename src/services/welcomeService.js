@@ -1,9 +1,30 @@
 const chalk = require('chalk');
 const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require('./aiLimitService');
 
-async function generateWelcomeWithGemini(client, member) {
+// 無料枠: RPM=5, TPM=10K, 出力TPM=4K
+// リクエスト間に最低12秒のインターバルを設けてRPM制限を回避
+const REQUEST_INTERVAL_MS = 12000;
+let lastRequestTime = 0;
+
+/**
+ * RPM制限を考慮したスロットリング付きウェイト
+ */
+async function waitForRateLimit() {
+    const now = Date.now();
+    const elapsed = now - lastRequestTime;
+    if (elapsed < REQUEST_INTERVAL_MS) {
+        const waitMs = REQUEST_INTERVAL_MS - elapsed;
+        console.log(chalk.yellow(`[AI Throttle] Waiting ${waitMs}ms to respect rate limit...`));
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+    lastRequestTime = Date.now();
+}
+
+async function generateWelcomeWithClaude(client, member) {
     const { user, guild } = member;
     try {
+        await waitForRateLimit();
+
         const prompt = `あなたはDiscordサーバーのプロフェッショナルな歓迎担当AIです。新しく参加したユーザーに対する、洗練された歓迎メッセージを作成してください。
 
 # 指示
@@ -16,10 +37,17 @@ async function generateWelcomeWithGemini(client, member) {
 - タイトルは「Welcome to our community」などの短いフレーズにしてください（20文字以内）。
 - **絶対に絵文字（UTF-8文字、特殊記号、デコレーション等すべて）を使用しないでください。**
 - 説明文は、ユーザーへの敬意を表した呼びかけから始め、サーバーのコンセプトに基づいた期待感を抱かせる内容にしてください（150文字以内）。
-- 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式で出力してください。`;
+- 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式のみで出力してください。JSONのみ出力し、前後に余分なテキストを含めないでください。`;
 
-        const result = await client.geminiModel.generateContent(prompt);
-        let text = result.response.text().trim();
+        const message = await client.anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001', // 無料枠対応・最もトークン効率が高い
+            max_tokens: 256,                     // 出力TPM 4K制限内に収める
+            messages: [
+                { role: 'user', content: prompt }
+            ]
+        });
+
+        let text = message.content[0].text.trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
 
@@ -28,7 +56,7 @@ async function generateWelcomeWithGemini(client, member) {
 
         return JSON.parse(text);
     } catch (error) {
-        console.error('[ERROR] Geminiでのウェルカムメッセージ生成エラー:', error);
+        console.error('[ERROR] ClaudeでのウェルカムメッセージHaiku生成エラー:', error);
 
         // 失敗時にレート制限情報を記録
         const isRateLimit = isRateLimitError(error);
@@ -59,6 +87,8 @@ function replacePlaceholders(text, member, rulesChannelId) {
 }
 
 module.exports = {
-    generateWelcomeWithGemini,
+    generateWelcomeWithClaude,
+    // 後方互換のためエイリアスも提供
+    generateWelcomeWithGemini: generateWelcomeWithClaude,
     replacePlaceholders
 };

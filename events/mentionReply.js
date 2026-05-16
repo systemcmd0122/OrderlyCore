@@ -14,7 +14,7 @@ const MAX_HISTORY_LENGTH = 10; // 最大10往復分の履歴を保持
  * 会話履歴を取得または初期化
  * @param {string} userId - ユーザーID
  * @param {string} channelId - チャンネルID
- * @returns {Array} - 会話履歴
+ * @returns {Array} - 会話履歴 [{role: 'user'|'assistant', content: string}]
  */
 function getConversationHistory(userId, channelId) {
     const key = `${channelId}_${userId}`;
@@ -541,7 +541,7 @@ function shouldPerformWebSearch(message) {
 }
 
 /**
- * Gemini AI にチャット応答を生成させる関数(Web検索状態表示付き)
+ * Claude AI にチャット応答を生成させる関数 (Web検索状態表示付き)
  * @param {import('discord.js').Client} client
  * @param {import('discord.js').Message} message
  * @param {object} aiConfig
@@ -609,31 +609,18 @@ async function generateChatResponse(client, message, aiConfig) {
             searchSummary = '';
         }
 
-        // ペルソナ設定の処理
+        // ---- Claude API 呼び出し ----------------------------------------
+
+        // system プロンプト構築
         let systemPrompt = '';
         if (aiConfig.aiPersonalityPrompt && aiConfig.aiPersonalityPrompt.trim() !== '') {
-            // カスタムペルソナが設定されている場合
             systemPrompt = `あなたは以下のペルソナで応答してください:\n${aiConfig.aiPersonalityPrompt}`;
         } else {
-            // デフォルト: 通常のAIとして振る舞う
             systemPrompt = `あなたはOrderlyCoreという名前のAIアシスタントです。親切で知識豊富、そして自然な会話ができます。`;
         }
 
-        // 会話履歴をプロンプトに組み込む
-        let conversationContext = '';
-        if (conversationHistory.length > 0) {
-            conversationContext = '\n### [HISTORY] 過去の会話履歴（参考程度に）\n';
-            conversationHistory.forEach((msg) => {
-                if (msg.role === 'user') {
-                    conversationContext += `ユーザー: ${msg.content}\n`;
-                } else {
-                    conversationContext += `あなた: ${msg.content}\n`;
-                }
-            });
-            conversationContext += '\n※過去の話題に固執せず、現在のメッセージに適切に応答してください。\n';
-        }
-
-        const prompt = `${systemPrompt}
+        // 応答ルールを system に追加
+        systemPrompt += `
 
 ### [RULES] 応答ルール
 - 会話は自然でフレンドリーに
@@ -645,18 +632,35 @@ async function generateChatResponse(client, message, aiConfig) {
 - **検索結果から得た情報は信頼性が高いものとして扱ってください**
 - URLは表示しないでください
 - 返答はメッセージ本文のみ
-${conversationContext}
 
-### [CONTEXT] 現在の会話情報（最重要）
+### [CONTEXT] 現在の会話情報
 - サーバー名: ${server}
-- 発言者: ${user}
-- **ユーザーの最新メッセージ**: "${userMessage}"
-${searchSummary ? '\n' + searchSummary : ''}
+- 発言者: ${user}`;
 
-### [RESPONSE] あなたの応答（最新メッセージに対する回答）:`;
+        // 検索結果があれば system に含める（TPM節約のため先頭に配置）
+        if (searchSummary) {
+            systemPrompt += `\n\n${searchSummary}`;
+        }
 
-        const result = await client.geminiModel.generateContent(prompt);
-        const text = result.response.text().trim().replace(/```/g, '');
+        // Claude API の messages 配列を構築
+        // conversationHistory は [{role:'user'|'assistant', content:string}] 形式なのでそのまま使用できる
+        // 最後に今回のユーザーメッセージを追加
+        const messages = [
+            ...conversationHistory,
+            {
+                role: 'user',
+                content: userMessage
+            }
+        ];
+
+        const response = await client.anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001', // 無料枠: RPM 5, TPM 10K
+            max_tokens: 512,                     // 200文字応答を想定しつつ余裕を確保
+            system: systemPrompt,
+            messages
+        });
+
+        const text = response.content[0].text.trim().replace(/```/g, '');
 
         // レート制限情報を記録
         await recordSuccessRequest(client.rtdb, message.author.id);
@@ -673,11 +677,11 @@ ${searchSummary ? '\n' + searchSummary : ''}
             }
         }
 
-        console.log(chalk.magenta(`[Gemini] User: ${userMessage.substring(0, 50)}... | Response: ${text.substring(0, 50)}... | History: ${conversationHistory.length / 2} turns | Web: ${webResults.length > 0 ? '[OK]' : '[SKIP]'}`));
+        console.log(chalk.magenta(`[Claude] User: ${userMessage.substring(0, 50)}... | Response: ${text.substring(0, 50)}... | History: ${conversationHistory.length / 2} turns | Web: ${webResults.length > 0 ? '[OK]' : '[SKIP]'}`));
         return text;
 
     } catch (error) {
-        console.error(chalk.red('[ERROR] Gemini API error:'), error);
+        console.error(chalk.red('[ERROR] Claude API error:'), error);
 
         // レート制限エラーを判定して記録
         const isRateLimit = isRateLimitError(error);
@@ -770,7 +774,7 @@ async function handleMention(message, client) {
 
 // イベントリスナーをエクスポート
 module.exports = (client) => {
-    console.log(chalk.green('[MentionReply] [OK] Module loaded - Enhanced Web Search Engine v2.0'));
+    console.log(chalk.green('[MentionReply] [OK] Module loaded - Enhanced Web Search Engine v2.0 (Claude API)'));
     console.log(chalk.cyan('[MentionReply] [SEARCH] Multi-source search: DDG-API + DDG-HTML'));
     console.log(chalk.gray(`[MentionReply] [TIME] History timeout: ${CONVERSATION_TIMEOUT / 1000 / 60} minutes, Max turns: ${MAX_HISTORY_LENGTH}`));
     client.on(Events.MessageCreate, (message) => handleMention(message, client));

@@ -3,6 +3,10 @@ const chalk = require('chalk');
 
 /**
  * AIレート制限情報を管理するサービス
+ * Claude API 無料枠対応版
+ * - RPM: 5 (全モデル共通)
+ * - TPM: 10,000 (入力)
+ * - 出力TPM: 4,000
  */
 
 /**
@@ -161,22 +165,34 @@ async function getGlobalLimitInfo(rtdb) {
 }
 
 /**
- * Gemini APIエラーがレート制限エラーかどうかを判定
+ * Claude APIエラーがレート制限エラーかどうかを判定
+ *
+ * Claude APIのレート制限エラー:
+ *   - HTTP 429 (RateLimitError) : RPM / TPM 超過
+ *   - HTTP 529 (OverloadedError): サーバー過負荷
+ *   - error.type === 'rate_limit_error'
+ *
  * @param {Error} error
  * @returns {boolean}
  */
 function isRateLimitError(error) {
     if (!error) return false;
 
-    const message = (error.message || '').toLowerCase();
+    // Anthropic SDK は APIError を throw し、status と error.type を持つ
     const status = error.status;
+    const errorType = error.error?.type || '';
+    const message = (error.message || '').toLowerCase();
 
-    // Google APIのレート制限エラーコード
-    return status === 429 ||
-        message.includes('rate') ||
-        message.includes('quota') ||
-        message.includes('resource_exhausted') ||
-        error.code === 'RATE_LIMITED';
+    return (
+        status === 429 ||
+        status === 529 ||
+        errorType === 'rate_limit_error' ||
+        errorType === 'overloaded_error' ||
+        message.includes('rate limit') ||
+        message.includes('rate_limit') ||
+        message.includes('overloaded') ||
+        message.includes('too many requests')
+    );
 }
 
 module.exports = {

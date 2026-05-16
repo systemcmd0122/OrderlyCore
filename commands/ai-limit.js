@@ -53,10 +53,10 @@ async function showUserLimit(interaction) {
 
         const embed = new EmbedBuilder()
             .setColor(Colors.Blurple)
-            .setTitle(`[STATS] ${interaction.user.username} のAIレート制限情報`)
+            .setTitle(`📊 ${interaction.user.username} のAIレート制限情報`)
             .addFields(
                 {
-                    name: '[DATA] リクエスト統計',
+                    name: '📈 リクエスト統計',
                     value: [
                         `**総リクエスト**: ${limitInfo.totalRequests || 0}`,
                         `**成功**: ${limitInfo.successRequests || 0}`,
@@ -66,7 +66,7 @@ async function showUserLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '[WARN] レート制限情報',
+                    name: '[WARN] レート制限情報 (Claude API 無料枠: RPM 5)',
                     value: [
                         `**制限回数**: ${limitInfo.rateLimitedCount || 0}`,
                         `**最後の制限**: ${limitInfo.lastRateLimitTime ? new Date(limitInfo.lastRateLimitTime).toLocaleString('ja-JP') : 'なし'}`
@@ -82,14 +82,14 @@ async function showUserLimit(interaction) {
                     inline: false
                 }
             )
-            .setFooter({ text: '情報は分単位で更新されます' })
+            .setFooter({ text: 'Claude API (claude-haiku-4-5) | 情報は分単位で更新されます' })
             .setTimestamp();
 
         // ステータス判定
         if (limitInfo.rateLimitedCount > 5) {
             embed.addFields({
                 name: '[WARN] 警告',
-                value: 'レート制限に複数回到達しています。しばらく時間をおいてからお使いください。',
+                value: 'レート制限に複数回到達しています。しばらく時間をおいてからお使いください。\nClaude API 無料枠のRPM制限: 全モデル合計 5リクエスト/分',
                 inline: false
             });
         }
@@ -121,10 +121,10 @@ async function showGlobalLimit(interaction) {
 
         const embed = new EmbedBuilder()
             .setColor(Colors.Gold)
-            .setTitle('[GLOBAL] AIレート制限 グローバル情報')
+            .setTitle('🌍 AIレート制限 グローバル情報')
             .addFields(
                 {
-                    name: '[USERS] ユーザー統計',
+                    name: '👥 ユーザー統計',
                     value: [
                         `**AI使用ユーザー数**: ${globalInfo.totalUsers}`,
                         `**総リクエスト数**: ${globalInfo.totalRequests}`,
@@ -134,7 +134,7 @@ async function showGlobalLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '[STATS] リクエスト成功率',
+                    name: '📊 リクエスト成功率',
                     value: `**${globalInfo.successRate}%**`,
                     inline: true
                 },
@@ -152,14 +152,14 @@ async function showGlobalLimit(interaction) {
                 .join('\n');
 
             embed.addFields({
-                name: '[ALERT] 最近レート制限を受けたユーザー (直近1時間)',
+                name: '🔴 最近レート制限を受けたユーザー (直近1時間)',
                 value: recentlyLimitedText || 'なし',
                 inline: false
             });
         }
 
         embed
-            .setFooter({ text: 'サーバー全体のAI利用統計です' })
+            .setFooter({ text: 'Claude API (claude-haiku-4-5) 無料枠 | サーバー全体のAI利用統計です' })
             .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });

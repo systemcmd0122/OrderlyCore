@@ -1,12 +1,13 @@
 const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Anthropic = require('@anthropic-ai/sdk');
 const { db, rtdb } = require('./firebase');
 const fs = require('node:fs');
 const path = require('node:path');
 const chalk = require('chalk');
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY
+});
 
 const client = new Client({
     intents: [
@@ -23,7 +24,7 @@ const client = new Client({
 client.db = db;
 client.rtdb = rtdb;
 client.commands = new Collection();
-client.geminiModel = geminiModel;
+client.anthropic = anthropic;
 
 function loadCommands() {
     console.log(chalk.blue('[INFO] Loading commands...'));
