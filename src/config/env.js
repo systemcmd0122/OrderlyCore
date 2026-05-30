@@ -12,7 +12,9 @@ const requiredEnvVars = [
     'FIREBASE_APP_ID',
     'GOOGLE_API_KEY',
     'SESSION_SECRET',
-    'ADMIN_PASSWORD'
+    'ADMIN_PASSWORD',
+    'DISCORD_CLIENT_SECRET',
+    'CALLBACK_URL'
 ];
 
 function validateEnv() {

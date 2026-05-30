@@ -8,6 +8,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const passport = require('passport');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const path = require('node:path');
@@ -33,13 +34,15 @@ app.use(cookieParser());
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     cookie: {
         secure: NODE_ENV === 'production',
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000
     }
 }));
+app.use(passport.initialize());
+app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 3. Security Headers Middleware
