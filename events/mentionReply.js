@@ -532,9 +532,9 @@ function shouldPerformWebSearch(message) {
     const shouldSearch = hasSearchKeyword || (isQuestion && message.length > 10) || hasTimeKeyword;
 
     if (shouldSearch) {
-        console.log(chalk.cyan(`[Search Decision] 🔍 Web search enabled for: "${message.substring(0, 50)}..."`));
+        console.log(chalk.cyan(`[Search Decision] [SEARCH] Web search enabled for: "${message.substring(0, 50)}..."`));
     } else {
-        console.log(chalk.gray(`[Search Decision] ⏭️ Web search skipped for: "${message.substring(0, 50)}..."`));
+        console.log(chalk.gray(`[Search Decision] [SKIP] Web search skipped for: "${message.substring(0, 50)}..."`));
     }
 
     return shouldSearch;
@@ -574,12 +574,12 @@ async function generateChatResponse(client, message, aiConfig) {
         let searchSummary = '';
 
         if (needsWebSearch) {
-            console.log(chalk.cyan('[AI] 🔍 Web search triggered'));
+            console.log(chalk.cyan('[AI] [SEARCH] Web search triggered'));
 
             // Web検索中の状態を表示
             try {
                 statusMessage = await message.reply({
-                    content: '🔍 **Web検索中...**\n最新情報をインターネットから取得しています...',
+                    content: '[SEARCH] **Web検索中...**\n最新情報をインターネットから取得しています...',
                     allowedMentions: { repliedUser: false }
                 });
             } catch (err) {
@@ -590,7 +590,7 @@ async function generateChatResponse(client, message, aiConfig) {
             webResults = await performWebSearch(userMessage);
             const searchDuration = ((Date.now() - searchStartTime) / 1000).toFixed(1);
 
-            console.log(chalk.green(`[Search] ✅ Completed in ${searchDuration}s, found ${webResults.length} results`));
+            console.log(chalk.green(`[Search] [OK] Completed in ${searchDuration}s, found ${webResults.length} results`));
 
             searchSummary = formatSearchResults(webResults);
 
@@ -598,14 +598,14 @@ async function generateChatResponse(client, message, aiConfig) {
             if (statusMessage) {
                 try {
                     await statusMessage.edit({
-                        content: `✅ **検索完了!** (${webResults.length}件)\n⏳ **AI回答生成中...**`
+                        content: `[OK] **検索完了!** (${webResults.length}件)\n[WAIT] **AI回答生成中...**`
                     });
                 } catch (err) {
                     console.error(chalk.yellow('[Status] Failed to update status:'), err.message);
                 }
             }
         } else {
-            console.log(chalk.gray('[AI] ⏭️ Skipping web search - not needed'));
+            console.log(chalk.gray('[AI] [SKIP] Skipping web search - not needed'));
             searchSummary = '';
         }
 
@@ -677,11 +677,11 @@ async function generateChatResponse(client, message, aiConfig) {
             }
         }
 
-        console.log(chalk.magenta(`[Claude] User: ${userMessage.substring(0, 50)}... | Response: ${text.substring(0, 50)}... | History: ${conversationHistory.length / 2} turns | Web: ${webResults.length > 0 ? '✅' : '⏭️'}`));
+        console.log(chalk.magenta(`[Claude] User: ${userMessage.substring(0, 50)}... | Response: ${text.substring(0, 50)}... | History: ${conversationHistory.length / 2} turns | Web: ${webResults.length > 0 ? '[OK]' : '[SKIP]'}`));
         return text;
 
     } catch (error) {
-        console.error(chalk.red('❌ Claude API error:'), error);
+        console.error(chalk.red('[ERROR] Claude API error:'), error);
 
         // レート制限エラーを判定して記録
         const isRateLimit = isRateLimitError(error);
@@ -754,7 +754,7 @@ async function handleMention(message, client) {
         });
 
     } catch (error) {
-        console.error(chalk.red('❌ Mention handler error:'), error);
+        console.error(chalk.red('[ERROR] Mention handler error:'), error);
 
         // タイピングインジケータを停止
         if (typingInterval) {
@@ -767,15 +767,15 @@ async function handleMention(message, client) {
                 allowedMentions: { repliedUser: false }
             });
         } catch (replyError) {
-            console.error(chalk.red('❌ Failed to send error message:'), replyError);
+            console.error(chalk.red('[ERROR] Failed to send error message:'), replyError);
         }
     }
 }
 
 // イベントリスナーをエクスポート
 module.exports = (client) => {
-    console.log(chalk.green('[MentionReply] ✅ Module loaded - Enhanced Web Search Engine v2.0 (Claude API)'));
-    console.log(chalk.cyan('[MentionReply] 🔍 Multi-source search: DDG-API + DDG-HTML'));
+    console.log(chalk.green('[MentionReply] [OK] Module loaded - Enhanced Web Search Engine v2.0 (Claude API)'));
+    console.log(chalk.cyan('[MentionReply] [SEARCH] Multi-source search: DDG-API + DDG-HTML'));
     console.log(chalk.gray(`[MentionReply] [TIME] History timeout: ${CONVERSATION_TIMEOUT / 1000 / 60} minutes, Max turns: ${MAX_HISTORY_LENGTH}`));
     client.on(Events.MessageCreate, (message) => handleMention(message, client));
 };

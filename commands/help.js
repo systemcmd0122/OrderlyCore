@@ -60,7 +60,7 @@ module.exports = {
                     inline: false 
                 },
                 { 
-                    name: 'ℹ️ 一般',
+                    name: '[INFO] 一般',
                     value: [
                         ...commands.general.map(cmd => `> </${cmd.name}:${interaction.client.application.id}>: ${cmd.description}`),
                         `> </help:${interaction.client.application.id}>: ヘルプを表示します。`

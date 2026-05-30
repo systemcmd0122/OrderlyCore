@@ -57,7 +57,7 @@ module.exports = {
                 await interaction.editReply({ embeds: [replyEmbed] });
 
                 const dmEmbed = createStandardEmbed({
-                    title: `⚠️ ${interaction.guild.name} からの警告`,
+                    title: `[WARN] ${interaction.guild.name} からの警告`,
                     description: `サーバー内で警告を受けました。`,
                     color: COLORS.WARNING,
                     fields: [
@@ -69,8 +69,8 @@ module.exports = {
                 await targetUser.send({ embeds: [dmEmbed] }).catch(() => null);
 
             } catch (error) {
-                console.error('❌ 警告の追加失敗:', error);
-                await interaction.editReply({ content: '❌ 記録に失敗しました。' });
+                console.error('[ERROR] 警告の追加失敗:', error);
+                await interaction.editReply({ content: '[ERROR] 記録に失敗しました。' });
             }
 
         } else if (subcommand === 'history') {
@@ -101,8 +101,8 @@ module.exports = {
                 }
                 await interaction.editReply({ embeds: [embed] });
             } catch (error) {
-                console.error('❌ 警告履歴取得失敗:', error);
-                await interaction.editReply({ content: '❌ 取得に失敗しました。' });
+                console.error('[ERROR] 警告履歴取得失敗:', error);
+                await interaction.editReply({ content: '[ERROR] 取得に失敗しました。' });
             }
         }
     }

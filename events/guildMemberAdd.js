@@ -21,12 +21,12 @@ module.exports = {
             let guildConfig = guildConfigSnap.exists() ? guildConfigSnap.data() : {};
 
             if (user.bot) {
-                console.log(`ℹ️ Bot ${user.tag} joined ${member.guild.name}`);
+                console.log(`[INFO] Bot ${user.tag} joined ${member.guild.name}`);
                 if (guildSettings.botAutoroleId) {
                     const role = member.guild.roles.cache.get(guildSettings.botAutoroleId);
                     if (role && member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles) && role.position < member.guild.members.me.roles.highest.position) {
-                        await member.roles.add(role).catch(e => console.error('❌ Bot role add failure:', e.message));
-                        console.log(`✅ Role ${role.name} assigned to Bot ${user.tag}`);
+                        await member.roles.add(role).catch(e => console.error('[ERROR] Bot role add failure:', e.message));
+                        console.log(`[OK] Role ${role.name} assigned to Bot ${user.tag}`);
                     }
                 }
                 return;
@@ -77,7 +77,7 @@ module.exports = {
             if (guildConfig.welcomeRoleId) {
                 const welcomeRole = member.guild.roles.cache.get(guildConfig.welcomeRoleId);
                 if (welcomeRole && member.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageRoles) && welcomeRole.position < member.guild.members.me.roles.highest.position) {
-                    await member.roles.add(welcomeRole).catch(e => console.error('❌ Welcome role add failure:', e.message));
+                    await member.roles.add(welcomeRole).catch(e => console.error('[ERROR] Welcome role add failure:', e.message));
                 }
             }
 
@@ -92,11 +92,11 @@ module.exports = {
                     }
                 }, { merge: true });
             } catch (error) {
-                console.error(`❌ Statistics update failure:`, error.message);
+                console.error(`[ERROR] Statistics update failure:`, error.message);
             }
 
         } catch (error) {
-            console.error('❌ guildMemberAdd error:', error);
+            console.error('[ERROR] guildMemberAdd error:', error);
         }
     },
 };

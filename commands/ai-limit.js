@@ -28,7 +28,7 @@ module.exports = {
         } catch (error) {
             console.error(`[AI Limit Command] Error:`, error);
             await interaction.reply({
-                content: '❌ レート制限情報の取得に失敗しました。',
+                content: '[ERROR] レート制限情報の取得に失敗しました。',
                 ephemeral: true
             }).catch(() => { });
         }
@@ -47,7 +47,7 @@ async function showUserLimit(interaction) {
 
         if (!limitInfo) {
             return await interaction.editReply({
-                content: 'ℹ️ あなたはまだAIを使用していません。'
+                content: '[INFO] あなたはまだAIを使用していません。'
             });
         }
 
@@ -66,7 +66,7 @@ async function showUserLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '⚠️ レート制限情報 (Claude API 無料枠: RPM 5)',
+                    name: '[WARN] レート制限情報 (Claude API 無料枠: RPM 5)',
                     value: [
                         `**制限回数**: ${limitInfo.rateLimitedCount || 0}`,
                         `**最後の制限**: ${limitInfo.lastRateLimitTime ? new Date(limitInfo.lastRateLimitTime).toLocaleString('ja-JP') : 'なし'}`
@@ -88,7 +88,7 @@ async function showUserLimit(interaction) {
         // ステータス判定
         if (limitInfo.rateLimitedCount > 5) {
             embed.addFields({
-                name: '⚠️ 警告',
+                name: '[WARN] 警告',
                 value: 'レート制限に複数回到達しています。しばらく時間をおいてからお使いください。\nClaude API 無料枠のRPM制限: 全モデル合計 5リクエスト/分',
                 inline: false
             });
@@ -98,7 +98,7 @@ async function showUserLimit(interaction) {
     } catch (error) {
         console.error(`[AI Limit Command] Error showing user limit:`, error);
         await interaction.editReply({
-            content: '❌ 情報の取得に失敗しました。'
+            content: '[ERROR] 情報の取得に失敗しました。'
         });
     }
 }
@@ -115,7 +115,7 @@ async function showGlobalLimit(interaction) {
 
         if (!globalInfo) {
             return await interaction.editReply({
-                content: 'ℹ️ レート制限情報がまだ記録されていません。'
+                content: '[INFO] レート制限情報がまだ記録されていません。'
             });
         }
 
@@ -139,7 +139,7 @@ async function showGlobalLimit(interaction) {
                     inline: true
                 },
                 {
-                    name: '⚠️ 制限発生回数',
+                    name: '[WARN] 制限発生回数',
                     value: `**${globalInfo.totalRateLimited}回**`,
                     inline: true
                 }
@@ -166,7 +166,7 @@ async function showGlobalLimit(interaction) {
     } catch (error) {
         console.error(`[AI Limit Command] Error showing global limit:`, error);
         await interaction.editReply({
-            content: '❌ グローバル情報の取得に失敗しました。'
+            content: '[ERROR] グローバル情報の取得に失敗しました。'
         });
     }
 }

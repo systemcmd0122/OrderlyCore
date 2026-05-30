@@ -22,7 +22,7 @@ async function saveLogToFirestore(client, guild, logData) {
         };
         await addDoc(collection(client.db, 'audit_logs'), logWithDefaults);
     } catch (error) {
-        console.error('❌ Firestoreへの監査ログ保存に失敗しました:', error);
+        console.error('[ERROR] Firestoreへの監査ログ保存に失敗しました:', error);
     }
 }
 
@@ -40,7 +40,7 @@ async function sendLog(client, guild, embed, firestoreData) {
             }
         }
     } catch (error) {
-        console.error('❌ 監査ログのチャンネル送信に失敗しました:', error);
+        console.error('[ERROR] 監査ログのチャンネル送信に失敗しました:', error);
     }
 }
 
@@ -101,7 +101,7 @@ module.exports = (client) => {
             await sendLog(client, message.guild, embed, firestoreData);
 
         } catch (error) {
-            console.error("❌ メッセージ削除ログの処理失敗:", error);
+            console.error("[ERROR] メッセージ削除ログの処理失敗:", error);
         }
     });
 

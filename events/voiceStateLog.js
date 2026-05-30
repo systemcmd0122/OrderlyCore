@@ -18,7 +18,7 @@ class MessageDeleteManager {
             try {
                 if (message && !message.deleted) await message.delete();
             } catch (error) {
-                if (error.code !== 10008) console.error(chalk.red('❌ Error deleting voice message:'), error);
+                if (error.code !== 10008) console.error(chalk.red('[ERROR] Error deleting voice message:'), error);
             } finally {
                 this.scheduledDeletions.delete(messageId);
             }
@@ -52,7 +52,7 @@ async function getLogChannelIdForVc(db, guildId, voiceChannelId) {
         }
         return null;
     } catch (error) {
-        console.error(chalk.red(`❌ Error fetching log channel for VC ${voiceChannelId}:`), error);
+        console.error(chalk.red(`[ERROR] Error fetching log channel for VC ${voiceChannelId}:`), error);
         return null;
     }
 }
@@ -77,7 +77,7 @@ async function getVcLogConfig(db, guildId, voiceChannelId) {
         // デフォルト設定を返す
         return { silent: true, deleteAfter: true };
     } catch (error) {
-        console.error(chalk.red(`❌ Error fetching VC log config for ${voiceChannelId}:`), error);
+        console.error(chalk.red(`[ERROR] Error fetching VC log config for ${voiceChannelId}:`), error);
         return { silent: true, deleteAfter: true };
     }
 }
@@ -189,7 +189,7 @@ async function updateUserStayTime(db, guildId, userId, stayDuration) {
         }, { merge: true });
         console.log(chalk.blue(`[STATS] Voice stats updated for ${userId}. Added ${Math.round(stayDuration / 1000)}s`));
     } catch (error) {
-        console.error(chalk.red(`❌ Error updating user stay time for ${userId}:`), error);
+        console.error(chalk.red(`[ERROR] Error updating user stay time for ${userId}:`), error);
     }
 }
 
@@ -215,7 +215,7 @@ async function sendVcLog(logChannel, content, config) {
 
         return message;
     } catch (error) {
-        console.error(chalk.red('❌ Error sending VC log:'), error);
+        console.error(chalk.red('[ERROR] Error sending VC log:'), error);
         return null;
     }
 }
@@ -235,7 +235,7 @@ async function handleVoiceJoin(newState, client) {
             const config = await getVcLogConfig(db, guild.id, channel.id);
             await sendVcLog(logChannel, `[JOIN] **${member.displayName}** が **${channel.name}** に参加しました`, config);
         } catch (error) {
-            console.error(chalk.red('❌ Error sending join log:'), error);
+            console.error(chalk.red('[ERROR] Error sending join log:'), error);
         }
     }
 }
@@ -265,7 +265,7 @@ async function handleVoiceLeave(oldState, client) {
             const config = await getVcLogConfig(db, guild.id, channel.id);
             await sendVcLog(logChannel, `[EXIT] **${member.displayName}** が **${channel.name}** から退出しました`, config);
         } catch (error) {
-            console.error(chalk.red('❌ Error sending leave log:'), error);
+            console.error(chalk.red('[ERROR] Error sending leave log:'), error);
         }
     }
 }
@@ -325,16 +325,16 @@ module.exports = {
                         }
                         await sendVcLog(logChannel, `[MOVE] **${newState.member.displayName}** が **${oldState.channel.name}** から **${newState.channel.name}** に移動しました`, config);
                     } catch (error) {
-                        console.error(chalk.red('❌ Error sending move log:'), error);
+                        console.error(chalk.red('[ERROR] Error sending move log:'), error);
                     }
                 }
             }
         } catch (error) {
-            console.error(chalk.red('❌ Error in voice state update handler:'), error);
+            console.error(chalk.red('[ERROR] Error in voice state update handler:'), error);
         }
     },
     shutdown() {
         deleteManager.cleanup();
-        console.log(chalk.yellow('ℹ️ Voice state log module shutdown completed'));
+        console.log(chalk.yellow('[INFO] Voice state log module shutdown completed'));
     },
 };

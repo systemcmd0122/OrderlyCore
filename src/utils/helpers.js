@@ -5,7 +5,7 @@ async function keepAlive() {
     const appUrl = process.env.APP_URL;
 
     if (!appUrl) {
-        console.warn(chalk.yellow('⚠️ APP_URL is not set. Keep-alive is disabled.'));
+        console.warn(chalk.yellow('[WARN] APP_URL is not set. Keep-alive is disabled.'));
         return;
     }
 

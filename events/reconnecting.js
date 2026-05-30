@@ -3,7 +3,7 @@ const { ActivityType } = require('discord.js');
 module.exports = {
     name: 'reconnecting',
     execute(client) {
-        console.log('ℹ️ Discordに再接続中...');
+        console.log('[INFO] Discordに再接続中...');
         
         // 再接続中のステータス更新
         if (client.user) {

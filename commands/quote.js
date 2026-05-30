@@ -8,10 +8,10 @@ try {
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Regular.ttf'), 'NotoSansJP');
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Bold.ttf'), 'NotoSansJP-Bold');
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Light.ttf'), 'NotoSansJP-Light');
-    console.log('✅ フォントが正常に読み込まれました');
+    console.log('[OK] フォントが正常に読み込まれました');
 } catch (error) {
-    console.error('❌ フォントの読み込みエラー:', error.message);
-    console.error('ℹ️ `fonts`ディレクトリにNoto Sans JPフォントファイルを配置してください');
+    console.error('[ERROR] フォントの読み込みエラー:', error.message);
+    console.error('[INFO] `fonts`ディレクトリにNoto Sans JPフォントファイルを配置してください');
 }
 
 // --- 最新のモダンテーマ ---
@@ -308,7 +308,7 @@ module.exports = {
             const messageId = extractMessageId(input);
             if (!messageId) {
                 return await interaction.editReply({
-                    content: '❌ 無効なメッセージIDまたはURLです。\nℹ️ メッセージを右クリック→「IDをコピー」または、メッセージリンクをコピーしてください。',
+                    content: '[ERROR] 無効なメッセージIDまたはURLです。\n[INFO] メッセージを右クリック→「IDをコピー」または、メッセージリンクをコピーしてください。',
                     ephemeral: true
                 });
             }
@@ -318,14 +318,14 @@ module.exports = {
             
             if (!targetMessage) {
                 return await interaction.editReply({
-                    content: '❌ メッセージが見つかりませんでした。\nℹ️ このサーバー内のメッセージか確認してください。',
+                    content: '[ERROR] メッセージが見つかりませんでした。\n[INFO] このサーバー内のメッセージか確認してください。',
                     ephemeral: true
                 });
             }
 
             if (!targetMessage.content || targetMessage.content.trim() === '') {
                 return await interaction.editReply({
-                    content: '❌ このメッセージには引用できるテキストがありません。',
+                    content: '[ERROR] このメッセージには引用できるテキストがありません。',
                     ephemeral: true
                 });
             }
@@ -550,7 +550,7 @@ module.exports = {
             
             const errorMessage = error.message || '不明なエラー';
             await interaction.editReply({
-                content: `❌ 画像生成中にエラーが発生しました。\n\`\`\`\n${errorMessage}\n\`\`\``,
+                content: `[ERROR] 画像生成中にエラーが発生しました。\n\`\`\`\n${errorMessage}\n\`\`\``,
                 ephemeral: true
             }).catch(console.error);
         }

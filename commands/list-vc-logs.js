@@ -12,7 +12,7 @@ module.exports = {
 
         const guildId = interaction.guild.id;
         const db = interaction.client.db;
-        if (!db) return interaction.editReply({ content: '❌ データベース接続失敗。' });
+        if (!db) return interaction.editReply({ content: '[ERROR] データベース接続失敗。' });
 
         const settingsRef = doc(db, 'guild_settings', guildId);
         const docSnap = await getDoc(settingsRef);

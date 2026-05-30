@@ -50,7 +50,7 @@ async function handleMessage(message, client) {
         }
 
     } catch (error) {
-        console.error('❌ オートモデレーターの処理失敗:', error);
+        console.error('[ERROR] オートモデレーターの処理失敗:', error);
     }
 }
 

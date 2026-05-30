@@ -50,8 +50,8 @@ module.exports = {
             
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.error('❌ ランクコマンドの実行エラー:', error);
-            await interaction.editReply({ content: '❌ ランク情報の取得中にエラーが発生しました。' });
+            console.error('[ERROR] ランクコマンドの実行エラー:', error);
+            await interaction.editReply({ content: '[ERROR] ランク情報の取得中にエラーが発生しました。' });
         }
     }
 };

@@ -38,7 +38,7 @@ module.exports = {
                 const channel = interaction.options.getChannel('channel');
 
                 if (!channel.permissionsFor(interaction.client.user).has([PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ViewChannel])) {
-                    return await interaction.editReply({ content: `❌ ${channel} でメッセージを送信・編集する権限がありません。` });
+                    return await interaction.editReply({ content: `[ERROR] ${channel} でメッセージを送信・編集する権限がありません。` });
                 }
 
                 const initialEmbed = createStandardEmbed({
@@ -84,7 +84,7 @@ module.exports = {
                 }, { merge: true });
 
                 const embed = createStandardEmbed({
-                    title: '✅ 設定解除',
+                    title: '[OK] 設定解除',
                     description: 'ランキングボードを無効化しました。',
                     color: COLORS.WARNING
                 });
@@ -92,8 +92,8 @@ module.exports = {
                 console.log(chalk.yellow(`[Rankboard] Disabled in guild ${interaction.guild.name}`));
             }
         } catch (error) {
-            console.error('❌ rankboard コマンドエラー:', error);
-            await interaction.editReply({ content: '❌ 設定中にエラーが発生しました。' });
+            console.error('[ERROR] rankboard コマンドエラー:', error);
+            await interaction.editReply({ content: '[ERROR] 設定中にエラーが発生しました。' });
         }
     }
 };
