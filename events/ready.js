@@ -8,7 +8,7 @@ module.exports = {
     name: 'ready',
     once: true,
     async execute(client) {
-        console.log(chalk.bold.greenBright(`[OK] ${client.user.tag} が起動しました！`));
+        console.log(chalk.bold.greenBright(`✅ ${client.user.tag} が起動しました！`));
         
         // Initial setup
         client.user.setActivity('起動中...', { type: ActivityType.Custom });
@@ -22,6 +22,6 @@ module.exports = {
         setTimeout(() => updateRankboards(client), 10000);
         setInterval(() => updateRankboards(client), 5 * 60 * 1000);
 
-        console.log(chalk.green('[OK] Bot services initialized.'));
+        console.log(chalk.green('✅ Bot services initialized.'));
     }
 };

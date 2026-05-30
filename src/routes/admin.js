@@ -167,12 +167,12 @@ router.post('/announce', isAdminAuthenticated, async (req, res) => {
                     if (channel && channel.isTextBased()) {
                         return channel.send({ embeds: [embed] }).then(() => {
                             sentCount++;
-                            console.log(chalk.green(`[OK] Announcement sent to guild ${doc.id}`));
+                            console.log(chalk.green(`✅ Announcement sent to guild ${doc.id}`));
                         });
                     }
                 })
                 .catch(err => {
-                    console.error(chalk.red(`[ERROR] Failed to send announcement to ${channelId}:`), err.message);
+                    console.error(chalk.red(`❌ Failed to send announcement to ${channelId}:`), err.message);
                 });
             sendPromises.push(promise);
         });

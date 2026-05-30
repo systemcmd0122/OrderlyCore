@@ -161,11 +161,11 @@ module.exports = {
                     await this.handleDelete(interaction, guildId);
                     break;
                 default:
-                    await interaction.editReply({ content: '[ERROR] 無効なサブコマンドです。' });
+                    await interaction.editReply({ content: '❌ 無効なサブコマンドです。' });
             }
         } catch (error) {
-            console.error('[ERROR] ロールボードコマンドエラー:', error);
-            await interaction.editReply({ content: '[ERROR] コマンドの実行中にエラーが発生しました。' });
+            console.error('❌ ロールボードコマンドエラー:', error);
+            await interaction.editReply({ content: '❌ コマンドの実行中にエラーが発生しました。' });
         }
     },
 
@@ -181,12 +181,12 @@ module.exports = {
             if (colorMatch) {
                 embedColor = parseInt(colorMatch[1], 16);
             } else {
-                return await interaction.editReply({ content: '[ERROR] 無効な色の形式です。' });
+                return await interaction.editReply({ content: '❌ 無効な色の形式です。' });
             }
         }
 
         if (password && password.length > 128) {
-            return await interaction.editReply({ content: '[ERROR] パスワードは128文字以内で指定してください。' });
+            return await interaction.editReply({ content: '❌ パスワードは128文字以内で指定してください。' });
         }
 
         const boardId = `rb_${guildId}_${Date.now()}`;
@@ -216,7 +216,7 @@ module.exports = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            await interaction.editReply({ content: '[ERROR] ロールボードの作成に失敗しました。' });
+            await interaction.editReply({ content: '❌ ロールボードの作成に失敗しました。' });
         }
     },
 
@@ -230,12 +230,12 @@ module.exports = {
             const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
             
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
+                return await interaction.editReply({ content: '❌ ロールボードが見つかりません。' });
             }
 
             const botMember = interaction.guild.members.cache.get(interaction.client.user.id);
             if (role.position >= botMember.roles.highest.position) {
-                return await interaction.editReply({ content: '[ERROR] ボットの権限不足です。' });
+                return await interaction.editReply({ content: '❌ ボットの権限不足です。' });
             }
 
             const boardData = boardDoc.data();
@@ -266,7 +266,7 @@ module.exports = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            await interaction.editReply({ content: '[ERROR] ロールの追加に失敗しました。' });
+            await interaction.editReply({ content: '❌ ロールの追加に失敗しました。' });
         }
     },
 
@@ -277,12 +277,12 @@ module.exports = {
         try {
             const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
+                return await interaction.editReply({ content: '❌ ロールボードが見つかりません。' });
             }
 
             const boardData = boardDoc.data();
             if (!boardData.roles[role.id]) {
-                return await interaction.editReply({ content: '[ERROR] 登録されていないロールです。' });
+                return await interaction.editReply({ content: '❌ 登録されていないロールです。' });
             }
 
             const roleGenre = boardData.roles[role.id].genre;
@@ -309,7 +309,7 @@ module.exports = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            await interaction.editReply({ content: '[ERROR] ロールの削除に失敗しました。' });
+            await interaction.editReply({ content: '❌ ロールの削除に失敗しました。' });
         }
     },
 
@@ -321,14 +321,14 @@ module.exports = {
         try {
             const boardDoc = await getDoc(doc(interaction.client.db, 'roleboards', boardId));
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
+                return await interaction.editReply({ content: '❌ ロールボードが見つかりません。' });
             }
 
             const boardData = boardDoc.data();
             const roles = Object.keys(boardData.roles);
 
             if (roles.length === 0) {
-                return await interaction.editReply({ content: '[ERROR] ロールが登録されていません。' });
+                return await interaction.editReply({ content: '❌ ロールが登録されていません。' });
             }
 
             let passwordToUse = boardData.password;
@@ -394,9 +394,9 @@ module.exports = {
             if (currentRow.components.length > 0 && components.length < 5) components.push(currentRow);
 
             await targetChannel.send({ embeds: [embed], components });
-            await interaction.editReply({ content: `[OK] ロールボードを ${targetChannel} に送信しました。` });
+            await interaction.editReply({ content: `✅ ロールボードを ${targetChannel} に送信しました。` });
         } catch (error) {
-            await interaction.editReply({ content: '[ERROR] ロールボードの送信に失敗しました。' });
+            await interaction.editReply({ content: '❌ ロールボードの送信に失敗しました。' });
         }
     },
 
@@ -406,7 +406,7 @@ module.exports = {
             const q = query(boardsRef, where('guildId', '==', guildId));
             const snapshot = await getDocs(q);
 
-            if (snapshot.empty) return await interaction.editReply({ content: '[INFO] ロールボードがありません。' });
+            if (snapshot.empty) return await interaction.editReply({ content: 'ℹ️ ロールボードがありません。' });
 
             const boards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -425,7 +425,7 @@ module.exports = {
             embed.addFields([{ name: 'ボード一覧', value: boardList || 'なし', inline: false }]);
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            await interaction.editReply({ content: '[ERROR] 取得に失敗しました。' });
+            await interaction.editReply({ content: '❌ 取得に失敗しました。' });
         }
     },
 
@@ -435,12 +435,12 @@ module.exports = {
             const boardRef = doc(interaction.client.db, 'roleboards', boardId);
             const boardDoc = await getDoc(boardRef);
             if (!boardDoc.exists() || boardDoc.data().guildId !== guildId) {
-                return await interaction.editReply({ content: '[ERROR] ロールボードが見つかりません。' });
+                return await interaction.editReply({ content: '❌ ロールボードが見つかりません。' });
             }
             await deleteDoc(boardRef);
             await interaction.editReply({ embeds: [createSuccessEmbed('削除完了', `ロールボードを削除しました。`)] });
         } catch (error) {
-            await interaction.editReply({ content: '[ERROR] 削除に失敗しました。' });
+            await interaction.editReply({ content: '❌ 削除に失敗しました。' });
         }
     }
 };

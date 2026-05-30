@@ -33,7 +33,7 @@ async function generateLevelUpComment(client, user, newLevel, serverName) {
 
         return text || `**${user.displayName} が新たな境地へ到達しました！**`;
     } catch (error) {
-        console.error(chalk.red('[ERROR] Gemini APIでのコメント生成に失敗:'), error.message);
+        console.error(chalk.red('❌ Gemini APIでのコメント生成に失敗:'), error.message);
 
         // 失敗時にレート制限情報を記録
         const isRateLimit = isRateLimitError(error);

@@ -33,8 +33,8 @@ module.exports = {
             if (targetUser) await this.displayUserStats(interaction, targetUser);
             else await this.displayServerRanking(interaction);
         } catch (error) {
-            console.error('[ERROR] vc-stats failure:', error);
-            await interaction.editReply({ content: '[ERROR] 統計の取得に失敗しました。' });
+            console.error('❌ vc-stats failure:', error);
+            await interaction.editReply({ content: '❌ 統計の取得に失敗しました。' });
         }
     },
 

@@ -51,7 +51,7 @@ module.exports = {
             
             if (!owners.includes(interaction.user.id)) {
                 const reason = maintenanceData.reason || '現在メンテナンス中です。';
-                const message = { content: `[INFO] ${reason}`, ephemeral: true };
+                const message = { content: `ℹ️ ${reason}`, ephemeral: true };
                 if (interaction.isAutocomplete()) return null;
                 if (interaction.isRepliable()) return interaction.reply(message);
                 return;
@@ -77,7 +77,7 @@ module.exports = {
 
                 if (guildSettings && guildSettings.disabledCommands?.includes(interaction.commandName)) {
                     return interaction.reply({
-                        content: `[INFO] このコマンド「${interaction.commandName}」はこのサーバーで無効化されています。`,
+                        content: `ℹ️ このコマンド「${interaction.commandName}」はこのサーバーで無効化されています。`,
                         ephemeral: true
                     });
                 }
@@ -85,10 +85,10 @@ module.exports = {
 
             const command = client.commands.get(interaction.commandName);
             if (!command) {
-                console.error(chalk.red(`[ERROR] Unknown command: ${interaction.commandName}`));
+                console.error(chalk.red(`❌ Unknown command: ${interaction.commandName}`));
                 if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({
-                        content: `[ERROR] コマンド「${interaction.commandName}」が見つかりません。`,
+                        content: `❌ コマンド「${interaction.commandName}」が見つかりません。`,
                         ephemeral: true
                     }).catch(() => {});
                 }
@@ -96,13 +96,13 @@ module.exports = {
             }
 
             try {
-                console.log(chalk.cyan(`[INFO] Command Execution: /${interaction.commandName} | User: ${interaction.user.tag} | Guild: ${interaction.guild?.name || 'DM'}`));
+                console.log(chalk.cyan(`ℹ️ Command Execution: /${interaction.commandName} | User: ${interaction.user.tag} | Guild: ${interaction.guild?.name || 'DM'}`));
                 await command.execute(interaction);
             } catch (error) {
-                console.error(chalk.red(`[ERROR] Command Execution Error (${interaction.commandName}):`), error);
+                console.error(chalk.red(`❌ Command Execution Error (${interaction.commandName}):`), error);
                 
                 const errorMessage = {
-                    content: '[WARN] コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。',
+                    content: '⚠️ コマンドの実行中にエラーが発生しました。しばらく時間をおいてから再度お試しください。',
                     ephemeral: true
                 };
 
@@ -113,7 +113,7 @@ module.exports = {
                         await interaction.reply(errorMessage);
                     }
                 } catch (responseError) {
-                    console.error(chalk.red('[ERROR] Failed to send error response:'), responseError);
+                    console.error(chalk.red('❌ Failed to send error response:'), responseError);
                 }
             }
             return;
@@ -126,7 +126,7 @@ module.exports = {
             try {
                 await command.autocomplete(interaction);
             } catch (error) {
-                console.error(chalk.red(`[ERROR] Autocomplete Error (${interaction.commandName}):`), error);
+                console.error(chalk.red(`❌ Autocomplete Error (${interaction.commandName}):`), error);
             }
             return;
         }

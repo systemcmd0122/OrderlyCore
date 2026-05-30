@@ -64,7 +64,7 @@ module.exports = {
             console.log(chalk.green(`[Feedback] Received from ${interaction.user.tag}`));
 
         } catch (error) {
-            if (error.code !== 'InteractionCollectorError') console.error('[ERROR] Feedback error:', error);
+            if (error.code !== 'InteractionCollectorError') console.error('❌ Feedback error:', error);
         }
     },
 };

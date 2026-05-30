@@ -81,7 +81,7 @@ function createStandardEmbed(options) {
  */
 function createSuccessEmbed(title, description) {
     return createStandardEmbed({
-        title: `[OK] ${title}`,
+        title: `✅ ${title}`,
         description,
         color: COLORS.SUCCESS
     });
@@ -92,7 +92,7 @@ function createSuccessEmbed(title, description) {
  */
 function createErrorEmbed(title, description) {
     return createStandardEmbed({
-        title: `[ERROR] ${title}`,
+        title: `❌ ${title}`,
         description,
         color: COLORS.ERROR
     });
@@ -103,7 +103,7 @@ function createErrorEmbed(title, description) {
  */
 function createInfoEmbed(title, description) {
     return createStandardEmbed({
-        title: `[INFO] ${title}`,
+        title: `ℹ️ ${title}`,
         description,
         color: COLORS.INFO
     });

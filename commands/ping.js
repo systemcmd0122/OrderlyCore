@@ -28,10 +28,10 @@ module.exports = {
             const usedMem = totalMem - freeMem;
 
             function getLatencyLevel(ms) {
-                if (ms < 100) return { emoji: '[OK]', color: Colors.Green, status: '優秀' };
-                if (ms < 200) return { emoji: '[GOOD]', color: Colors.Yellow, status: '良好' };
-                if (ms < 500) return { emoji: '[NORMAL]', color: Colors.Orange, status: '普通' };
-                return { emoji: '[LAG]', color: Colors.Red, status: '遅延' };
+                if (ms < 100) return { emoji: '✅', color: Colors.Green, status: '優秀' };
+                if (ms < 200) return { emoji: '✨', color: Colors.Yellow, status: '良好' };
+                if (ms < 500) return { emoji: '⚡', color: Colors.Orange, status: '普通' };
+                return { emoji: '🐢', color: Colors.Red, status: '遅延' };
             }
 
             const wsLatencyInfo = getLatencyLevel(websocketLatency);
@@ -97,7 +97,7 @@ module.exports = {
             await interaction.editReply({ content: '', embeds: [embed] });
         } catch (error) {
             console.error('Ping コマンドエラー:', error);
-            await interaction.editReply({ content: '[ERROR] エラーが発生しました。' }).catch(() => {});
+            await interaction.editReply({ content: '❌ エラーが発生しました。' }).catch(() => {});
         }
     },
 };

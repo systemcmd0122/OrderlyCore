@@ -201,7 +201,7 @@ module.exports = {
 
         } catch (error) {
             console.error('プロフィールカード生成エラー:', error);
-            await interaction.editReply({ content: '[ERROR] カードの生成中にエラーが発生しました。' });
+            await interaction.editReply({ content: '❌ カードの生成中にエラーが発生しました。' });
         }
     }
 };
