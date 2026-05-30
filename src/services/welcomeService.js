@@ -56,7 +56,7 @@ async function generateWelcomeWithClaude(client, member) {
 
         return JSON.parse(text);
     } catch (error) {
-        console.error('[ERROR] ClaudeでのウェルカムメッセージHaiku生成エラー:', error);
+        console.error('❌ ClaudeでのウェルカムメッセージHaiku生成エラー:', error);
 
         // 失敗時にレート制限情報を記録
         const isRateLimit = isRateLimitError(error);

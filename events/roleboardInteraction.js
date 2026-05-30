@@ -18,7 +18,7 @@ async function handleRoleButton(interaction, client) {
                     requiresPassword = true;
                 }
             } catch (error) {
-                console.error('[ERROR] ロールボード取得失敗:', error);
+                console.error('❌ ロールボード取得失敗:', error);
             }
         }
 
@@ -44,7 +44,7 @@ async function handleRoleButton(interaction, client) {
         await performRoleAction(interaction, roleId, member, guild, client);
 
     } catch (error) {
-        console.error('[ERROR] ロールボタン処理失敗:', error);
+        console.error('❌ ロールボタン処理失敗:', error);
     }
 }
 
@@ -52,16 +52,16 @@ async function performRoleAction(interaction, roleId, member, guild, client) {
     try {
         const role = await guild.roles.fetch(roleId);
         if (!role) {
-            return await interaction.editReply({ content: '[ERROR] ロールが見つかりません。' });
+            return await interaction.editReply({ content: '❌ ロールが見つかりません。' });
         }
 
         const botMember = await guild.members.fetch(client.user.id);
         if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
-            return await interaction.editReply({ content: '[ERROR] 権限が不足しています。' });
+            return await interaction.editReply({ content: '❌ 権限が不足しています。' });
         }
 
         if (role.position >= botMember.roles.highest.position) {
-            return await interaction.editReply({ content: '[ERROR] 権限外のロールです。' });
+            return await interaction.editReply({ content: '❌ 権限外のロールです。' });
         }
 
         const hasRole = member.roles.cache.has(roleId);
@@ -70,7 +70,7 @@ async function performRoleAction(interaction, roleId, member, guild, client) {
         if (hasRole) {
             await member.roles.remove(role);
             embed = createStandardEmbed({
-                title: '[OK] ロール削除',
+                title: '✅ ロール削除',
                 description: `**${role.name}** を削除しました。`,
                 color: COLORS.ERROR
             });
@@ -81,8 +81,8 @@ async function performRoleAction(interaction, roleId, member, guild, client) {
         
         await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-        console.error('[ERROR] ロール操作失敗:', error);
-        await interaction.editReply({ content: '[ERROR] 操作中にエラーが発生しました。' }).catch(() => {});
+        console.error('❌ ロール操作失敗:', error);
+        await interaction.editReply({ content: '❌ 操作中にエラーが発生しました。' }).catch(() => {});
     }
 }
 
@@ -104,18 +104,18 @@ module.exports = (client) => {
                 const boardDoc = await getDoc(boardDocRef);
 
                 if (!boardDoc.exists()) {
-                    return await interaction.reply({ content: '[ERROR] ボードが見つかりません。', ephemeral: true });
+                    return await interaction.reply({ content: '❌ ボードが見つかりません。', ephemeral: true });
                 }
 
                 if (password !== boardDoc.data().password) {
-                    return await interaction.reply({ content: '[ERROR] パスワードが違います。', ephemeral: true });
+                    return await interaction.reply({ content: '❌ パスワードが違います。', ephemeral: true });
                 }
 
                 await interaction.deferReply({ ephemeral: true });
                 await performRoleAction(interaction, roleId, interaction.member, interaction.guild, client);
 
             } catch (error) {
-                console.error('[ERROR] パスワード認証失敗:', error);
+                console.error('❌ パスワード認証失敗:', error);
             }
         }
     });

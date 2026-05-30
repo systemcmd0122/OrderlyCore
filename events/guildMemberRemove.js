@@ -21,11 +21,11 @@ module.exports = {
             results.forEach((result, index) => {
                 if (result.status === 'rejected') {
                     const ops = ['ChannelMsg', 'DM', 'Stats'];
-                    console.error(`[ERROR] ${ops[index]}:`, result.reason);
+                    console.error(`❌ ${ops[index]}:`, result.reason);
                 }
             });
         } catch (error) {
-            console.error('[ERROR] guildMemberRemove error:', error);
+            console.error('❌ guildMemberRemove error:', error);
         }
     },
 };
@@ -62,7 +62,7 @@ async function sendGoodbyeMessage(member, client, guildConfig) {
         
         await goodbyeChannel.send({ embeds: [goodbyeEmbed] });
     } catch (error) {
-        console.error(`[ERROR] sendGoodbyeMessage error:`, error.message);
+        console.error(`❌ sendGoodbyeMessage error:`, error.message);
     }
 }
 
@@ -81,10 +81,10 @@ async function sendGoodbyeDM(member, client, guildConfig) {
         try {
             await user.send({ embeds: [dmEmbed] });
         } catch (dmError) {
-            console.log(`[WARN] ${user.tag} DM failure (blocked)`);
+            console.log(`⚠️ ${user.tag} DM failure (blocked)`);
         }
     } catch (error) {
-        console.error(`[ERROR] sendGoodbyeDM error:`, error.message);
+        console.error(`❌ sendGoodbyeDM error:`, error.message);
     }
 }
 
@@ -114,6 +114,6 @@ async function updateLeaveStatistics(guildConfigRef, guildConfig, user, member) 
             }
         }, { merge: true });
     } catch (error) {
-        console.error(`[ERROR] updateLeaveStatistics error:`, error.message);
+        console.error(`❌ updateLeaveStatistics error:`, error.message);
     }
 }

@@ -30,15 +30,15 @@ module.exports = {
             } else {
                 await setDoc(settingsRef, { announcementChannelId: null }, { merge: true });
                 const embed = createStandardEmbed({
-                    title: '[OK] 設定解除',
+                    title: '✅ 設定解除',
                     description: 'お知らせ受信を無効にしました。',
                     color: COLORS.WARNING
                 });
                 await interaction.editReply({ embeds: [embed] });
             }
         } catch (error) {
-            console.error('[ERROR] announcement-config error:', error);
-            await interaction.editReply({ content: '[ERROR] 設定に失敗しました。' });
+            console.error('❌ announcement-config error:', error);
+            await interaction.editReply({ content: '❌ 設定に失敗しました。' });
         }
     }
 };

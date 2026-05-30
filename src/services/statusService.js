@@ -29,7 +29,7 @@ async function generateAIStatus(client) {
 
         return JSON.parse(text);
     } catch (error) {
-        console.error(chalk.red('[ERROR] Geminiによるステータス生成に失敗:'), error);
+        console.error(chalk.red('❌ Geminiによるステータス生成に失敗:'), error);
 
         // 失敗時にレート制限情報を記録
         const isRateLimit = isRateLimitError(error);
@@ -38,7 +38,7 @@ async function generateAIStatus(client) {
         }
         await recordFailedRequest(client.rtdb, client.user.id, isRateLimit).catch(() => { });
 
-        return { emoji: null, state: '[ERROR] AI Status Failure' };
+        return { emoji: null, state: '❌ AI Status Failure' };
     }
 }
 
@@ -54,16 +54,16 @@ async function loadStatusSettings(db) {
             };
         } else {
             const defaultStatuses = [
-                { emoji: null, state: '[OK] System Online' },
-                { emoji: null, state: '[INFO] Type /help' },
+                { emoji: null, state: '✅ System Online' },
+                { emoji: null, state: 'ℹ️ Type /help' },
                 { emoji: null, state: '[SECURE] Active on ${serverCount} guilds' },
             ];
             await setDoc(settingsRef, { list: defaultStatuses, mode: 'custom' });
             return { list: defaultStatuses, mode: 'custom' };
         }
     } catch (error) {
-        console.error(chalk.red('[ERROR] Firestoreからのステータス読み込みに失敗:'), error.message);
-        return { list: [{ emoji: null, state: '[ERROR] Load Failure' }], mode: 'custom' };
+        console.error(chalk.red('❌ Firestoreからのステータス読み込みに失敗:'), error.message);
+        return { list: [{ emoji: null, state: '❌ Load Failure' }], mode: 'custom' };
     }
 }
 

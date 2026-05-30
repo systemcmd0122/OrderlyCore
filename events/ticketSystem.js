@@ -40,13 +40,13 @@ async function handleCreateTicket(interaction, client) {
     const existingTickets = await getDocs(q);
     if (!existingTickets.empty) {
         const ticketChannelId = existingTickets.docs[0].data().channelId;
-        return interaction.editReply({ content: `[WARN] チケットが既に存在します: <#${ticketChannelId}>` });
+        return interaction.editReply({ content: `⚠️ チケットが既に存在します: <#${ticketChannelId}>` });
     }
     
     const settingsRef = doc(client.db, 'guild_settings', guild.id);
     const settingsSnap = await getDoc(settingsRef);
     if (!settingsSnap.exists() || !settingsSnap.data().ticketSystem) {
-        return interaction.editReply({ content: '[ERROR] チケットシステムの設定がありません。' });
+        return interaction.editReply({ content: '❌ チケットシステムの設定がありません。' });
     }
     const settings = settingsSnap.data().ticketSystem;
     
@@ -54,7 +54,7 @@ async function handleCreateTicket(interaction, client) {
     const category = guild.channels.cache.get(settings.categoryId);
     
     if (!supportRole || !category) {
-        return interaction.editReply({ content: '[ERROR] 設定(ロール/カテゴリ)が見つかりません。' });
+        return interaction.editReply({ content: '❌ 設定(ロール/カテゴリ)が見つかりません。' });
     }
     
     try {
@@ -94,12 +94,12 @@ async function handleCreateTicket(interaction, client) {
         );
 
         await channel.send({ content: `${member} ${supportRole}`, embeds: [embed], components: [row] });
-        await interaction.editReply({ content: `[OK] チケットを作成しました: ${channel}` });
+        await interaction.editReply({ content: `✅ チケットを作成しました: ${channel}` });
         console.log(chalk.green(`[Ticket] Created by ${user.tag} in ${guild.name}`));
 
     } catch (error) {
-        console.error(chalk.red('[ERROR] Ticket creation error:'), error);
-        await interaction.editReply({ content: '[ERROR] 作成に失敗しました。' });
+        console.error(chalk.red('❌ Ticket creation error:'), error);
+        await interaction.editReply({ content: '❌ 作成に失敗しました。' });
     }
 }
 
@@ -108,7 +108,7 @@ async function handleCloseTicket(interaction, client, ticketId) {
 
     const ticketRef = doc(client.db, 'tickets', ticketId);
     const ticketSnap = await getDoc(ticketRef);
-    if (!ticketSnap.exists()) return interaction.editReply({ content: '[ERROR] データベースに存在しません。' });
+    if (!ticketSnap.exists()) return interaction.editReply({ content: '❌ データベースに存在しません。' });
     
     const embed = createStandardEmbed({
         title: '[CONFIRM] チケットクローズ',
@@ -151,13 +151,13 @@ async function handleConfirmClose(interaction, client, ticketId) {
             closedBy: interaction.user.id
         });
     } catch (error) {
-        console.error(chalk.red('[ERROR] Ticket close error:'), error);
+        console.error(chalk.red('❌ Ticket close error:'), error);
     }
 }
 
 async function handleCancelClose(interaction) {
     await interaction.message.delete();
-    await interaction.followUp({ content: '[INFO] キャンセルしました。', ephemeral: true });
+    await interaction.followUp({ content: 'ℹ️ キャンセルしました。', ephemeral: true });
 }
 
 module.exports = (client) => {
@@ -172,7 +172,7 @@ module.exports = (client) => {
                 case 'cancel': if (args[0] === 'close') await handleCancelClose(interaction); break;
             }
         } catch (error) {
-             console.error(chalk.red(`[ERROR] Ticket action failure: ${interaction.customId}`), error);
+             console.error(chalk.red(`❌ Ticket action failure: ${interaction.customId}`), error);
         }
     });
 };

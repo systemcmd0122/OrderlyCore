@@ -3,89 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OrderlyCore — ダッシュボード</title>
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css">
-    <link rel="stylesheet" href="/tom-select-custom.css">
+    <title>ダッシュボード - OrderlyCore</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/feather-icons"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Tom Select CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --header-height: 60px;
+            --primary-color: #5865F2;
+        }
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f0f2f5;
+            color: #212529;
+            overflow-x: hidden;
+        }
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #1e1f22;
+            color: #dbdee1;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid #2b2d31;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 0;
+        }
+        .nav-link {
+            padding: 0.6rem 1.25rem;
+            color: #949ba4;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+        .nav-link:hover {
+            color: #dbdee1;
+            background-color: #35373c;
+        }
+        .nav-link.active {
+            color: white;
+            background-color: #35373c;
+            border-left-color: var(--primary-color);
+        }
+        .nav-link i { font-size: 1.1rem; }
+        .nav-category {
+            padding: 1rem 1.25rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #80848e;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        /* Main Content */
+        .main-wrapper {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+        .main-header {
+            height: var(--header-height);
+            background-color: white;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+        .content-area {
+            padding: 1.5rem;
+        }
+        /* Components */
+        .card {
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+        .server-profile {
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid #2b2d31;
+        }
+        .server-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 0.5rem;
+        }
+        .server-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Mobile */
+        @media (max-width: 991.98px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.show { transform: translateX(0); }
+            .main-wrapper { margin-left: 0; }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background-color: rgba(0,0,0,0.5);
+                z-index: 999;
+            }
+            .sidebar-overlay.show { display: block; }
+        }
+        /* Loader */
+        .loader-wrapper {
+            position: fixed;
+            inset: 0;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        /* Discord Preview */
+        .discord-preview {
+            background-color: #2b2d31;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: #dbdee1;
+            font-size: 0.9rem;
+            border-left: 4px solid #5865F2;
+        }
+    </style>
 </head>
 <body>
-    <div id="loader" class="loader-container">
-        <div class="loader-ring"></div>
-        <p>サーバー情報を読み込み中...</p>
+
+    <div id="loader" class="loader-wrapper">
+        <div class="spinner-border text-primary mb-3" role="status"></div>
+        <div class="text-secondary small">サーバー情報を読み込み中...</div>
     </div>
 
-    <div class="dashboard-wrapper" style="display:none;">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <a href="#dashboard" class="logo">
-                    <i data-feather="cpu" style="width:18px;height:18px;"></i>
-                    OrderlyCore
-                </a>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="bi bi-robot fs-4 text-primary"></i>
+            <span>OrderlyCore</span>
+        </div>
+
+        <div class="server-profile">
+            <img id="server-icon" src="" alt="" class="server-icon bg-secondary">
+            <div class="server-name" id="server-name">読み込み中...</div>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="nav-category">概要</div>
+            <a href="#dashboard" class="nav-link active" data-page="dashboard"><i class="bi bi-speedometer2"></i><span>ダッシュボード</span></a>
+            <a href="#members" class="nav-link" data-page="members"><i class="bi bi-people"></i><span>メンバー管理</span></a>
+            <a href="#auditLog" class="nav-link" data-page="auditLog"><i class="bi bi-journal-text"></i><span>監査ログ</span></a>
+            <a href="#analytics" class="nav-link" data-page="analytics"><i class="bi bi-graph-up"></i><span>分析</span></a>
+
+            <div class="nav-category">設定</div>
+            <a href="#welcome" class="nav-link" data-page="welcome"><i class="bi bi-person-plus"></i><span>参加・退出</span></a>
+            <a href="#welcome-message" class="nav-link" data-page="welcome-message"><i class="bi bi-chat-left-dots"></i><span>歓迎メッセージ</span></a>
+            <a href="#roleboard" class="nav-link" data-page="roleboard"><i class="bi bi-grid-3x3-gap"></i><span>ロールボード</span></a>
+            <a href="#automod" class="nav-link" data-page="automod"><i class="bi bi-shield-check"></i><span>オートモッド</span></a>
+            <a href="#leveling" class="nav-link" data-page="leveling"><i class="bi bi-award"></i><span>レベリング</span></a>
+            <a href="#tickets" class="nav-link" data-page="tickets"><i class="bi bi-ticket-perforated"></i><span>チケット</span></a>
+            <a href="#commands" class="nav-link" data-page="commands"><i class="bi bi-slash-square"></i><span>コマンド</span></a>
+            <a href="#ai" class="nav-link" data-page="ai"><i class="bi bi-cpu"></i><span>AI設定</span></a>
+
+            <div class="nav-category">ログ</div>
+            <a href="#logging" class="nav-link" data-page="logging"><i class="bi bi-file-earmark-text"></i><span>基本ログ</span></a>
+            <a href="#vc-log" class="nav-link" data-page="vc-log"><i class="bi bi-mic"></i><span>VCログ</span></a>
+
+            <div class="nav-category">その他</div>
+            <a href="#announcements" class="nav-link" data-page="announcements"><i class="bi bi-megaphone"></i><span>お知らせ</span></a>
+            <a href="#autorole" class="nav-link" data-page="autorole"><i class="bi bi-person-check"></i><span>自動ロール</span></a>
+            <a href="/data-manager" class="nav-link"><i class="bi bi-database"></i><span>データ管理</span></a>
+        </div>
+
+        <div class="p-3 border-top border-secondary-subtle">
+            <button id="logout-btn" class="btn btn-outline-danger w-100 btn-sm d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-box-arrow-right"></i>
+                ログアウト
+            </button>
+        </div>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="main-header shadow-sm">
+            <button class="btn btn-light d-lg-none me-2" id="sidebar-toggle">
+                <i class="bi bi-list fs-4"></i>
+            </button>
+            <h5 class="mb-0 fw-bold" id="page-title">ダッシュボード</h5>
+            <div class="ms-auto d-flex align-items-center">
+                <div class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2 d-none d-sm-flex align-items-center gap-2">
+                    <span class="spinner-grow spinner-grow-sm" role="status"></span>
+                    システム正常
+                </div>
             </div>
+        </header>
 
-            <div class="server-info">
-                <img id="server-icon" src="" alt="Server Icon" class="server-icon">
-                <h2 id="server-name">読み込み中...</h2>
-            </div>
-
-            <nav class="sidebar-nav">
-                <div class="nav-category">OVERVIEW</div>
-                <a href="#dashboard"     class="nav-item active" data-page="dashboard"><i data-feather="activity"></i><span>ダッシュボード</span></a>
-                <a href="#members"       class="nav-item" data-page="members"><i data-feather="users"></i><span>メンバー</span></a>
-                <a href="#auditLog"      class="nav-item" data-page="auditLog"><i data-feather="list"></i><span>監査ログ</span></a>
-                <a href="#analytics"     class="nav-item" data-page="analytics"><i data-feather="pie-chart"></i><span>アナリティクス</span></a>
-
-                <div class="nav-category">CONFIGURATION</div>
-                <a href="#welcome"        class="nav-item" data-page="welcome"><i data-feather="user-plus"></i><span>参加設定</span></a>
-                <a href="#welcome-message" class="nav-item" data-page="welcome-message"><i data-feather="message-circle"></i><span>歓迎メッセージ</span></a>
-                <a href="#roleboard"      class="nav-item" data-page="roleboard"><i data-feather="grid"></i><span>ロールボード</span></a>
-                <a href="#automod"        class="nav-item" data-page="automod"><i data-feather="shield"></i><span>オートモッド</span></a>
-                <a href="#leveling"       class="nav-item" data-page="leveling"><i data-feather="trending-up"></i><span>レベリング</span></a>
-                <a href="#tickets"        class="nav-item" data-page="tickets"><i data-feather="life-buoy"></i><span>チケット</span></a>
-                <a href="#commands"       class="nav-item" data-page="commands"><i data-feather="settings"></i><span>コマンド</span></a>
-                <a href="#ai"             class="nav-item" data-page="ai"><i data-feather="cpu"></i><span>AI設定</span></a>
-
-                <div class="nav-category">LOGGING</div>
-                <a href="#logging"  class="nav-item" data-page="logging"><i data-feather="file-text"></i><span>基本ログ</span></a>
-                <a href="#vc-log"   class="nav-item" data-page="vc-log"><i data-feather="mic"></i><span>VCログ</span></a>
-
-                <div class="nav-category">OTHERS</div>
-                <a href="#announcements" class="nav-item" data-page="announcements"><i data-feather="bell"></i><span>お知らせ</span></a>
-                <a href="#autorole"      class="nav-item" data-page="autorole"><i data-feather="user-check"></i><span>自動ロール</span></a>
-                <a href="/data-manager"  class="nav-item"><i data-feather="database"></i><span>データ管理</span></a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-secondary" style="width:100%;">
-                    <i data-feather="log-out"></i>
-                    <span>ログアウト</span>
-                </button>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            <header class="main-header">
-                <button id="menu-toggle" class="menu-toggle-btn">
-                    <i data-feather="menu"></i>
-                </button>
-                <h1 id="page-title">ダッシュボード</h1>
-            </header>
-
-            <div id="page-content-wrapper">
-                <div id="page-content" class="page-content"></div>
-            </div>
+        <main class="content-area">
+            <div id="page-content"></div>
         </main>
     </div>
 
-    <div id="modal-container"></div>
-
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <!-- Tom Select JS -->
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+    <!-- App Logic -->
     <script src="/client.js"></script>
-    <script>feather.replace();</script>
 </body>
 </html>

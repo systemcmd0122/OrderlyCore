@@ -5,7 +5,7 @@ module.exports = {
     name: 'guildDelete',
     async execute(guild, client) {
         console.log(chalk.yellow(`[EXIT] サーバーから退出: ${guild.name} (ID: ${guild.id})`));
-        console.log(chalk.cyan(`[INFO] 現在のサーバー数: ${client.guilds.cache.size}`));
+        console.log(chalk.cyan(`ℹ️ 現在のサーバー数: ${client.guilds.cache.size}`));
 
         try {
             const guildId = guild.id;
@@ -35,7 +35,7 @@ module.exports = {
                         console.log(chalk.green(`[CLEAN] ${collectionInfo.name}: ${snapshot.size}件削除`));
                     }
                 } catch (error) {
-                    console.error(chalk.red(`[ERROR] ${collectionInfo.name}の削除エラー:`), error.message);
+                    console.error(chalk.red(`❌ ${collectionInfo.name}の削除エラー:`), error.message);
                 }
             }
 
@@ -46,7 +46,7 @@ module.exports = {
                 totalDeleted++;
                 console.log(chalk.green(`[CLEAN] guild_settings: 削除完了`));
             } catch (error) {
-                console.error(chalk.red(`[ERROR] guild_settingsの削除エラー:`), error.message);
+                console.error(chalk.red(`❌ guild_settingsの削除エラー:`), error.message);
             }
 
             // guildsコレクションからも削除
@@ -56,13 +56,13 @@ module.exports = {
                 totalDeleted++;
                 console.log(chalk.green(`[CLEAN] guilds: 削除完了`));
             } catch (error) {
-                console.error(chalk.red(`[ERROR] guildsの削除エラー:`), error.message);
+                console.error(chalk.red(`❌ guildsの削除エラー:`), error.message);
             }
 
-            console.log(chalk.greenBright(`[OK] ${guild.name} の全データ削除完了 (合計: ${totalDeleted}件)`));
+            console.log(chalk.greenBright(`✅ ${guild.name} の全データ削除完了 (合計: ${totalDeleted}件)`));
 
         } catch (error) {
-            console.error(chalk.red(`[ERROR] ${guild.name} のデータ削除中にエラーが発生:`), error);
+            console.error(chalk.red(`❌ ${guild.name} のデータ削除中にエラーが発生:`), error);
         }
     }
 };

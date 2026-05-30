@@ -8,7 +8,7 @@ module.exports = {
     
     async execute(interaction) {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-            return await interaction.reply({ content: '[ERROR] 権限が不足しています。', ephemeral: true });
+            return await interaction.reply({ content: '❌ 権限が不足しています。', ephemeral: true });
         }
         
         const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}dashboard`;

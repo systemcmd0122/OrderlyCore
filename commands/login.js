@@ -10,7 +10,7 @@ module.exports = {
     async execute(interaction) {
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
             return interaction.reply({
-                content: '[ERROR] このコマンドを実行するには「サーバーの管理」権限が必要です。',
+                content: '❌ このコマンドを実行するには「サーバーの管理」権限が必要です。',
                 ephemeral: true,
             });
         }
@@ -44,15 +44,15 @@ module.exports = {
             });
 
             await interaction.user.send({ embeds: [embed] }).catch(async () => {
-                 await interaction.editReply({ content: '[ERROR] DMの送信に失敗しました。受信設定を確認してください。' });
+                 await interaction.editReply({ content: '❌ DMの送信に失敗しました。受信設定を確認してください。' });
                  return;
             });
             
-            await interaction.editReply({ content: '[OK] DMにログイン用トークンを送信しました。' });
+            await interaction.editReply({ content: '✅ DMにログイン用トークンを送信しました。' });
 
         } catch (error) {
-            console.error('[ERROR] Login command error:', error);
-            await interaction.editReply({ content: '[ERROR] エラーが発生しました。' });
+            console.error('❌ Login command error:', error);
+            await interaction.editReply({ content: '❌ エラーが発生しました。' });
         }
     },
 };

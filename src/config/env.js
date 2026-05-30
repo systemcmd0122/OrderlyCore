@@ -12,19 +12,21 @@ const requiredEnvVars = [
     'FIREBASE_APP_ID',
     'GOOGLE_API_KEY',
     'SESSION_SECRET',
-    'ADMIN_PASSWORD'
+    'ADMIN_PASSWORD',
+    'DISCORD_CLIENT_SECRET',
+    'CALLBACK_URL'
 ];
 
 function validateEnv() {
     const missing = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
     if (missing.length > 0) {
-        console.error(chalk.red('[ERROR] Missing required environment variables:'));
+        console.error(chalk.red('❌ Missing required environment variables:'));
         missing.forEach(envVar => console.error(chalk.red(`   - ${envVar}`)));
         process.exit(1);
     }
 
-    console.log(chalk.green('[OK] Environment variables validated successfully.'));
+    console.log(chalk.green('✅ Environment variables validated successfully.'));
 }
 
 module.exports = {
