@@ -14,6 +14,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const chalk = require('chalk');
 
+const rateLimit = require('express-rate-limit');
 const { validateEnv, PORT, NODE_ENV, FRONTEND_URL } = require('./src/config/env');
 const { client, loadCommands, loadEvents } = require('./src/config/discord');
 
@@ -50,12 +51,34 @@ app.use((_req, res, next) => {
     next();
 });
 
-// 4. API & Authentication Routes
+// 4. Rate Limiting
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Too many login attempts, try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 120,
+    message: { error: 'Too many requests, slow down.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// 5. API & Authentication Routes
+app.use('/api/verify', loginLimiter);
+app.use('/api/admin/login', loginLimiter);
+app.use('/api', apiLimiter);
 app.use('/api', require('./src/routes/auth'));
 app.use('/api', require('./src/routes/api'));
 app.use('/api/admin', require('./src/routes/admin'));
 
-// 5. Basic Health & Static Routes
+// 6. Basic Health & Static Routes
+app.get('/ping', (_req, res) => res.status(200).end('pong'));
+
 app.get('/health', (_req, res) => {
     res.status(client.isReady() ? 200 : 503).json({
         status: client.isReady() ? 'ok' : 'degraded',
@@ -69,7 +92,7 @@ app.get('/dashboard', (_req, res) => res.sendFile(path.join(__dirname, 'public',
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// 6. Catch-all / SPA Fallback
+// 7. Catch-all / SPA Fallback
 app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
         const filePath = path.join(__dirname, 'public', req.path);
@@ -82,11 +105,11 @@ app.get('*', (req, res) => {
     res.status(404).json({ error: 'Not Found' });
 });
 
-// 7. Discord Bot Initialization
+// 8. Discord Bot Initialization
 const commands = loadCommands();
 loadEvents();
 
-// 8. Bot Login & Command Deployment
+// 9. Bot Login & Command Deployment
 client.login(process.env.DISCORD_TOKEN).then(async () => {
     console.log(chalk.green('[OK] Discord bot logged in.'));
     const { deployCommands } = require('./src/config/discord');
@@ -95,7 +118,7 @@ client.login(process.env.DISCORD_TOKEN).then(async () => {
     console.error(chalk.red('[ERROR] Discord bot login failed:'), err);
 });
 
-// 9. Server Initialization
+// 10. Server Initialization
 if (require.main === module) {
     app.listen(PORT, () => {
         console.log(chalk.bold.cyan(`
@@ -108,7 +131,7 @@ Environment: ${NODE_ENV}
     });
 }
 
-// 10. Global Error Handlers
+// 11. Global Error Handlers
 process.on('unhandledRejection', (reason, promise) => {
     console.error(chalk.red('Unhandled Rejection at:', promise, 'reason:', reason));
 });

@@ -5,7 +5,7 @@ const { updateRankboards } = require('../src/services/rankboardService');
 const { keepAlive } = require('../src/utils/helpers');
 
 module.exports = {
-    name: 'ready',
+    name: 'clientReady',
     once: true,
     async execute(client) {
         console.log(chalk.bold.greenBright(`[OK] ${client.user.tag} が起動しました！`));

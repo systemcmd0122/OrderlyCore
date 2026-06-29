@@ -7,7 +7,7 @@ try {
     const fontPath = path.join(__dirname, '..', 'fonts');
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Regular.ttf'), 'NotoSansJP');
     GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Bold.ttf'), 'NotoSansJP-Bold');
-    GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Light.ttf'), 'NotoSansJP-Light');
+    GlobalFonts.registerFromPath(path.join(fontPath, 'NotoSansJP-Regular.ttf'), 'NotoSansJP-Light');
     console.log('[OK] フォントが正常に読み込まれました');
 } catch (error) {
     console.error('[ERROR] フォントの読み込みエラー:', error.message);

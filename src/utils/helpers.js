@@ -11,7 +11,8 @@ async function keepAlive() {
 
     setInterval(async () => {
         try {
-            const url = appUrl.endsWith('/ping') ? appUrl : `${appUrl}/ping`;
+            const baseUrl = appUrl.replace(/\/+$/, '');
+            const url = baseUrl.endsWith('/ping') ? baseUrl : `${baseUrl}/ping`;
             // Use global fetch (Node.js 18+)
             const response = await fetch(url, {
                 headers: { 'User-Agent': 'OrderlyCore-Bot/1.0.0' }

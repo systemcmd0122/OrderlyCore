@@ -105,7 +105,6 @@ setInterval(() => {
  * @returns {string} - 最適化されたクエリ
  */
 function optimizeSearchQuery(query) {
-    // ノイズワードを削除
     const noiseWords = ['について', 'に関して', '教えて', 'ください', 'って', 'とは', 'what', 'how', 'why', 'when', 'where', 'is', 'are', 'the', 'a', 'an'];
     let optimized = query;
 
@@ -114,10 +113,8 @@ function optimizeSearchQuery(query) {
         optimized = optimized.replace(regex, '');
     });
 
-    // 余分な空白を削除
     optimized = optimized.replace(/\s+/g, ' ').trim();
 
-    // 時系列キーワードの追加（最新情報が必要な場合）
     const currentYear = new Date().getFullYear();
     const timeKeywords = ['最新', '今', '現在', 'latest', 'current', 'now', String(currentYear), String(currentYear + 1)];
     const hasTimeKeyword = timeKeywords.some(kw => query.toLowerCase().includes(kw));
@@ -131,7 +128,7 @@ function optimizeSearchQuery(query) {
 }
 
 /**
- * 高度なWeb検索 - 複数ソースから取得
+ * 高度なWeb検索 - 複数ソースから取得（タイムアウト付き）
  * @param {string} query - 検索クエリ
  * @returns {Promise<Array>} - 検索結果の配列 [{title, snippet, url, source}]
  */
@@ -139,24 +136,30 @@ async function performWebSearch(query) {
     const optimizedQuery = optimizeSearchQuery(query);
     const searchPromises = [];
 
-    // 1. DuckDuckGo Instant Answer API
     searchPromises.push(searchDuckDuckGo(optimizedQuery));
-
-    // 2. DuckDuckGo HTML Scraping (フォールバック)
     searchPromises.push(searchDuckDuckGoHTML(optimizedQuery));
+    searchPromises.push(searchDuckDuckGoLite(optimizedQuery));
+
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 12000));
 
     try {
-        const results = await Promise.allSettled(searchPromises);
-        const allResults = [];
+        const raceResult = await Promise.race([
+            Promise.allSettled(searchPromises),
+            timeoutPromise
+        ]);
 
-        // 成功した検索結果をマージ
-        results.forEach((result, index) => {
+        if (raceResult === 'TIMEOUT') {
+            console.warn(chalk.yellow('[Web Search] Overall search timed out (12s)'));
+            return [];
+        }
+
+        const allResults = [];
+        raceResult.forEach((result) => {
             if (result.status === 'fulfilled' && Array.isArray(result.value)) {
                 allResults.push(...result.value);
             }
         });
 
-        // 重複を削除（URLベース）
         const uniqueResults = [];
         const seenUrls = new Set();
 
@@ -167,10 +170,9 @@ async function performWebSearch(query) {
             }
         }
 
-        // 最大8件に制限
         const finalResults = uniqueResults.slice(0, 8);
 
-        console.log(chalk.green(`[Web Search] Total results: ${finalResults.length} (from ${allResults.length} sources)`));
+        console.log(chalk.green(`[Web Search] Total results: ${finalResults.length} (from ${allResults.length} raw)`));
         return finalResults;
 
     } catch (error) {
@@ -294,7 +296,7 @@ function searchDuckDuckGo(query) {
 }
 
 /**
- * DuckDuckGo HTML スクレイピング検索（強化版）
+ * DuckDuckGo HTML スクレイピング検索
  * @param {string} query - 検索クエリ
  * @returns {Promise<Array>} - 検索結果
  */
@@ -307,10 +309,9 @@ function searchDuckDuckGoHTML(query) {
             const request = https.get(url, {
                 timeout: 10000,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate, br',
                     'Referer': 'https://duckduckgo.com/'
                 }
             }, (res) => {
@@ -351,7 +352,52 @@ function searchDuckDuckGoHTML(query) {
 }
 
 /**
- * HTML検索結果をパース（改良版）
+ * DuckDuckGo Lite API 検索 (シンプルなHTML構造、フォールバック用)
+ * @param {string} query - 検索クエリ
+ * @returns {Promise<Array>} - 検索結果
+ */
+function searchDuckDuckGoLite(query) {
+    return new Promise((resolve) => {
+        try {
+            const encodedQuery = encodeURIComponent(query);
+            const url = `https://lite.duckduckgo.com/lite/?q=${encodedQuery}`;
+
+            const request = https.get(url, {
+                timeout: 10000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8'
+                }
+            }, (res) => {
+                let data = '';
+
+                res.on('data', (chunk) => {
+                    data += chunk.toString();
+                });
+
+                res.on('end', () => {
+                    try {
+                        const results = parseLiteResults(data);
+                        console.log(chalk.cyan(`[DDG-Lite] Found ${results.length} results`));
+                        resolve(results);
+                    } catch (parseError) {
+                        console.error(chalk.yellow('[DDG-Lite] Parse error:'), parseError.message);
+                        resolve([]);
+                    }
+                });
+            });
+
+            request.on('error', () => resolve([]));
+            request.on('timeout', () => { request.destroy(); resolve([]); });
+        } catch (err) {
+            resolve([]);
+        }
+    });
+}
+
+/**
+ * HTML検索結果をパース（複数パターン対応、堅牢化）
  * @param {string} html - HTMLコンテンツ
  * @returns {Array} - パースされた検索結果
  */
@@ -359,64 +405,145 @@ function parseHTMLResults(html) {
     const results = [];
 
     try {
-        // より堅牢な正規表現パターン
-        const resultPattern = /<div class="result__body">[\s\S]*?<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+        const patterns = [
+            // Pattern 1: Standard result__body + result__a + result__snippet
+            {
+                regex: /<div[^>]*class="[^"]*result__body[^"]*"[\s\S]*?<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<(?:a|span)[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\//gi,
+                extractUrl: (m) => extractDdgUrl(m[1])
+            },
+            // Pattern 2: Generic result link with heading
+            {
+                regex: /<a[^>]*rel="nofollow"[^>]*href="([^"]*)"[^>]*class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\//gi,
+                extractUrl: (m) => extractDdgUrl(m[1])
+            },
+            // Pattern 3: Article-based results (modern DDG)
+            {
+                regex: /<article[^>]*data-testid="result"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>[\s\S]*?<div[^>]*data-testid="result-snippet"[^>]*>([\s\S]*?)<\/div>/gi,
+                extractUrl: (m) => m[1]
+            },
+            // Pattern 4: Broad match - any link with result in class
+            {
+                regex: /<a[^>]*class="[^"]*result[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<span[^>]*class="[^"]*snippet[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+                extractUrl: (m) => extractDdgUrl(m[1])
+            }
+        ];
 
-        let match;
-        let count = 0;
+        for (const pattern of patterns) {
+            if (results.length >= 8) break;
+            let match;
+            while ((match = pattern.regex.exec(html)) !== null && results.length < 8) {
+                const url = (match[1] || '').trim();
+                const title = (match[2] || '').replace(/<[^>]*>/g, '').trim();
+                const snippet = (match[3] || '').replace(/<[^>]*>/g, '').trim();
 
-        while ((match = resultPattern.exec(html)) !== null && count < 10) {
-            const url = match[1]?.trim() || '';
-            const title = match[2]?.replace(/<[^>]*>/g, '').trim() || '';
-            const snippet = match[3]?.replace(/<[^>]*>/g, '').trim() || '';
-
-            if (url && title) {
-                // URLデコード
-                let decodedUrl = url;
-                try {
-                    // DuckDuckGoのリダイレクトURLから実際のURLを抽出
-                    if (url.includes('uddg=')) {
-                        const uddgMatch = url.match(/uddg=([^&]*)/);
-                        if (uddgMatch) {
-                            decodedUrl = decodeURIComponent(uddgMatch[1]);
-                        }
-                    }
-                } catch (e) {
-                    // デコード失敗時は元のURLを使用
+                if (url && title && !results.some(r => r.url === url)) {
+                    results.push({
+                        title: cleanText(title),
+                        snippet: cleanText(snippet) || cleanText(title),
+                        url: pattern.extractUrl(match),
+                        source: 'DDG-HTML'
+                    });
                 }
-
-                results.push({
-                    title: cleanText(title),
-                    snippet: cleanText(snippet) || title,
-                    url: decodedUrl,
-                    source: 'DDG-HTML'
-                });
-                count++;
             }
         }
 
-        // 別のパターンも試す（フォールバック）
+        // Fallback: generic link + text extraction if no patterns matched
         if (results.length === 0) {
-            const altPattern = /<a[^>]*class="result__url"[^>]*href="([^"]*)"[^>]*>[\s\S]*?<\/a>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>[\s\S]*?<div[^>]*class="result__snippet"[^>]*>([\s\S]*?)<\/div>/gi;
-
-            while ((match = altPattern.exec(html)) !== null && results.length < 10) {
-                const url = match[1]?.trim() || '';
-                const title = match[2]?.replace(/<[^>]*>/g, '').trim() || '';
-                const snippet = match[3]?.replace(/<[^>]*>/g, '').trim() || '';
-
-                if (url && title) {
+            const linkRegex = /<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+            let match;
+            let count = 0;
+            while ((match = linkRegex.exec(html)) !== null && count < 8) {
+                const url = match[1];
+                const title = match[2].replace(/<[^>]*>/g, '').trim();
+                if (url && title && !url.includes('duckduckgo.com') && title.length > 5) {
                     results.push({
                         title: cleanText(title),
-                        snippet: cleanText(snippet) || title,
+                        snippet: '',
                         url: url,
-                        source: 'DDG-HTML-ALT'
+                        source: 'DDG-HTML-FALLBACK'
                     });
+                    count++;
                 }
             }
         }
 
     } catch (error) {
         console.error(chalk.red('[HTML Parse] Error:'), error.message);
+    }
+
+    return results;
+}
+
+/**
+ * DuckDuckGoリダイレクトURLから実際のURLを抽出
+ * @param {string} url - DDGリダイレクトURL
+ * @returns {string} - デコードされたURL
+ */
+function extractDdgUrl(url) {
+    try {
+        if (url.includes('uddg=')) {
+            const m = url.match(/uddg=([^&]*)/);
+            if (m) return decodeURIComponent(m[1]);
+        }
+        if (url.includes('/l/?uddg=')) {
+            const m = url.match(/\/l\/\?uddg=([^&]*)/);
+            if (m) return decodeURIComponent(m[1]);
+        }
+    } catch (e) {
+        // ignore
+    }
+    return url;
+}
+
+/**
+ * DuckDuckGo Lite HTML をパース (シンプルなテーブル構造)
+ * @param {string} html - Lite版HTML
+ * @returns {Array} - 検索結果
+ */
+function parseLiteResults(html) {
+    const results = [];
+
+    try {
+        // Lite版は <table> 内の <tr class="result"> を使用
+        const rowRegex = /<tr[^>]*class="[^"]*result[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*class="[^"]*snippet[^"]*"[^>]*>([\s\S]*?)<\/td>/gi;
+
+        let match;
+        while ((match = rowRegex.exec(html)) !== null && results.length < 8) {
+            const url = (match[1] || '').trim();
+            const title = (match[2] || '').replace(/<[^>]*>/g, '').trim();
+            const snippet = (match[3] || '').replace(/<[^>]*>/g, '').trim();
+
+            if (url && title) {
+                results.push({
+                    title: cleanText(title),
+                    snippet: cleanText(snippet) || cleanText(title),
+                    url: extractDdgUrl(url),
+                    source: 'DDG-Lite'
+                });
+            }
+        }
+
+        // Fallback: any table row with a link (minimal Lite HTML)
+        if (results.length === 0) {
+            const fallbackRegex = /<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/gi;
+            let match;
+            while ((match = fallbackRegex.exec(html)) !== null && results.length < 8) {
+                const url = match[1];
+                const title = match[2].replace(/<[^>]*>/g, '').trim();
+                const snippet = match[3].replace(/<[^>]*>/g, '').trim();
+                if (url && title && !url.includes('duckduckgo.com') && title.length > 5) {
+                    results.push({
+                        title: cleanText(title),
+                        snippet: cleanText(snippet) || cleanText(title),
+                        url: url,
+                        source: 'DDG-Lite-FALLBACK'
+                    });
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error(chalk.red('[Lite Parse] Error:'), error.message);
     }
 
     return results;
@@ -448,10 +575,10 @@ function cleanText(text) {
  */
 function formatSearchResults(results) {
     if (!results || results.length === 0) {
-        return '';
+        return '[SEARCH_RESULTS] Web検索を試みましたが、結果が見つかりませんでした。AIの知識で回答してください。';
     }
 
-    let formatted = '### [SEARCH_RESULTS] 最新のウェブ検索結果\n\n';
+    let formatted = '### [SEARCH_RESULTS] 最新のウェブ検索結果（以下を最優先で使用）\n\n';
 
     results.forEach((result, index) => {
         formatted += `**[RESULT_${index + 1}] ${result.title}**\n`;
@@ -473,12 +600,14 @@ function formatSearchResults(results) {
 function shouldPerformWebSearch(message) {
     const lowerMessage = message.toLowerCase();
 
-    // 明示的な検索キーワード
+    const currentYear = new Date().getFullYear();
+    const yearStrings = [String(currentYear), String(currentYear - 1), String(currentYear + 1)];
+
     const searchKeywords = [
         '検索', 'さがして', '探して', '調べて', 'ググって',
         'search', 'find', 'look up', 'google',
         '最新', '今', '現在', 'latest', 'current', 'now',
-        'ニュース', 'news', '情報', 'info',
+        'ニュース', 'news', '情報', 'info', '知りたい',
         '価格', 'price', '値段', '相場',
         '天気', 'weather', '気温', 'temperature',
         'いつ', 'when', 'どこ', 'where',
@@ -489,7 +618,8 @@ function shouldPerformWebSearch(message) {
         'レビュー', 'review', '評価', 'rating',
         '方法', 'やり方', 'how to', 'tutorial',
         'おすすめ', 'recommend', 'suggestion',
-        '～について', 'とは', 'って何', 'what is'
+        'について', 'に関して', 'とは', 'って何', 'what is',
+        'WBC', '野球', 'サッカー', '試合', '結果', '予想', '速報'
     ];
 
     // キーワードマッチング
@@ -506,8 +636,7 @@ function shouldPerformWebSearch(message) {
         lowerMessage.startsWith('why') ||
         lowerMessage.startsWith('who');
 
-    // 時系列キーワード
-    const hasTimeKeyword = ['2024', '2025', '2026', '今年', '今月', '今日', 'today', 'this year'].some(kw =>
+    const hasTimeKeyword = [...yearStrings, '今年', '今月', '今日', 'today', 'this year'].some(kw =>
         lowerMessage.includes(kw)
     );
 
@@ -541,6 +670,31 @@ function shouldPerformWebSearch(message) {
 }
 
 /**
+ * Gemini API 呼び出し(リトライ付き)
+ * @param {import('@google/generative-ai').GenerativeModel} model - Gemini model
+ * @param {string} prompt - フルプロンプト
+ * @param {number} retries - リトライ回数
+ * @returns {Promise<string>} - 応答テキスト
+ */
+async function generateWithRetry(model, prompt, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim().replace(/```/g, '');
+        } catch (error) {
+            const is503 = error.status === 503 || (error.message && error.message.includes('503'));
+            if (attempt < retries && is503) {
+                const delay = (attempt + 1) * 2000;
+                console.log(chalk.yellow(`[Gemini] 503 retry ${attempt + 1}/${retries} after ${delay}ms`));
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
+/**
  * Gemini AI にチャット応答を生成させる関数 (Web検索状態表示付き)
  * @param {import('discord.js').Client} client
  * @param {import('discord.js').Message} message
@@ -559,16 +713,13 @@ async function generateChatResponse(client, message, aiConfig) {
             return 'こんにちは!何か御用でしょうか?';
         }
 
-        // 特殊コマンド: 履歴クリア
         if (userMessage === 'リセット' || userMessage === 'reset' || userMessage === '履歴クリア') {
             clearConversationHistory(message.author.id, message.channel.id);
             return '会話履歴をリセットしました!新しい会話を始めましょう。';
         }
 
-        // 会話履歴を取得
         const conversationHistory = getConversationHistory(message.author.id, message.channel.id);
 
-        // Web検索が必要かどうかを判断
         const needsWebSearch = shouldPerformWebSearch(userMessage);
         let webResults = [];
         let searchSummary = '';
@@ -595,9 +746,10 @@ async function generateChatResponse(client, message, aiConfig) {
 
             if (statusMessage) {
                 try {
-                    await statusMessage.edit({
-                        content: `[OK] **検索完了!** (${webResults.length}件)\n[WAIT] **AI回答生成中...**`
-                    });
+                    const resultText = webResults.length > 0
+                        ? `[OK] **検索完了!** (${webResults.length}件)\n[WAIT] **AI回答生成中...**`
+                        : '[WARN] **検索結果が0件でした**\n[WAIT] **AIが知識で回答生成中...**';
+                    await statusMessage.edit({ content: resultText });
                 } catch (err) {
                     console.error(chalk.yellow('[Status] Failed to update status:'), err.message);
                 }
@@ -606,8 +758,6 @@ async function generateChatResponse(client, message, aiConfig) {
             console.log(chalk.gray('[AI] [SKIP] Skipping web search - not needed'));
             searchSummary = '';
         }
-
-        // ---- Gemini API 呼び出し ----------------------------------------
 
         // システムプロンプト構築
         let systemPrompt = '';
@@ -638,7 +788,6 @@ async function generateChatResponse(client, message, aiConfig) {
             systemPrompt += `\n\n${searchSummary}`;
         }
 
-        // 会話履歴をプロンプトに埋め込む
         let conversationContext = '';
         for (const msg of conversationHistory) {
             const roleLabel = msg.role === 'assistant' ? 'Assistant' : 'User';
@@ -647,13 +796,9 @@ async function generateChatResponse(client, message, aiConfig) {
 
         const fullPrompt = `${systemPrompt}\n\n---\n\n${conversationContext}User: ${userMessage}\nAssistant:`;
 
-        const result = await client.geminiModel.generateContent(fullPrompt);
-        const text = result.response.text().trim().replace(/```/g, '');
+        const text = await generateWithRetry(client.geminiModel, fullPrompt);
 
-        // レート制限情報を記録
         await recordSuccessRequest(client.rtdb, message.author.id);
-
-        // 会話履歴を保存
         saveConversationHistory(message.author.id, message.channel.id, userMessage, text);
 
         if (statusMessage) {
@@ -680,7 +825,7 @@ async function generateChatResponse(client, message, aiConfig) {
             try {
                 await statusMessage.delete();
             } catch (err) {
-                // 削除失敗は無視
+                // ignore
             }
         }
 

@@ -50,12 +50,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="modal-backdrop">
                 <div class="modal">
                     <div class="modal-header">
-                        <h2>${title}</h2>
+                        <h2>${escapeHTML(title)}</h2>
                         <button class="close-btn">&times;</button>
                     </div>
                     <div class="modal-body">${content}</div>
                     <div class="modal-footer">
-                        ${footerButtons.map(btn => `<button id="${btn.id}" class="btn ${btn.class || ''}">${btn.text}</button>`).join('')}
+                        ${footerButtons.map(btn => `<button id="${btn.id}" class="btn ${btn.class || ''}">${escapeHTML(btn.text)}</button>`).join('')}
                     </div>
                 </div>
             </div>`;
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const data = await api.get(`/api/admin/user-search?userId=${userId}`);
                     createModal('ユーザー検索結果', `
                         <div style="text-align:center;padding:10px 0;">
-                            <img src="${data.avatar}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border);margin-bottom:12px;">
+                            <img src="${/^https?:\/\//i.test(data.avatar) ? escapeHTML(data.avatar) : ''}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border);margin-bottom:12px;">
                             <div style="font-size:1.1rem;font-weight:600;">${escapeHTML(data.tag)}</div>
                             <div style="font-size:0.8rem;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:14px;">ID: ${escapeHTML(data.id)}</div>
                             <p style="color:var(--text-secondary);font-size:0.88rem;">所属サーバー (${data.guilds.length}):</p>

@@ -64,12 +64,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="modal-backdrop">
                 <div class="modal">
                     <div class="modal-header">
-                        <h2>${title}</h2>
+                        <h2>${escapeHTML(title)}</h2>
                         <button class="close-btn">&times;</button>
                     </div>
                     <div class="modal-body">${content}</div>
                     <div class="modal-footer">
-                        ${footerButtons.map(btn => `<button id="${btn.id}" class="btn ${btn.class || ''}">${btn.text}</button>`).join('')}
+                        ${footerButtons.map(btn => `<button id="${btn.id}" class="btn ${btn.class || ''}">${escapeHTML(btn.text)}</button>`).join('')}
                     </div>
                 </div>
             </div>`;
@@ -471,7 +471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                              <label for="role-filter">ロール絞り込み</label>
                             <select id="role-filter" placeholder="すべてのロール">
                                 <option value="">すべてのロール</option>
-                                ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                                ${guildInfo.roles.map(r => `<option value="${escapeHTML(r.id)}">${escapeHTML(r.name)}</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -572,17 +572,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     let content = '';
                     switch (eventType) {
                         case 'MessageDelete':
-                            content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<div class="log-content">${details.content}</div>`;
+                            content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<div class="log-content">${escapeHTML(details.content)}</div>`;
                             break;
                         case 'MessageUpdate':
-                            content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<strong>変更前:</strong><div class="log-content">${details.before}</div><strong>変更後:</strong><div class="log-content">${details.after}</div>`;
+                            content = `<strong>チャンネル:</strong> <#${details.channelId}>\n<strong>変更前:</strong><div class="log-content">${escapeHTML(details.before)}</div><strong>変更後:</strong><div class="log-content">${escapeHTML(details.after)}</div>`;
                             break;
                         case 'NicknameUpdate':
-                            content = `<strong>変更前:</strong> ${details.before}\n<strong>変更後:</strong> ${details.after}`;
+                            content = `<strong>変更前:</strong> ${escapeHTML(details.before)}\n<strong>変更後:</strong> ${escapeHTML(details.after)}`;
                             break;
                         case 'RoleAdd':
                         case 'RoleRemove':
-                            content = `<strong>ロール:</strong> ${details.roleName}`;
+                            content = `<strong>ロール:</strong> ${escapeHTML(details.roleName)}`;
                             break;
                         default:
                             content = `<pre>${JSON.stringify(details, null, 2)}</pre>`;
@@ -646,9 +646,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         tableBody.innerHTML = logs.map(log => `
                         <tr>
                             <td>${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
-                            <td>${log.eventType}</td>
-                            <td>${log.executorTag || 'N/A'}</td>
-                            <td>${log.targetTag || 'N/A'}</td>
+                            <td>${escapeHTML(log.eventType)}</td>
+                            <td>${escapeHTML(log.executorTag || 'N/A')}</td>
+                            <td>${escapeHTML(log.targetTag || 'N/A')}</td>
                             <td>${formatLogDetails(log)}</td>
                         </tr>
                     `).join('');
@@ -695,8 +695,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <li>
                         <span class="rank">#${i + 1}</span>
                         <div class="user-info">
-                            <div class="user-name">${user.displayName || user.username}</div>
-                            <div class="user-id">${user.userId}</div>
+                            <div class="user-name">${escapeHTML(user.displayName || user.username)}</div>
+                            <div class="user-id">${escapeHTML(user.userId)}</div>
                         </div>
                         <span class="stat">${user.messageCount.toLocaleString()} メッセージ</span>
                     </li>`).join('');
@@ -773,7 +773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <label for="announcementChannelId">受信チャンネル</label>
                             <select id="announcementChannelId" placeholder="チャンネルを選択しない（受信しない）">
                                 <option value="">選択しない</option>
-                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                             </select>
                             <p class="form-hint">
                                 ボットのアップデート情報や重要なお知らせなど、開発者からのお知らせを受信するチャンネルを指定します。
@@ -794,7 +794,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 pageTitle.textContent = '参加・退出設定';
                 const settings = await api.get('/api/settings/guilds');
                 settingsCache['guilds'] = settings;
-                const createSelectOptions = (options) => options.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+                const createSelectOptions = (options) => options.map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('');
 
                 pageContent.innerHTML = `
                 <form id="welcome-form">
@@ -924,17 +924,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <div class="card-header"><h3>メッセージ内容</h3></div>
                                 <div class="form-group">
                                     <label for="welcome-title">タイトル</label>
-                                    <input type="text" id="welcome-title" value="${settings.title || ''}">
+                                    <input type="text" id="welcome-title" value="${escapeHTML(settings.title || '')}">
                                 </div>
                                 <div class="form-group">
                                     <label for="welcome-description">説明文</label>
-                                    <textarea id="welcome-description" rows="6">${settings.description || ''}</textarea>
+                                    <textarea id="welcome-description" rows="6">${escapeHTML(settings.description || '')}</textarea>
                                     <p class="form-hint"><b>変数:</b> <code>{user.displayName}</code>, <code>{user.mention}</code>, <code>{server.name}</code>, <code>{server.memberCount}</code>, <code>{rulesChannel}</code></p>
                                 </div>
                                 <div class="form-grid">
                                     <div class="form-group">
                                         <label for="welcome-imageUrl">画像URL</label>
-                                        <input type="text" id="welcome-imageUrl" placeholder="https://..." value="${settings.imageUrl || ''}">
+                                        <input type="text" id="welcome-imageUrl" placeholder="https://..." value="${escapeHTML(settings.imageUrl || '')}">
                                     </div>
                                     <div class="form-group">
                                         <label for="modal-color">埋め込みの色</label>
@@ -1000,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <label for="botAutoroleId">自動付与ロール</label>
                             <select id="botAutoroleId" placeholder="ロールを選択...">
                                 <option value="">選択しない</option>
-                                ${guildInfo.roles.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                ${guildInfo.roles.map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                             </select>
                             <p class="form-hint">新しいBotが参加した際、選択したロールが自動付与されます。</p>
                         </div>
@@ -1023,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="card-header"><h3>NGワードフィルター</h3></div>
                         <div class="form-group">
                             <label for="ngWords">NGワード (カンマ区切り)</label>
-                            <textarea id="ngWords" rows="4" placeholder="word1,word2">${(automod.ngWords || []).join(',')}</textarea>
+                            <textarea id="ngWords" rows="4" placeholder="word1,word2">${escapeHTML((automod.ngWords || []).join(','))}</textarea>
                         </div>
                     </div>
                     <div class="card">
@@ -1054,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <label for="auditLogChannel">監査ログチャンネル</label>
                             <select id="auditLogChannel" placeholder="チャンネルを選択...">
                                 <option value="">選択しない</option>
-                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -1100,9 +1100,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="vc-log-mapping-item" data-vc-id="${vcId}">
                             <div class="vc-log-mapping-config">
                                 <div class="vc-log-mapping-channels">
-                                    <div class="channel-name"><i data-feather="mic"></i><span>${vc.name}</span></div>
+                                    <div class="channel-name"><i data-feather="mic"></i><span>${escapeHTML(vc.name)}</span></div>
                                     <i data-feather="arrow-right"></i>
-                                    <div class="channel-name"><i data-feather="message-square"></i><span>${tc.name}</span></div>
+                                    <div class="channel-name"><i data-feather="message-square"></i><span>${escapeHTML(tc.name)}</span></div>
                                 </div>
                                 <div class="vc-log-mapping-options">
                                     <label class="checkbox-label">
@@ -1233,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <label for="levelUpChannel">通知チャンネル</label>
                             <select id="levelUpChannel" placeholder="レベルアップしたチャンネルに通知">
                                 <option value="">レベルアップしたチャンネルに通知</option>
-                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                ${guildInfo.channels.filter(c => c.type === 0).map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -1246,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <input type="number" id="reward-level" placeholder="レベル" min="1">
                                 <select id="reward-role-id" placeholder="ロールを選択...">
                                     <option value="">選択してください</option>
-                                    ${guildInfo.roles.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                    ${guildInfo.roles.map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                                 </select>
                                 <button type="button" id="add-reward-btn" class="btn">追加</button>
                             </div>
@@ -1269,7 +1269,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="role-item" data-index="${index}">
                             <div class="role-info">
                                 <span class="role-name">Lv. ${reward.level}</span>
-                                <span class="role-genre-tag">${guildInfo.roles.find(r => r.id === reward.roleId)?.name || '不明'}</span>
+                                <span class="role-genre-tag">${escapeHTML(guildInfo.roles.find(r => r.id === reward.roleId)?.name || '不明')}</span>
                             </div>
                             <button type="button" class="btn btn-danger btn-small remove-reward-btn">&times;</button>
                         </div>`).join('');
@@ -1326,14 +1326,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <label for="ticket-category">チケット作成カテゴリ</label>
                                 <select id="ticket-category" placeholder="カテゴリを選択...">
                                     <option value="">選択しない</option>
-                                    ${guildInfo.channels.filter(c => c.type === 4).map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                    ${guildInfo.channels.filter(c => c.type === 4).map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label for="ticket-role">サポート担当ロール</label>
                                 <select id="ticket-role" placeholder="ロールを選択...">
                                     <option value="">選択しない</option>
-                                    ${guildInfo.roles.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+                                    ${guildInfo.roles.map(o => `<option value="${escapeHTML(o.id)}">${escapeHTML(o.name)}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
@@ -1342,17 +1342,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="card-header"><h3>メッセージ設定</h3></div>
                         <div class="form-group">
                             <label for="ticket-title">チケットパネルのタイトル</label>
-                            <input type="text" id="ticket-title" value="${settings.title || 'お問い合わせ'}">
+                            <input type="text" id="ticket-title" value="${escapeHTML(settings.title || 'お問い合わせ')}">
                         </div>
                         <div class="form-group">
                             <label for="ticket-desc">チケットパネルの説明</label>
-                            <textarea id="ticket-desc" rows="4">${settings.description || '下のボタンをクリックしてチケットを作成してください。'}</textarea>
+                            <textarea id="ticket-desc" rows="4">${escapeHTML(settings.description || '下のボタンをクリックしてチケットを作成してください。')}</textarea>
                         </div>
                     </div>
                     <button type="submit" class="btn">設定を保存</button>
                 </form>
             `;
-
                 initializeTomSelect('#ticket-category', { items: [settings.categoryId] });
                 initializeTomSelect('#ticket-role', { items: [settings.supportRoleId] });
 
@@ -1483,7 +1482,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="card-header"><h3>AIのペルソナ設定</h3></div>
                         <div class="form-group">
                             <label for="aiPersonalityPrompt">AIへの指示（プロンプト）</label>
-                            <textarea id="aiPersonalityPrompt" rows="8" placeholder="例：あなたは猫のキャラクターです。語尾に「にゃん」を付けてください。">${aiConfig.aiPersonalityPrompt || ''}</textarea>
+                            <textarea id="aiPersonalityPrompt" rows="8" placeholder="例：あなたは猫のキャラクターです。語尾に「にゃん」を付けてください。">${escapeHTML(aiConfig.aiPersonalityPrompt || '')}</textarea>
                             <p class="form-hint">AIの性格や口調を指定できます。空欄の場合はフレンドリーなアシスタントになります。</p>
                         </div>
                         
@@ -1491,7 +1490,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <label>ペルソナ設定アシスタント</label>
                             <p class="form-hint">クリックすると、テンプレートを上のテキストエリアに挿入します。</p>
                             <div id="persona-templates" class="persona-templates-container">
-                                ${personaTemplates.map(template => `<button type="button" class="btn btn-secondary btn-small" data-prompt="${template.prompt.replace(/"/g, '&quot;')}">${template.name}</button>`).join('')}
+                                ${personaTemplates.map(template => `<button type="button" class="btn btn-secondary btn-small" data-prompt="${escapeHTML(template.prompt)}">${escapeHTML(template.name)}</button>`).join('')}
                             </div>
                         </div>
 
@@ -1526,13 +1525,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             listEl.innerHTML = boards.map(board => `
                 <div class="card">
                     <div class="card-header">
-                        <h3>${board.title}</h3>
+                        <h3>${escapeHTML(board.title)}</h3>
                         <div>
-                            <button class="btn btn-secondary btn-small edit-roleboard-btn" data-id="${board.id}">編集</button>
-                            <button class="btn btn-danger btn-small delete-roleboard-btn" data-id="${board.id}">削除</button>
+                            <button class="btn btn-secondary btn-small edit-roleboard-btn" data-id="${escapeHTML(board.id)}">編集</button>
+                            <button class="btn btn-danger btn-small delete-roleboard-btn" data-id="${escapeHTML(board.id)}">削除</button>
                         </div>
                     </div>
-                    <p>${board.description}</p>
+                    <p>${escapeHTML(board.description)}</p>
                     <p><strong>ロール数:</strong> ${Object.keys(board.roles || {}).length}</p>
                 </div>`).join('');
             listEl.querySelectorAll('.edit-roleboard-btn').forEach(btn =>
@@ -1617,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="form-grid">
                     <div class="form-group">
                         <label>タイトル</label>
-                        <input type="text" id="edit-title" value="${board.title || ''}">
+                        <input type="text" id="edit-title" value="${escapeHTML(board.title || '')}">
                     </div>
                     <div class="form-group">
                         <label>色</label>
@@ -1629,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 <div class="form-group">
                     <label>説明</label>
-                    <textarea id="edit-desc">${board.description || ''}</textarea>
+                    <textarea id="edit-desc">${escapeHTML(board.description || '')}</textarea>
                 </div>
                 <div class="form-group">
                     <label for="edit-password">
@@ -1638,7 +1637,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             ユーザーがロール付与時にパスワード入力が必須になります。空欄で無効化。
                         </small>
                     </label>
-                    <input type="password" id="edit-password" value="${board.password || ''}" placeholder="パスワード（最大128文字、空欄で無効化）" maxlength="128">
+                    <input type="password" id="edit-password" value="${escapeHTML(board.password || '')}" placeholder="パスワード（最大128文字、空欄で無効化）" maxlength="128">
                 </div>
                 <hr style="border-color: var(--border); margin: 20px 0;">
                 <h4>ロール管理</h4>
@@ -1649,7 +1648,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="form-group">
                             <select id="add-role-select" placeholder="ロールを選択...">
                                 <option value="">ロールを選択...</option>
-                                ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                                ${guildInfo.roles.map(r => `<option value="${escapeHTML(r.id)}">${escapeHTML(r.name)}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group">
@@ -1685,10 +1684,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
                 listEl.innerHTML = Object.entries(roles).map(([id, data]) => `
-                    <div class="role-item" data-id="${id}">
+                    <div class="role-item" data-id="${escapeHTML(id)}">
                         <div class="role-info">
-                            <span class="role-name">${data.name}</span>
-                            <span class="role-genre-tag">${data.genre}</span>
+                            <span class="role-name">${escapeHTML(data.name)}</span>
+                            <span class="role-genre-tag">${escapeHTML(data.genre)}</span>
                         </div>
                         <button class="btn btn-danger btn-small remove-role-btn">&times;</button>
                     </div>`).join('');
@@ -1906,7 +1905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="form-group">
                 <label>ロールを編集</label>
                 <select id="roles-select" multiple placeholder="ロールを選択...">
-                    ${guildInfo.roles.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                    ${guildInfo.roles.map(r => `<option value="${escapeHTML(r.id)}">${escapeHTML(r.name)}</option>`).join('')}
                 </select>
             </div>`,
             [{ id: 'save-roles', text: '保存', class: 'btn' }]
