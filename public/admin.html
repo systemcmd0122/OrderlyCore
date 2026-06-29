@@ -3,43 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OrderlyCore — Admin Panel</title>
+    <title>OrderlyCore — 管理パネル</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/admin.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body class="admin-body">
     <div id="loader" class="loader-container">
         <div class="loader-ring"></div>
-        <p id="loader-text">INITIALIZING ADMIN INTERFACE...</p>
+        <p>読み込み中...</p>
     </div>
 
     <div class="dashboard-wrapper" style="display:none;">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <a href="#servers" class="logo" data-text="[O] Admin_Panel">
+                <a href="#servers" class="logo">
                     <i data-feather="shield" style="width:16px;height:16px;"></i>
-                    [O] ADMIN_PANEL
+                    Admin Panel
                 </a>
             </div>
 
             <div class="server-info">
                 <img id="bot-avatar" src="" alt="Bot Avatar" class="server-icon">
-                <h2 id="bot-name" class="glitch">OrderlyCore</h2>
+                <h2 id="bot-name">OrderlyCore</h2>
                 <div class="bot-stats">
                     <div class="stat-item">
                         <i data-feather="server"></i>
                         <span id="guild-count">0</span>
-                        <span style="font-size:0.68rem;color:rgba(0,255,136,0.35);">GUILDS</span>
+                        <span>サーバー</span>
                     </div>
                     <div class="stat-item">
                         <i data-feather="users"></i>
                         <span id="user-count">0</span>
-                        <span style="font-size:0.68rem;color:rgba(0,255,136,0.35);">USERS</span>
+                        <span>ユーザー</span>
                     </div>
                 </div>
             </div>
@@ -59,8 +59,8 @@
             </nav>
 
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn btn-secondary" style="width:100%;font-size:0.78rem;letter-spacing:0.06em;">
-                    <i data-feather="log-out"></i><span>LOGOUT</span>
+                <button id="logout-btn" class="btn btn-secondary" style="width:100%;">
+                    <i data-feather="log-out"></i><span>ログアウト</span>
                 </button>
             </div>
         </aside>
@@ -71,11 +71,11 @@
                     <i data-feather="menu"></i>
                 </button>
                 <div class="header-title">
-                    <h1 id="page-title">OVERVIEW<span id="page-title-cursor"></span></h1>
+                    <h1 id="page-title">管理パネル</h1>
                     <p id="page-subtitle" class="subtitle"></p>
                 </div>
                 <div class="header-actions">
-                    <input id="global-user-search" type="text" placeholder="$ search --user-id [ID]">
+                    <input id="global-user-search" type="text" placeholder="ユーザーIDを検索..." style="width:200px;font-size:0.82rem;">
                     <div class="status-indicator">
                         <span class="status-dot"></span>
                         <span>ONLINE</span>
@@ -92,30 +92,6 @@
     <div id="modal-container"></div>
 
     <script src="/admin.js"></script>
-    <script>
-        // Loader text typewriter effect
-        const loaderMessages = [
-            'INITIALIZING ADMIN INTERFACE...',
-            'LOADING SYSTEM MODULES...',
-            'AUTHENTICATING SESSION...',
-            'FETCHING BOT DATA...'
-        ];
-        let msgIdx = 0;
-        const loaderTextEl = document.getElementById('loader-text');
-        const loaderInterval = setInterval(() => {
-            msgIdx = (msgIdx + 1) % loaderMessages.length;
-            if (loaderTextEl) loaderTextEl.textContent = loaderMessages[msgIdx];
-        }, 600);
-
-        // Stop interval once dashboard loads
-        const observer = new MutationObserver(() => {
-            if (document.querySelector('.dashboard-wrapper[style*="flex"]')) {
-                clearInterval(loaderInterval);
-                observer.disconnect();
-            }
-        });
-        observer.observe(document.body, { attributes: true, subtree: true });
-    </script>
     <script>feather.replace();</script>
 </body>
 </html>

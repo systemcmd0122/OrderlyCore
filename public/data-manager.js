@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await api.get('/api/data-manager/collections');
 
             const newHtml = Object.entries(data).map(([name, count]) => `
-                <div class="stat-card overview-card" data-collection="${name}" style="flex-direction:column;text-align:center;padding:18px 14px;cursor:pointer;transition:all var(--t-base);">
+                <div class="stat-card overview-card" data-collection="${name}" style="flex-direction:column;text-align:center;padding:18px 14px;cursor:pointer;transition:all 0.15s;">
                     <div class="stat-icon" style="margin:0 auto 10px;background:rgba(0,0,0,0.2);color:${COLLECTION_COLORS[name] || 'var(--primary)'};">
                         <i data-feather="${COLLECTION_ICONS[name] || 'database'}"></i>
                     </div>

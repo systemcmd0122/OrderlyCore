@@ -7,40 +7,31 @@
     <link rel="stylesheet" href="/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body class="login-page-body">
-
     <div class="login-container">
-        <div class="terminal">
-            <div class="terminal-header">
-                <div class="terminal-dot dot-red"></div>
-                <div class="terminal-dot dot-yellow"></div>
-                <div class="terminal-dot dot-green"></div>
-                <div class="terminal-title">OrderlyCore — authentication</div>
-            </div>
-            <div class="terminal-body">
-                <h1 class="login-title">[O] OrderlyCore</h1>
-                <p class="login-description">
-                    Discordサーバーで <code style="background:var(--bg-raised);padding:2px 7px;border-radius:5px;font-family:var(--font-mono);color:var(--cyan);font-size:0.85em;">/login</code> コマンドを実行して取得したワンタイムトークンを入力してください。
-                </p>
-                <form id="login-form">
-                    <div class="form-group">
-                        <label for="token" class="prompt">user@OrderlyCore:~$ one-time-token</label>
-                        <div class="input-with-icon">
-                            <i data-feather="key"></i>
-                            <input type="text" id="token" name="token" required placeholder="ここにトークンを貼り付け" autocomplete="off">
-                        </div>
+        <div class="login-card">
+            <div class="login-logo">OrderlyCore</div>
+            <p class="login-description">
+                Discordサーバーで <code>/login</code> コマンドを実行して取得したワンタイムトークンを入力してください。
+            </p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="token" class="login-label">ワンタイムトークン</label>
+                    <div class="input-wrapper">
+                        <i data-feather="key"></i>
+                        <input type="text" id="token" name="token" required placeholder="トークンを貼り付け" autocomplete="off">
                     </div>
-                    <button type="submit" class="btn login-btn" id="submit-btn">
-                        <span class="btn-text">Authenticate</span>
-                        <div class="loader-ring-small" style="display:none;"></div>
-                    </button>
-                </form>
-                <div id="message-container" style="display:none;">
-                    <p id="message"></p>
                 </div>
+                <button type="submit" class="btn login-btn" id="submit-btn">
+                    <span class="btn-text">認証</span>
+                    <div class="loader-ring-small" style="display:none;"></div>
+                </button>
+            </form>
+            <div id="message-container" style="display:none;">
+                <p id="message"></p>
             </div>
         </div>
     </div>
@@ -49,21 +40,20 @@
     document.addEventListener('DOMContentLoaded', () => {
         feather.replace();
 
-        const form        = document.getElementById('login-form');
-        const tokenInput  = document.getElementById('token');
+        const form = document.getElementById('login-form');
+        const tokenInput = document.getElementById('token');
 
-        // Admin shortcut
         tokenInput.addEventListener('input', () => {
             if (tokenInput.value.trim().toLowerCase() === 'admin') {
                 window.location.href = '/admin-login.html';
             }
         });
 
-        const messageEl   = document.getElementById('message');
-        const msgWrap     = document.getElementById('message-container');
-        const submitBtn   = document.getElementById('submit-btn');
-        const btnText     = submitBtn.querySelector('.btn-text');
-        const btnLoader   = submitBtn.querySelector('.loader-ring-small');
+        const messageEl = document.getElementById('message');
+        const msgWrap = document.getElementById('message-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnLoader = submitBtn.querySelector('.loader-ring-small');
 
         const showMsg = (text, type) => {
             msgWrap.style.display = 'block';
@@ -82,7 +72,7 @@
             msgWrap.style.display = 'none';
 
             try {
-                const res  = await fetch('/api/verify', {
+                const res = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token })
@@ -91,12 +81,12 @@
 
                 if (res.ok) {
                     showMsg('認証成功！ダッシュボードに移動します...', 'success');
-                    setTimeout(() => { window.location.href = '/dashboard'; }, 1400);
+                    setTimeout(() => { window.location.href = '/dashboard'; }, 1200);
                 } else {
-                    throw new Error(data.error || '不明なエラーが発生しました。');
+                    throw new Error(data.error || '認証に失敗しました。');
                 }
             } catch (err) {
-                showMsg(`エラー: ${err.message}`, 'error');
+                showMsg('エラー: ' + err.message, 'error');
                 submitBtn.disabled = false;
                 btnText.style.display = 'inline';
                 btnLoader.style.display = 'none';

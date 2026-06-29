@@ -3,463 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OrderlyCore — Admin Login</title>
+    <title>OrderlyCore — 管理ログイン</title>
+    <link rel="stylesheet" href="/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/feather-icons"></script>
     <style>
-        :root {
-            --adm-green:        #00ff88;
-            --adm-green-dim:    #00cc66;
-            --adm-green-glow:   rgba(0, 255, 136, 0.18);
-            --adm-green-subtle: rgba(0, 255, 136, 0.06);
-            --adm-red:          #ff3355;
-            --adm-amber:        #ffb300;
-            --term-bg:          #030608;
-            --term-surface:     #070d0f;
-            --term-raised:      #0a1214;
-            --term-float:       #0e181c;
-            --term-border:      rgba(0,255,136,0.12);
-            --term-border-mid:  rgba(0,255,136,0.22);
-            --term-border-hi:   rgba(0,255,136,0.45);
-            --success: #00ff88;
-            --error:   #ff3355;
-            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
-        }
-
-        @keyframes spin      { to { transform: rotate(360deg); } }
-        @keyframes blink     { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-        @keyframes crt-flicker {
-            0%   { opacity: 1; }
-            91%  { opacity: 1; }
-            92%  { opacity: 0.96; }
-            93%  { opacity: 1; }
-            96%  { opacity: 0.98; }
-            100% { opacity: 1; }
-        }
-        @keyframes scanline-move {
-            0%   { transform: translateY(-100%); }
-            100% { transform: translateY(100vh); }
-        }
-        @keyframes boot-in {
-            from { opacity: 0; transform: scale(0.98); filter: brightness(0); }
-            to   { opacity: 1; transform: scale(1); filter: brightness(1); }
-        }
-        @keyframes glow-pulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(0,255,136,0.1), 0 0 40px rgba(0,255,136,0.05); }
-            50%       { box-shadow: 0 0 30px rgba(0,255,136,0.2), 0 0 60px rgba(0,255,136,0.08); }
-        }
-        @keyframes type-line {
-            from { width: 0; }
-            to   { width: 100%; }
-        }
-
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: var(--font-mono);
-            background: var(--term-bg);
-            color: var(--adm-green);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 24px;
-            -webkit-font-smoothing: antialiased;
-            position: relative;
-            overflow: hidden;
-            animation: crt-flicker 10s infinite;
-        }
-
-        /* CRT scanlines background */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background:
-                repeating-linear-gradient(
-                    0deg,
-                    transparent,
-                    transparent 2px,
-                    rgba(0,0,0,0.12) 2px,
-                    rgba(0,0,0,0.12) 4px
-                ),
-                radial-gradient(ellipse 90% 70% at 50% 50%, rgba(0,255,136,0.03) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        /* Moving scanline */
-        body::after {
-            content: '';
-            position: fixed;
-            top: -10%;
-            left: 0; right: 0;
-            height: 180px;
-            background: linear-gradient(
-                transparent,
-                rgba(0, 255, 136, 0.012),
-                transparent
-            );
-            animation: scanline-move 8s linear infinite;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .login-container {
-            width: 100%;
-            max-width: 480px;
-            position: relative;
-            z-index: 2;
-            animation: boot-in 0.6s ease forwards;
-        }
-
-        /* ── Terminal window ───────────────── */
-        .terminal {
-            background: var(--term-surface);
-            border: 1px solid var(--term-border-mid);
-            border-radius: 0;
-            box-shadow:
-                0 0 0 1px var(--term-border),
-                0 0 40px rgba(0,255,136,0.08),
-                0 20px 60px rgba(0,0,0,0.8);
-            overflow: hidden;
-            animation: glow-pulse 4s ease infinite;
-        }
-
-        /* ── Title bar ─────────────────────── */
-        .terminal-header {
-            display: flex;
-            align-items: center;
-            padding: 10px 16px;
-            background: var(--term-raised);
-            border-bottom: 1px solid var(--term-border-mid);
-            gap: 0;
-        }
-
-        .terminal-dot { width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; cursor: default; }
-        .dot-red    { background: #ff5f57; box-shadow: 0 0 4px rgba(255,95,87,0.6); }
-        .dot-yellow { background: #febc2e; box-shadow: 0 0 4px rgba(254,188,46,0.6); }
-        .dot-green  { background: #28c840; box-shadow: 0 0 4px rgba(40,200,64,0.6); }
-
-        .terminal-title {
-            flex: 1;
-            text-align: center;
-            color: rgba(0,255,136,0.4);
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            letter-spacing: 0.1em;
-        }
-
-        /* ── Body ──────────────────────────── */
-        .terminal-body {
-            padding: 28px 28px 24px;
-        }
-
-        /* ── ASCII header ─────────────────── */
-        .ascii-art {
-            font-size: 0.6rem;
-            line-height: 1.3;
-            color: rgba(0,255,136,0.35);
-            text-align: center;
-            margin-bottom: 16px;
-            letter-spacing: 0.02em;
-            white-space: pre;
-            overflow: hidden;
-        }
-
-        .login-title {
-            font-size: 1.3rem;
-            font-weight: 700;
-            font-family: var(--font-mono);
-            color: var(--adm-green);
-            text-shadow: 0 0 16px rgba(0,255,136,0.6), 0 0 40px rgba(0,255,136,0.2);
-            margin-bottom: 6px;
-            text-align: center;
-            letter-spacing: 0.08em;
-        }
-
-        .admin-badge {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            width: fit-content;
-            margin: 0 auto 20px;
-            background: rgba(255,179,0,0.08);
-            border: 1px solid rgba(255,179,0,0.25);
-            border-radius: 0;
-            padding: 4px 12px;
-            font-size: 0.68rem;
-            font-weight: 600;
-            color: var(--adm-amber);
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-        }
-
-        /* Blinking shield icon */
-        .badge-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--adm-amber);
-            border-radius: 50%;
-            animation: blink 1s steps(1) infinite;
-            box-shadow: 0 0 4px var(--adm-amber);
-        }
-
-        .login-description {
-            color: rgba(0,255,136,0.45);
-            text-align: center;
-            margin-bottom: 24px;
-            font-size: 0.76rem;
-            line-height: 1.7;
-            letter-spacing: 0.02em;
-        }
-
-        /* ── Form ─────────────────────────── */
-        .form-group { margin-bottom: 20px; }
-
-        .prompt {
-            display: block;
-            color: var(--adm-green-dim);
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            margin-bottom: 8px;
-            letter-spacing: 0.04em;
-            opacity: 0.8;
-        }
-
-        .prompt::after {
-            content: '_';
-            animation: blink 1.1s steps(1) infinite;
-            color: var(--adm-green);
-        }
-
-        .input-wrapper { position: relative; }
-
-        .input-prefix {
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            color: var(--adm-green-dim);
-            font-size: 0.82rem;
-            opacity: 0.6;
-            pointer-events: none;
-            font-family: var(--font-mono);
-        }
-
-        input[type="password"] {
-            width: 100%;
-            padding: 11px 14px 11px 40px;
-            background: var(--term-raised);
-            border: 1px solid var(--term-border-mid);
-            border-radius: 0;
-            color: var(--adm-green);
-            font-size: 0.88rem;
-            font-family: var(--font-mono);
-            transition: all 0.12s ease;
-            caret-color: var(--adm-green);
-            letter-spacing: 0.08em;
-        }
-
-        input[type="password"]:focus {
-            outline: none;
-            border-color: var(--adm-green);
-            box-shadow:
-                0 0 0 2px var(--adm-green-glow),
-                0 0 16px var(--adm-green-glow),
-                inset 0 0 8px rgba(0,255,136,0.04);
-            background: var(--term-float);
-        }
-
-        input[type="password"]::placeholder {
-            color: rgba(0,255,136,0.2);
-            font-size: 0.8rem;
-            letter-spacing: 0.04em;
-        }
-
-        /* ── Submit button ────────────────── */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px;
-            width: 100%;
-            background: transparent;
-            border: 1px solid var(--adm-green);
-            border-radius: 0;
-            color: var(--adm-green);
-            font-size: 0.85rem;
-            font-weight: 600;
-            font-family: var(--font-mono);
-            cursor: pointer;
-            transition: all 0.12s ease;
-            min-height: 46px;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            text-shadow: 0 0 8px rgba(0,255,136,0.5);
-            box-shadow: 0 0 12px var(--adm-green-glow) inset;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, rgba(0,255,136,0.08), transparent);
-            opacity: 0;
-            transition: opacity 0.12s;
-        }
-
-        .btn:hover:not(:disabled) {
-            background: rgba(0,255,136,0.08);
-            box-shadow: 0 0 20px var(--adm-green-glow) inset, 0 0 24px var(--adm-green-glow);
-        }
-
-        .btn:hover:not(:disabled)::before { opacity: 1; }
-
-        .btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            text-shadow: none;
-            box-shadow: none;
-        }
-
-        .btn-text::before { content: '$ '; opacity: 0.6; }
-
-        /* Loader spinner */
-        .loader-ring-small {
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(0,255,136,0.2);
-            border-top-color: var(--adm-green);
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-
-        /* ── Message ──────────────────────── */
-        #message-container { margin-top: 14px; text-align: center; min-height: 20px; }
-        #message { font-weight: 600; font-size: 0.8rem; letter-spacing: 0.04em; }
-        #message.success { color: var(--success); text-shadow: 0 0 8px rgba(0,255,136,0.4); }
-        #message.error   { color: var(--error); text-shadow: 0 0 8px rgba(255,51,85,0.4); }
-        #message.success::before { content: '[OK]  '; opacity: 0.7; }
-        #message.error::before   { content: '[ERR] '; opacity: 0.7; }
-
-        /* ── Back link ────────────────────── */
-        .back-to-home {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 18px;
-            color: rgba(0,255,136,0.3);
-            text-decoration: none;
-            font-size: 0.76rem;
-            letter-spacing: 0.06em;
-            transition: all 0.12s;
-            font-family: var(--font-mono);
-        }
-
-        .back-to-home:hover {
-            color: var(--adm-green-dim);
-        }
-
-        .back-to-home::before { content: '← '; }
-
-        /* ── Divider ──────────────────────── */
-        .term-divider {
-            border: none;
-            border-top: 1px solid var(--term-border);
-            margin: 20px 0;
-        }
-
-        /* ── System info lines ────────────── */
-        .sys-line {
-            font-size: 0.68rem;
-            color: rgba(0,255,136,0.2);
-            letter-spacing: 0.04em;
-            margin-bottom: 3px;
-        }
-
-        .sys-lines { margin-bottom: 20px; }
+        .admin-header { color: var(--success); }
+        .admin-input input { background: var(--bg-primary); border-color: rgba(63,185,80,0.3); color: var(--success); font-family: var(--font-mono); }
+        .admin-input input:focus { border-color: var(--success); box-shadow: 0 0 0 2px rgba(63,185,80,0.15); }
+        .admin-btn { background: var(--success); color: var(--bg-primary); }
+        .admin-btn:hover { background: #4cda6a; }
     </style>
 </head>
-<body>
+<body class="login-page-body">
     <div class="login-container">
-        <div class="terminal">
-            <div class="terminal-header">
-                <div class="terminal-dot dot-red"></div>
-                <div class="terminal-dot dot-yellow"></div>
-                <div class="terminal-dot dot-green"></div>
-                <div class="terminal-title">root@OrderlyCore — admin-auth v2.0</div>
-            </div>
-            <div class="terminal-body">
-
-                <pre class="ascii-art">
-  ____  ____  ____  ____ ____  _  _  ___  __  ____  ____
- / __ \|  _ \|  _ \| ___| __ )| || |/ __||/ /|  _ \| ___|
-| |  | | |_) | | | | _| |  _ \| || | (__ |  < | | | | _|
-| |__| |  _ <| |_| | |__| |_) | || |\__ \|. \| |_| | |___
- \____/|_| \_\____/|____|____/|_||_||___/|_|\_\____/|_____|</pre>
-
-                <h1 class="login-title">ADMIN ACCESS REQUIRED</h1>
-
-                <div class="admin-badge">
-                    <span class="badge-dot"></span>
-                    RESTRICTED — AUTHORIZED PERSONNEL ONLY
-                </div>
-
-                <div class="sys-lines">
-                    <div class="sys-line">SYSTEM: OrderlyCore Management Console</div>
-                    <div class="sys-line">HOST: admin.orderlycore.local</div>
-                    <div class="sys-line">SESSION: <span id="session-id">loading...</span></div>
-                </div>
-
-                <p class="login-description">管理者パスワードを入力して認証してください。<br>
-                不正アクセスは記録・報告されます。</p>
-
-                <form id="login-form">
-                    <div class="form-group">
-                        <label for="password" class="prompt">root@orderlycore:~$ sudo authenticate</label>
-                        <div class="input-wrapper">
-                            <span class="input-prefix">$</span>
-                            <input type="password" id="password" name="password" required placeholder="[ ENTER ADMIN PASSWORD ]" autocomplete="current-password">
-                        </div>
+        <div class="login-card" style="border-color: rgba(63,185,80,0.2);">
+            <div class="login-logo admin-header">管理者パネル</div>
+            <p class="login-description">管理者パスワードを入力してください。</p>
+            <form id="admin-login-form">
+                <div class="form-group">
+                    <label for="password" class="login-label">パスワード</label>
+                    <div class="input-wrapper admin-input">
+                        <i data-feather="lock" style="color:var(--success);"></i>
+                        <input type="password" id="password" name="password" required placeholder="管理者パスワード" autocomplete="off">
                     </div>
-                    <button type="submit" class="btn" id="submit-btn">
-                        <span class="btn-text">AUTHENTICATE</span>
-                        <div class="loader-ring-small" style="display:none;"></div>
-                    </button>
-                </form>
-
-                <div id="message-container" style="display:none;">
-                    <p id="message"></p>
                 </div>
-
-                <hr class="term-divider">
+                <button type="submit" class="btn admin-btn login-btn" id="submit-btn">
+                    <span class="btn-text">ログイン</span>
+                    <div class="loader-ring-small" style="display:none;border-top-color:var(--bg-primary);"></div>
+                </button>
+            </form>
+            <div id="message-container" style="display:none;">
+                <p id="message"></p>
             </div>
         </div>
-        <a href="/" class="back-to-home">Return to main interface</a>
     </div>
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Generate a fake session ID for terminal feel
-        const sessionId = [...Array(16)].map(() => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
-        const sessionEl = document.getElementById('session-id');
-        if (sessionEl) sessionEl.textContent = `0x${sessionId}`;
+        feather.replace();
 
-        const form       = document.getElementById('login-form');
-        const passwordEl = document.getElementById('password');
-        const messageEl  = document.getElementById('message');
-        const msgWrap    = document.getElementById('message-container');
-        const submitBtn  = document.getElementById('submit-btn');
-        const btnText    = submitBtn.querySelector('.btn-text');
-        const btnLoader  = submitBtn.querySelector('.loader-ring-small');
+        const form = document.getElementById('admin-login-form');
+        const passwordInput = document.getElementById('password');
+        const messageEl = document.getElementById('message');
+        const msgWrap = document.getElementById('message-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnLoader = submitBtn.querySelector('.loader-ring-small');
 
         const showMsg = (text, type) => {
             msgWrap.style.display = 'block';
@@ -469,7 +61,7 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const password = passwordEl.value;
+            const password = passwordInput.value.trim();
             if (!password) { showMsg('パスワードを入力してください。', 'error'); return; }
 
             submitBtn.disabled = true;
@@ -478,7 +70,7 @@
             msgWrap.style.display = 'none';
 
             try {
-                const res  = await fetch('/api/admin/login', {
+                const res = await fetch('/api/admin/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password })
@@ -487,12 +79,12 @@
 
                 if (res.ok) {
                     showMsg('認証成功！管理パネルに移動します...', 'success');
-                    setTimeout(() => { window.location.href = '/admin.html'; }, 1400);
+                    setTimeout(() => { window.location.href = '/admin.html'; }, 1200);
                 } else {
-                    throw new Error(data.error || '不明なエラー');
+                    throw new Error(data.error || 'パスワードが違います。');
                 }
             } catch (err) {
-                showMsg(`${err.message}`, 'error');
+                showMsg('エラー: ' + err.message, 'error');
                 submitBtn.disabled = false;
                 btnText.style.display = 'inline';
                 btnLoader.style.display = 'none';

@@ -177,12 +177,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const data = await api.get(`/api/admin/user-search?userId=${userId}`);
                     createModal('ユーザー検索結果', `
                         <div style="text-align:center;padding:10px 0;">
-                            <img src="${data.avatar}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border-base);margin-bottom:12px;">
+                            <img src="${data.avatar}" style="width:64px;height:64px;border-radius:50%;border:2px solid var(--border);margin-bottom:12px;">
                             <div style="font-size:1.1rem;font-weight:600;">${escapeHTML(data.tag)}</div>
                             <div style="font-size:0.8rem;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:14px;">ID: ${escapeHTML(data.id)}</div>
                             <p style="color:var(--text-secondary);font-size:0.88rem;">所属サーバー (${data.guilds.length}):</p>
-                            <ul style="list-style:none;padding:0;margin-top:8px;max-height:100px;overflow-y:auto;text-align:left;background:var(--bg-raised);border-radius:var(--r-sm);padding:8px 12px;">
-                                ${data.guilds.map(g => `<li style="font-size:0.87rem;padding:3px 0;border-bottom:1px solid var(--border-subtle);">${escapeHTML(g.name)}</li>`).join('') || '<li style="color:var(--text-muted);">なし</li>'}
+                            <ul style="list-style:none;padding:0;margin-top:8px;max-height:100px;overflow-y:auto;text-align:left;background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:8px 12px;">
+                                ${data.guilds.map(g => `<li style="font-size:0.87rem;padding:3px 0;border-bottom:1px solid var(--border-light);">${escapeHTML(g.name)}</li>`).join('') || '<li style="color:var(--text-muted);">なし</li>'}
                             </ul>
                             <div style="margin-top:16px;">
                                 <button class="btn btn-danger btn-small" id="bl-user-btn">ブラックリストに追加</button>
@@ -301,8 +301,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <div class="server-card-header">
                                         <div style="display:flex;align-items:center;gap:12px;">
                                             ${guild.icon
-                                                ? `<img src="${escapeHTML(guild.icon)}" alt="icon" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border-base);">`
-                                                : `<div style="width:40px;height:40px;border-radius:50%;background:var(--bg-raised);border:2px solid var(--border-base);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-weight:700;font-size:1rem;">${escapeHTML(guild.name.charAt(0))}</div>`
+                                                ? `<img src="${escapeHTML(guild.icon)}" alt="icon" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);">`
+                                                : `<div style="width:40px;height:40px;border-radius:50%;background:var(--bg-tertiary);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-weight:700;font-size:1rem;">${escapeHTML(guild.name.charAt(0))}</div>`
                                             }
                                             <div>
                                                 <div class="server-name">${escapeHTML(guild.name)}</div>
@@ -864,7 +864,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <tbody>
                                     ${(stats.topGuilds || stats.recentGuilds).map((guild, i) => `
                                         <tr>
-                                            <td style="font-family:var(--font-mono);color:var(--cyan);font-weight:700;">#${i + 1}</td>
+                                            <td style="font-family:var(--font-mono);color:var(--accent);font-weight:700;">#${i + 1}</td>
                                             <td style="font-weight:500;">${escapeHTML(guild.name)}</td>
                                             <td style="font-family:var(--font-mono);">${guild.memberCount.toLocaleString()}</td>
                                             <td style="font-size:0.86rem;color:var(--text-muted);">${new Date(guild.joinedTimestamp).toLocaleDateString('ja-JP')}</td>

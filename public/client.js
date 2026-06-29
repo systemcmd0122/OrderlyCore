@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 App.bindGlobalEvents();
             } catch (error) {
                 console.error('App init error:', error);
-                loader.innerHTML = `<p class="message error" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
+                loader.innerHTML = `<p class="message error" style="background-color: var(--error); color: white; padding: 15px; border-radius: var(--radius-md); text-align: center;">情報の読み込みに失敗しました。再ログインしてください。</p><a href="/login" class="btn" style="margin-top:20px;">ログインページへ</a>`;
             }
         },
 
@@ -239,10 +239,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         await App.renderers[page]();
                     } catch (error) {
                         console.error(`Render error on ${page}:`, error);
-                        pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`;
+                        pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error); color: white; padding: 15px; border-radius: var(--radius-md); text-align: center;">ページの読み込みに失敗しました: ${error.message}</p>`;
                     }
                 } else {
-                    pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error-color); color: white; padding: 15px; border-radius: var(--border-radius); text-align: center;">ページが見つかりません。</p>`;
+                    pageContent.innerHTML = `<p class="message error show" style="background-color: var(--error); color: white; padding: 15px; border-radius: var(--radius-md); text-align: center;">ページが見つかりません。</p>`;
                 }
 
                 feather.replace();
@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon" style="background:rgba(124,77,255,0.1);color:var(--violet);"><i data-feather="cpu"></i></div>
+                        <div class="stat-icon" style="background:rgba(124,77,255,0.1);color:#bc8cff;"><i data-feather="cpu"></i></div>
                         <div class="stat-info">
                             <div class="stat-value text-secondary">${(guildInfo.botCount || 0).toLocaleString()}</div>
                             <div class="stat-label">ボット</div>
@@ -355,13 +355,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
 
                 <div class="grid-container" style="grid-template-columns: 2fr 1fr; margin-top: 24px; gap: 24px;">
-                    <div class="card glass no-border shadow-md">
+                    <div class="card">
                         <div class="card-header"><h3>サーバー成長トレンド</h3></div>
                         <div style="height: 300px; position: relative; padding: 10px;">
                             <canvas id="trendChart"></canvas>
                         </div>
                     </div>
-                    <div class="card glass no-border shadow-md">
+                    <div class="card">
                         <div class="card-header"><h3>クイックメニュー</h3></div>
                         <div style="display: flex; flex-direction: column; gap: 12px; padding: 5px;">
                             <a href="#announcements" class="btn btn-secondary btn-small w-full text-left justify-start"><i data-feather="bell" style="width:16px;"></i> お知らせ設定</a>
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 </div>
 
-                <div class="card glass no-border shadow-md" style="margin-top: 24px;">
+                <div class="card" style="margin-top: 24px;">
                     <div class="card-header"><h3>最新の監査ログ</h3></div>
                     <div class="table-container" style="background: transparent; border: none;">
                         <table class="styled-table">
@@ -388,7 +388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
                                         <td style="color: var(--text-secondary); font-size: 0.9em;">${new Date(log.timestamp.seconds * 1000).toLocaleString()}</td>
                                         <td style="font-weight: 500;">${escapeHTML(log.eventType)}</td>
-                                        <td style="color: var(--primary-light);">${escapeHTML(log.executorTag || 'System')}</td>
+                                        <td style="color: var(--accent);">${escapeHTML(log.executorTag || 'System')}</td>
                                     </tr>
                                 `).join('') || '<tr><td colspan="3" style="text-align:center;">表示可能なログはありません。</td></tr>'}
                             </tbody>
@@ -460,9 +460,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             members: async () => {
                 pageTitle.textContent = 'メンバー管理';
                 pageContent.innerHTML = `
-                <div class="card glass no-border shadow-md">
+                <div class="card">
                     <div class="card-header"><h3>サーバーメンバー</h3></div>
-                    <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
+                    <div class="filter-bar" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
                         <div class="form-group">
                              <label for="member-search">検索</label>
                             <input type="text" id="member-search" placeholder="名前やユーザーID...">
@@ -489,7 +489,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <tbody id="members-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="pagination-controls glass" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
+                    <div class="pagination-controls" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
                         <button id="prev-page" class="btn btn-secondary btn-small" disabled>前</button>
                         <span id="page-info" class="page-info"></span>
                         <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
@@ -591,9 +591,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 };
 
                 pageContent.innerHTML = `
-                <div class="card glass no-border shadow-md">
+                <div class="card">
                     <div class="card-header"><h3>操作履歴</h3></div>
-                     <div class="filter-bar glass" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
+                     <div class="filter-bar" style="border:none; background: rgba(255,255,255,0.02); margin-bottom: 24px;">
                          <div class="form-group">
                             <input type="text" id="log-user-search" placeholder="ユーザー名やタグ...">
                         </div>
@@ -622,7 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <tbody id="logs-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="pagination-controls glass" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
+                    <div class="pagination-controls" style="border:none; background: rgba(255,255,255,0.02); margin-top: 24px;">
                         <button id="prev-page" class="btn btn-secondary btn-small" disabled>前</button>
                         <span id="page-info" class="page-info"></span>
                         <button id="next-page" class="btn btn-secondary btn-small" disabled>次</button>
@@ -689,7 +689,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Leaderboard
                 const listEl = document.getElementById('leaderboard-list');
                 if (data.topUsers.length === 0) {
-                    listEl.innerHTML = `<p style="text-align:center; color: var(--text-muted-color);">まだランキングデータがありません。</p>`;
+                    listEl.innerHTML = `<p style="text-align:center; color: var(--text-muted);">まだランキングデータがありません。</p>`;
                 } else {
                     listEl.innerHTML = data.topUsers.map((user, i) => `
                     <li>
@@ -747,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             roleboard: async () => {
                 pageTitle.textContent = 'ロールボード管理';
                 pageContent.innerHTML = `
-                <div class="card glass">
+                <div class="card">
                     <div class="card-header">
                         <h3>ロールボード一覧</h3>
                         <button id="add-roleboard-btn" class="btn">新規作成</button>
@@ -765,7 +765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 pageContent.innerHTML = `
                 <form id="announcements-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header">
                             <h3>ボットからのお知らせ受信</h3>
                         </div>
@@ -798,7 +798,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 pageContent.innerHTML = `
                 <form id="welcome-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>チャンネル設定</h3></div>
                         <div class="form-grid">
                             <div class="form-group">
@@ -824,7 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         </div>
                     </div>
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>機能設定</h3></div>
                         <div class="form-group">
                             <label for="welcomeRoleId">ウェルカムロール</label>
@@ -994,7 +994,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 settingsCache['guild_settings'] = settings;
                 pageContent.innerHTML = `
                 <form id="autorole-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>Bot用ロール</h3></div>
                         <div class="form-group">
                             <label for="botAutoroleId">自動付与ロール</label>
@@ -1019,14 +1019,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const automod = settings.automod || { ngWords: [], blockInvites: true };
                 pageContent.innerHTML = `
                 <form id="automod-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>NGワードフィルター</h3></div>
                         <div class="form-group">
                             <label for="ngWords">NGワード (カンマ区切り)</label>
                             <textarea id="ngWords" rows="4" placeholder="word1,word2">${(automod.ngWords || []).join(',')}</textarea>
                         </div>
                     </div>
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>招待リンクフィルター</h3></div>
                         <div class="form-group">
                             <label>招待リンクをブロック</label>
@@ -1048,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 settingsCache['guild_settings'] = settings;
                 pageContent.innerHTML = `
                 <form id="logging-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>監査ログ</h3></div>
                         <div class="form-group">
                             <label for="auditLogChannel">監査ログチャンネル</label>
@@ -1085,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const renderMappings = () => {
                     const listEl = document.getElementById('vc-log-mapping-list');
                     if (Object.keys(mappings).length === 0) {
-                        listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">まだVCログ設定がありません。</p>';
+                        listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted);">まだVCログ設定がありません。</p>';
                         return;
                     }
                     listEl.innerHTML = Object.entries(mappings).map(([vcId, config]) => {
@@ -1146,11 +1146,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 pageContent.innerHTML = `
                 <form id="vc-log-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>現在の設定</h3></div>
                         <div id="vc-log-mapping-list" class="vc-log-mapping-list"></div>
                     </div>
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>新しい設定を追加</h3></div>
                         <div class="form-group" style="margin-bottom: 16px;">
                             <p class="form-hint">デフォルト設定: サイレント送信、自動削除</p>
@@ -1170,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button type="submit" class="btn">設定を保存</button>
                 </form>
                 <style>
-                    .vc-log-mapping-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px; background: rgba(0,0,0,0.1); border-radius: var(--border-radius); margin-bottom: 12px; }
+                    .vc-log-mapping-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px; background: rgba(0,0,0,0.1); border-radius: var(--radius-md); margin-bottom: 12px; }
                     .vc-log-mapping-config { flex: 1; }
                     .vc-log-mapping-channels { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
                     .channel-name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
@@ -1227,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const levelingSettings = settings.leveling || { roleRewards: [] };
                 pageContent.innerHTML = `
                 <form id="leveling-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>レベルアップ通知</h3></div>
                         <div class="form-group">
                             <label for="levelUpChannel">通知チャンネル</label>
@@ -1237,10 +1237,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </select>
                         </div>
                     </div>
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>ロール報酬</h3></div>
                         <div id="role-rewards-list"></div>
-                        <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
+                        <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
                             <label>新しい報酬を追加</label>
                             <div class="form-grid" style="align-items:flex-end;">
                                 <input type="number" id="reward-level" placeholder="レベル" min="1">
@@ -1260,7 +1260,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const renderRoleRewards = () => {
                     const listEl = document.getElementById('role-rewards-list');
                     if (!levelingSettings.roleRewards || levelingSettings.roleRewards.length === 0) {
-                        listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted-color);">ロール報酬はまだ設定されていません。</p>';
+                        listEl.innerHTML = '<p style="text-align:center; color: var(--text-muted);">ロール報酬はまだ設定されていません。</p>';
                         return;
                     }
                     listEl.innerHTML = levelingSettings.roleRewards
@@ -1315,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 pageContent.innerHTML = `
                 <form id="tickets-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>基本設定</h3></div>
                         <div class="form-group">
                             <label>チケットシステムを有効化</label>
@@ -1338,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         </div>
                     </div>
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>メッセージ設定</h3></div>
                         <div class="form-group">
                             <label for="ticket-title">チケットパネルのタイトル</label>
@@ -1388,7 +1388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ];
 
                 pageContent.innerHTML = `
-                <div class="card glass">
+                <div class="card">
                     <div class="card-header"><h3>コマンドの有効/無効化</h3></div>
                     <p class="form-hint" style="margin-bottom: 20px;">無効化したコマンドはサーバー内で使用できなくなります。</p>
                     <div class="command-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
@@ -1468,7 +1468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 pageContent.innerHTML = `
                 <form id="ai-form">
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>メンション応答機能</h3></div>
                         <div class="form-group">
                             <label>メンションへの自動応答</label>
@@ -1479,7 +1479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <p class="form-hint">BotにメンションするとAIが返信します。</p>
                         </div>
                     </div>
-                    <div class="card glass">
+                    <div class="card">
                         <div class="card-header"><h3>AIのペルソナ設定</h3></div>
                         <div class="form-group">
                             <label for="aiPersonalityPrompt">AIへの指示（プロンプト）</label>
@@ -1487,7 +1487,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <p class="form-hint">AIの性格や口調を指定できます。空欄の場合はフレンドリーなアシスタントになります。</p>
                         </div>
                         
-                        <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
+                        <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
                             <label>ペルソナ設定アシスタント</label>
                             <p class="form-hint">クリックすると、テンプレートを上のテキストエリアに挿入します。</p>
                             <div id="persona-templates" class="persona-templates-container">
@@ -1520,11 +1520,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const boards = await api.get('/api/roleboards');
             if (boards.length === 0) {
-                listEl.innerHTML = '<p style="text-align: center; color: var(--text-muted-color);">まだロールボードが作成されていません。</p>';
+                listEl.innerHTML = '<p style="text-align: center; color: var(--text-muted);">まだロールボードが作成されていません。</p>';
                 return;
             }
             listEl.innerHTML = boards.map(board => `
-                <div class="card glass">
+                <div class="card">
                     <div class="card-header">
                         <h3>${board.title}</h3>
                         <div>
@@ -1566,7 +1566,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="form-group">
                 <label for="modal-password">
                     パスワード保護（オプション）
-                    <small style="color: var(--text-muted-color); display: block; margin-top: 4px;">
+                    <small style="color: var(--text-muted); display: block; margin-top: 4px;">
                         パスワードを設定すると、ユーザーはロール付与時にパスワード入力が必須になります。
                     </small>
                 </label>
@@ -1634,16 +1634,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="form-group">
                     <label for="edit-password">
                         パスワード保護
-                        <small style="color: var(--text-muted-color); display: block; margin-top: 4px;">
+                        <small style="color: var(--text-muted); display: block; margin-top: 4px;">
                             ユーザーがロール付与時にパスワード入力が必須になります。空欄で無効化。
                         </small>
                     </label>
                     <input type="password" id="edit-password" value="${board.password || ''}" placeholder="パスワード（最大128文字、空欄で無効化）" maxlength="128">
                 </div>
-                <hr style="border-color: var(--border-color); margin: 20px 0;">
+                <hr style="border-color: var(--border); margin: 20px 0;">
                 <h4>ロール管理</h4>
                 <div id="modal-role-list"></div>
-                <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px;">
                     <label>ロールを追加</label>
                     <div class="add-role-grid">
                         <div class="form-group">
@@ -1681,7 +1681,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const listEl = document.getElementById('modal-role-list');
                 const roles = localBoard.roles || {};
                 if (Object.keys(roles).length === 0) {
-                    listEl.innerHTML = '<p style="text-align: center; color: var(--text-muted-color);">まだロールが追加されていません。</p>';
+                    listEl.innerHTML = '<p style="text-align: center; color: var(--text-muted);">まだロールが追加されていません。</p>';
                     return;
                 }
                 listEl.innerHTML = Object.entries(roles).map(([id, data]) => `
