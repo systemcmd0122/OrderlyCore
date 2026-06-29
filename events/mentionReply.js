@@ -609,15 +609,15 @@ async function generateChatResponse(client, message, aiConfig) {
 
         // ---- Gemini API 呼び出し ----------------------------------------
 
-        // system instruction 構築
-        let systemInstruction = '';
+        // システムプロンプト構築
+        let systemPrompt = '';
         if (aiConfig.aiPersonalityPrompt && aiConfig.aiPersonalityPrompt.trim() !== '') {
-            systemInstruction = `あなたは以下のペルソナで応答してください:\n${aiConfig.aiPersonalityPrompt}`;
+            systemPrompt = `あなたは以下のペルソナで応答してください:\n${aiConfig.aiPersonalityPrompt}`;
         } else {
-            systemInstruction = `あなたはOrderlyCoreという名前のAIアシスタントです。親切で知識豊富、そして自然な会話ができます。`;
+            systemPrompt = `あなたはOrderlyCoreという名前のAIアシスタントです。親切で知識豊富、そして自然な会話ができます。`;
         }
 
-        systemInstruction += `
+        systemPrompt += `
 
 ### [RULES] 応答ルール
 - 会話は自然でフレンドリーに
@@ -635,21 +635,19 @@ async function generateChatResponse(client, message, aiConfig) {
 - 発言者: ${user}`;
 
         if (searchSummary) {
-            systemInstruction += `\n\n${searchSummary}`;
+            systemPrompt += `\n\n${searchSummary}`;
         }
 
-        // Gemini の history 形式に変換: {role: "user"|"model", parts: [{text: string}]}
-        const geminiHistory = conversationHistory.map(msg => ({
-            role: msg.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: msg.content }]
-        }));
+        // 会話履歴をプロンプトに埋め込む
+        let conversationContext = '';
+        for (const msg of conversationHistory) {
+            const roleLabel = msg.role === 'assistant' ? 'Assistant' : 'User';
+            conversationContext += `${roleLabel}: ${msg.content}\n`;
+        }
 
-        const chat = client.geminiModel.startChat({
-            history: geminiHistory,
-            systemInstruction
-        });
+        const fullPrompt = `${systemPrompt}\n\n---\n\n${conversationContext}User: ${userMessage}\nAssistant:`;
 
-        const result = await chat.sendMessage(userMessage);
+        const result = await client.geminiModel.generateContent(fullPrompt);
         const text = result.response.text().trim().replace(/```/g, '');
 
         // レート制限情報を記録

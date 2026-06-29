@@ -3,7 +3,7 @@ const chalk = require('chalk');
 
 /**
  * AIレート制限情報を管理するサービス
- * Claude API 無料枠対応版
+ * Gemini API 無料枠対応版
  * - RPM: 5 (全モデル共通)
  * - TPM: 10,000 (入力)
  * - 出力TPM: 4,000
@@ -165,12 +165,11 @@ async function getGlobalLimitInfo(rtdb) {
 }
 
 /**
- * Claude APIエラーがレート制限エラーかどうかを判定
+ * APIエラーがレート制限エラーかどうかを判定
  *
- * Claude APIのレート制限エラー:
+ * レート制限エラー:
  *   - HTTP 429 (RateLimitError) : RPM / TPM 超過
  *   - HTTP 529 (OverloadedError): サーバー過負荷
- *   - error.type === 'rate_limit_error'
  *
  * @param {Error} error
  * @returns {boolean}
@@ -178,7 +177,7 @@ async function getGlobalLimitInfo(rtdb) {
 function isRateLimitError(error) {
     if (!error) return false;
 
-    // Anthropic SDK は APIError を throw し、status と error.type を持つ
+    // status と message でレート制限を判定
     const status = error.status;
     const errorType = error.error?.type || '';
     const message = (error.message || '').toLowerCase();

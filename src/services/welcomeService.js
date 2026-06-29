@@ -1,7 +1,6 @@
 const chalk = require('chalk');
 const { recordSuccessRequest, recordFailedRequest, isRateLimitError } = require('./aiLimitService');
 
-// 無料枠: RPM=5, TPM=10K, 出力TPM=4K
 // リクエスト間に最低12秒のインターバルを設けてRPM制限を回避
 const REQUEST_INTERVAL_MS = 12000;
 let lastRequestTime = 0;
