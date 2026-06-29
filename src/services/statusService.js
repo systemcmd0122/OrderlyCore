@@ -29,7 +29,7 @@ async function generateAIStatus(client) {
 
         return JSON.parse(text);
     } catch (error) {
-        console.error(chalk.red('[ERROR] Geminiによるステータス生成に失敗:'), error);
+        console.error(chalk.red('[ERROR] Geminiによるステータス生成に失敗:'), error.message);
 
         // 失敗時にレート制限情報を記録
         const isRateLimit = isRateLimitError(error);

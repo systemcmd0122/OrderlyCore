@@ -20,7 +20,7 @@ async function waitForRateLimit() {
     lastRequestTime = Date.now();
 }
 
-async function generateWelcomeWithClaude(client, member) {
+async function generateWelcomeWithGemini(client, member) {
     const { user, guild } = member;
     try {
         await waitForRateLimit();
@@ -39,26 +39,17 @@ async function generateWelcomeWithClaude(client, member) {
 - 説明文は、ユーザーへの敬意を表した呼びかけから始め、サーバーのコンセプトに基づいた期待感を抱かせる内容にしてください（150文字以内）。
 - 必ずJSON形式で、{"title": "生成したタイトル", "description": "生成した説明文"} の形式のみで出力してください。JSONのみ出力し、前後に余分なテキストを含めないでください。`;
 
-        const message = await client.anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001', // 無料枠対応・最もトークン効率が高い
-            max_tokens: 256,                     // 出力TPM 4K制限内に収める
-            messages: [
-                { role: 'user', content: prompt }
-            ]
-        });
-
-        let text = message.content[0].text.trim();
+        const result = await client.geminiModel.generateContent(prompt);
+        let text = result.response.text().trim();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) text = jsonMatch[0];
 
-        // 成功時にレート制限情報を記録
         await recordSuccessRequest(client.rtdb, user.id).catch(() => { });
 
         return JSON.parse(text);
     } catch (error) {
-        console.error('[ERROR] ClaudeでのウェルカムメッセージHaiku生成エラー:', error);
+        console.error('[ERROR] Geminiでのウェルカムメッセージ生成エラー:', error);
 
-        // 失敗時にレート制限情報を記録
         const isRateLimit = isRateLimitError(error);
         if (isRateLimit) {
             console.warn(chalk.yellow('[AI Limit] Rate limit reached for user:'), user.id);
@@ -87,8 +78,6 @@ function replacePlaceholders(text, member, rulesChannelId) {
 }
 
 module.exports = {
-    generateWelcomeWithClaude,
-    // 後方互換のためエイリアスも提供
-    generateWelcomeWithGemini: generateWelcomeWithClaude,
+    generateWelcomeWithGemini,
     replacePlaceholders
 };

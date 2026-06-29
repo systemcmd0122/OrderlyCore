@@ -66,7 +66,7 @@ async function showUserLimit(interaction) {
                     inline: false
                 },
                 {
-                    name: '[WARN] レート制限情報 (Claude API 無料枠: RPM 5)',
+                    name: '[WARN] レート制限情報 (Gemini API 無料枠: 60 RPM)',
                     value: [
                         `**制限回数**: ${limitInfo.rateLimitedCount || 0}`,
                         `**最後の制限**: ${limitInfo.lastRateLimitTime ? new Date(limitInfo.lastRateLimitTime).toLocaleString('ja-JP') : 'なし'}`
@@ -82,14 +82,14 @@ async function showUserLimit(interaction) {
                     inline: false
                 }
             )
-            .setFooter({ text: 'Claude API (claude-haiku-4-5) | 情報は分単位で更新されます' })
+            .setFooter({ text: 'Gemini API (gemini-2.5-flash-lite) | 情報は分単位で更新されます' })
             .setTimestamp();
 
         // ステータス判定
         if (limitInfo.rateLimitedCount > 5) {
             embed.addFields({
                 name: '[WARN] 警告',
-                value: 'レート制限に複数回到達しています。しばらく時間をおいてからお使いください。\nClaude API 無料枠のRPM制限: 全モデル合計 5リクエスト/分',
+                value: 'レート制限に複数回到達しています。しばらく時間をおいてからお使いください。\nGemini API 無料枠の制限: 60リクエスト/分',
                 inline: false
             });
         }
@@ -159,7 +159,7 @@ async function showGlobalLimit(interaction) {
         }
 
         embed
-            .setFooter({ text: 'Claude API (claude-haiku-4-5) 無料枠 | サーバー全体のAI利用統計です' })
+                .setFooter({ text: 'Gemini API (gemini-2.5-flash-lite) 無料枠 | サーバー全体のAI利用統計です' })
             .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });

@@ -25,6 +25,7 @@
     "@distube/soundcloud": "^2.0.4",
     "@distube/spotify": "^2.0.2",
     "@distube/yt-dlp": "^2.0.1",
+    "@google/generative-ai": "^0.24.1",
     "@napi-rs/canvas": "^0.1.77",
     "chalk": "^4.1.2",
     "chart.js": "^4.4.2",

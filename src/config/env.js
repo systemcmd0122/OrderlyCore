@@ -11,6 +11,7 @@ const requiredEnvVars = [
     'FIREBASE_MESSAGING_SENDER_ID',
     'FIREBASE_APP_ID',
     'GOOGLE_API_KEY',
+    'ANTHROPIC_API_KEY',
     'SESSION_SECRET',
     'ADMIN_PASSWORD'
 ];
