@@ -258,6 +258,8 @@ async function handleVoiceLeave(oldState, client) {
         console.log(chalk.yellow(`[SESSION] ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
     }
 
+    await cleanupAfkTracking(rtdb, guild.id, member.id);
+
     const logChannelId = await getLogChannelIdForVc(db, guild.id, channel.id);
     if (logChannelId) {
         try {
@@ -267,6 +269,40 @@ async function handleVoiceLeave(oldState, client) {
         } catch (error) {
             console.error(chalk.red('[ERROR] Error sending leave log:'), error);
         }
+    }
+}
+
+async function cleanupAfkTracking(rtdb, guildId, userId) {
+    try {
+        const afkCondRef = ref(rtdb, `afkConditions/${guildId}/${userId}`);
+        await remove(afkCondRef);
+
+        const afkActivityRef = ref(rtdb, `afkActivity/${guildId}/${userId}`);
+        await remove(afkActivityRef);
+
+        const afkTrackRef = ref(rtdb, `afkTracking/${guildId}/${userId}`);
+        const snap = await get(afkTrackRef);
+        if (snap.exists()) {
+            const afkData = snap.val();
+            const memberRef = ref(rtdb, `voiceSessions/${guildId}/${userId}`);
+            const sessionSnap = await get(memberRef);
+
+            if (!sessionSnap.exists() && afkData && !afkData.manual) {
+                await remove(afkTrackRef);
+                console.log(chalk.gray(`[AFK] Auto AFK tracking cleaned up for user ${userId} (left VC)`));
+            }
+        }
+    } catch (error) {
+        console.error(chalk.red('[AFK] Error cleaning up AFK tracking:'), error);
+    }
+}
+
+async function updateLastActionAt(rtdb, guildId, userId) {
+    try {
+        const actionRef = ref(rtdb, `afkActivity/${guildId}/${userId}`);
+        await set(actionRef, { lastActionAt: Date.now() });
+    } catch (error) {
+        console.error(chalk.red('[AFK] Error updating lastActionAt:'), error);
     }
 }
 
@@ -281,6 +317,9 @@ module.exports = {
         const newChannelId = newState.channelId;
 
         try {
+            if (newChannelId) {
+                await updateLastActionAt(rtdb, newState.guild.id, newState.member.id);
+            }
             if (!oldChannelId && newChannelId) {
                 // VC参加
                 await handleVoiceJoin(newState, client);
@@ -306,6 +345,8 @@ module.exports = {
                     await remove(sessionRef);
                     console.log(chalk.yellow(`[SESSION] ended for ${member.user.tag}. Duration: ${Math.round(stayDuration / 1000)}s`));
                 }
+
+                await cleanupAfkTracking(rtdb, guild.id, member.id);
 
                 // 新しいセッション開始
                 const newSessionRef = ref(rtdb, `voiceSessions/${guild.id}/${member.id}`);
