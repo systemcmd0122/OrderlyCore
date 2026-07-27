@@ -126,6 +126,11 @@ async function handleSet(interaction, db, rtdb, guildId, userId) {
     const userSettings = await getUserAfkSettings(db, guildId, userId);
     const action = userSettings.action;
 
+    const previousState = {
+        serverMute: member.voice.serverMute || false,
+        serverDeaf: member.voice.serverDeaf || false
+    };
+
     const afkRef = ref(rtdb, `afkTracking/${guildId}/${userId}`);
     await set(afkRef, {
         isAfk: true,
@@ -134,25 +139,36 @@ async function handleSet(interaction, db, rtdb, guildId, userId) {
         afkMessage,
         channelId: voiceChannel.id,
         channelName: voiceChannel.name,
-        action
+        action,
+        previousState
     });
 
     const appliedActions = [];
     try {
         if (action === 'mute') {
-            await member.voice.setMute(true).catch(() => null);
-            appliedActions.push('ミュート');
+            if (!previousState.serverMute) {
+                await member.voice.setMute(true).catch(() => null);
+                appliedActions.push('ミュート');
+            } else {
+                appliedActions.push('ミュート（既にミュート済み）');
+            }
         } else if (action === 'deafen') {
-            await member.voice.setMute(true).catch(() => null);
-            await member.voice.setDeaf(true).catch(() => null);
-            appliedActions.push('ミュート + デフン');
+            if (!previousState.serverMute) {
+                await member.voice.setMute(true).catch(() => null);
+            }
+            if (!previousState.serverDeaf) {
+                await member.voice.setDeaf(true).catch(() => null);
+            }
+            appliedActions.push('デフン');
         } else if (action === 'move') {
             const afkChannelId = guildSettings.afk?.afkChannelId;
             if (afkChannelId) {
                 await member.voice.setChannel(afkChannelId).catch(() => null);
                 appliedActions.push('AFKチャンネルに移動');
             } else {
-                await member.voice.setMute(true).catch(() => null);
+                if (!previousState.serverMute) {
+                    await member.voice.setMute(true).catch(() => null);
+                }
                 appliedActions.push('ミュート（AFKチャンネル未設定のため）');
             }
         } else if (action === 'kick') {
@@ -163,14 +179,22 @@ async function handleSet(interaction, db, rtdb, guildId, userId) {
         console.error(chalk.red('[AFK] Error applying AFK action:'), err);
     }
 
-    const actionLabels = { mute: 'ミュート', deafen: 'デフン', move: 'AFKチャンネル移動', kick: 'VC切断' };
-
     console.log(chalk.cyan(`[AFK] ${interaction.user.tag} manually set as AFK in ${voiceChannel.name} (action: ${action}): "${afkMessage}"`));
+
+    if (action === 'kick') {
+        await interaction.editReply({
+            embeds: [createSuccessEmbed(
+                'AFK設定完了',
+                `**${voiceChannel.name}** でAFKに設定しました。\n**メッセージ:** ${afkMessage}\n**アクション:** VCから切断`
+            )]
+        }).catch(() => null);
+        return;
+    }
 
     await interaction.editReply({
         embeds: [createSuccessEmbed(
             'AFK設定完了',
-            `**${voiceChannel.name}** でAFKに設定しました。\n**メッセージ:** ${afkMessage}\n**アクション:** ${appliedActions.length > 0 ? appliedActions.join(', ') : actionLabels[action]}`
+            `**${voiceChannel.name}** でAFKに設定しました。\n**メッセージ:** ${afkMessage}\n**アクション:** ${appliedActions.join(', ')}`
         )]
     });
 }
@@ -189,6 +213,7 @@ async function handleRemove(interaction, db, rtdb, guildId, userId) {
 
     const afkData = snapshot.val();
     const duration = Date.now() - afkData.afkSince;
+    const previousState = afkData.previousState || {};
 
     await remove(afkRef);
 
@@ -196,11 +221,11 @@ async function handleRemove(interaction, db, rtdb, guildId, userId) {
     const revertedActions = [];
     if (member.voice.channel) {
         try {
-            if (member.voice.serverMute) {
+            if (member.voice.serverMute && !previousState.serverMute) {
                 await member.voice.setMute(false).catch(() => null);
                 revertedActions.push('ミュート解除');
             }
-            if (member.voice.serverDeaf) {
+            if (member.voice.serverDeaf && !previousState.serverDeaf) {
                 await member.voice.setDeaf(false).catch(() => null);
                 revertedActions.push('デフン解除');
             }

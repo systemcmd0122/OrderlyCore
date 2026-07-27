@@ -204,14 +204,25 @@ async function applyAfkAction(client, guild, member, config, { action, afkMessag
     const actionLabels = { mute: 'ミュート', deafen: 'デフン', move: 'AFKチャンネル移動', kick: 'VC切断' };
     console.log(chalk.magenta(`[AFK] ${member.user.tag} is AFK! Condition: ${condition}, Action: ${action}`));
 
+    const previousState = {
+        serverMute: member.voice.serverMute || false,
+        serverDeaf: member.voice.serverDeaf || false
+    };
+
     let actionApplied = false;
     try {
         if (action === 'mute') {
-            await member.voice.setMute(true);
-            actionApplied = true;
+            if (!previousState.serverMute) {
+                await member.voice.setMute(true);
+                actionApplied = true;
+            }
         } else if (action === 'deafen') {
-            await member.voice.setMute(true);
-            await member.voice.setDeaf(true);
+            if (!previousState.serverMute) {
+                await member.voice.setMute(true);
+            }
+            if (!previousState.serverDeaf) {
+                await member.voice.setDeaf(true);
+            }
             actionApplied = true;
         } else if (action === 'move' && config.afkChannelId) {
             await member.voice.setChannel(config.afkChannelId);
@@ -222,7 +233,9 @@ async function applyAfkAction(client, guild, member, config, { action, afkMessag
         }
 
         if (action === 'move' && !config.afkChannelId) {
-            await member.voice.setMute(true);
+            if (!previousState.serverMute) {
+                await member.voice.setMute(true);
+            }
             actionApplied = true;
             console.log(chalk.yellow(`[AFK] AFK channel not configured, falling back to mute for ${member.user.tag}`));
         }
@@ -240,7 +253,8 @@ async function applyAfkAction(client, guild, member, config, { action, afkMessag
             channelId: member.voice.channelId,
             channelName: member.voice.channel?.name || 'Unknown',
             action,
-            detectedCondition: condition
+            detectedCondition: condition,
+            previousState
         });
 
         const logChannelId = config.logChannelId;
