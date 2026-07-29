@@ -63,8 +63,8 @@ module.exports = (client) => {
             let executor = null;
             let descriptionText = '';
 
-            if (deleteLog && (Date.now() - deleteLog.createdTimestamp < 5000)) {
-                if (deleteLog.extra.channel.id === message.channel.id) {
+            if (deleteLog && (Date.now() - deleteLog.createdTimestamp < 5000) && deleteLog.extra) {
+                if (deleteLog.extra.channel?.id === message.channel.id) {
                     executor = deleteLog.executor;
                     author = deleteLog.target;
                 }

@@ -30,7 +30,7 @@ module.exports = {
 
         try {
             await set(tokenRef, tokenData);
-            const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}login`;
+            const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}/login`;
 
             const embed = createStandardEmbed({
                 title: '[AUTH] Web Dashboard Login',

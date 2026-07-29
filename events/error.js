@@ -1,9 +1,10 @@
+const { ActivityType } = require('discord.js');
+
 module.exports = {
     name: 'error',
     execute(error, client) {
         console.error('[ERROR] Discord クライアントエラー:', error);
         
-        // エラーの種類に応じて処理を分岐
         if (error.code === 'TOKEN_INVALID') {
             console.error('[AUTH] 無効なトークンです。環境変数を確認してください。');
             process.exit(1);
@@ -16,9 +17,8 @@ module.exports = {
             console.error('[ERROR] 予期しないエラーが発生しました:', error.message);
         }
         
-        // エラー時のボットステータス更新
         if (client.user) {
-            client.user.setActivity('System Error', { type: 4 }); // Custom status
+            client.user.setActivity('System Error', { type: ActivityType.Custom });
         }
     }
 };

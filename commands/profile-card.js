@@ -139,7 +139,7 @@ module.exports = {
 
             ctx.fillStyle = '#8b949e';
             ctx.font = '24px "NotoSansJP"';
-            ctx.fillText(`参加日: ${member.joinedAt.toLocaleDateString('ja-JP')}`, 300, 160);
+            ctx.fillText(`参加日: ${member.joinedAt ? member.joinedAt.toLocaleDateString('ja-JP') : '不明'}`, 300, 160);
 
             // --- 統計情報 (日本語化) ---
             const stats = [

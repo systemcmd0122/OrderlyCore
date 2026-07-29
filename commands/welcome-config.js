@@ -11,7 +11,7 @@ module.exports = {
             return await interaction.reply({ content: '[ERROR] 権限が不足しています。', ephemeral: true });
         }
         
-        const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}dashboard`;
+        const loginUrl = `${process.env.APP_URL || 'http://localhost:8000'}/dashboard`;
         const embed = createStandardEmbed({
             title: '[WEB] ダッシュボードへ',
             description: 'ウェルカムメッセージ等の設定は、Webダッシュボードから行えます。',

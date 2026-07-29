@@ -354,7 +354,7 @@ async function handleConfig(interaction, db, rtdb, guildId, userId, subcommand) 
         }
     }
 
-    const merged = { ...currentSettings, ...updateData, guildId, userId };
+    const merged = { ...updateData, guildId, userId };
     const userSettingsRef = doc(db, 'afk_settings', `${guildId}_${userId}`);
     await setDoc(userSettingsRef, merged, { merge: true });
 
@@ -388,7 +388,7 @@ async function handleConfig(interaction, db, rtdb, guildId, userId, subcommand) 
 
 async function getUserAfkSettings(db, guildId, userId) {
     const defaults = {
-        autoDetect: true,
+        autoDetect: false,
         timeout: 300,
         action: 'mute',
         afkMessage: 'AFK中'

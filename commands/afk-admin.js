@@ -200,7 +200,7 @@ async function handleStatus(interaction, db, guildId) {
         kick: 'VCから切断'
     };
 
-    const isEnabled = afkConfig.enabled !== false;
+    const isEnabled = afkConfig.enabled === true;
     const afkChannel = afkConfig.afkChannelId ? `<#${afkConfig.afkChannelId}>` : '未設定';
     const logChannel = afkConfig.logChannelId ? `<#${afkConfig.logChannelId}>` : '未設定';
     const defaultTimeout = afkConfig.defaultTimeout ? `${afkConfig.defaultTimeout / 60}分` : '5分';

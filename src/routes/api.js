@@ -278,6 +278,55 @@ router.get('/analytics/activity', isAuthenticated, isGuildAdmin, async (req, res
     }
 });
 
+router.get('/settings/afk', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists() && docSnap.data().afk) {
+            res.json(docSnap.data().afk);
+        } else {
+            res.json({
+                enabled: false,
+                afkChannelId: null,
+                logChannelId: null,
+                defaultTimeout: 300,
+                defaultAction: 'mute'
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching AFK settings:', error);
+        res.status(500).json({ error: 'Failed to fetch AFK settings.' });
+    }
+});
+
+router.post('/settings/afk', isAuthenticated, isGuildAdmin, async (req, res) => {
+    try {
+        const settingsRef = doc(db, 'guild_settings', req.session.guildId);
+        const settingsSnap = await getDoc(settingsRef);
+        const current = settingsSnap.exists() ? settingsSnap.data() : {};
+        const afkConfig = current.afk || {};
+
+        const updated = { ...afkConfig, ...req.body };
+
+        if (req.body.afkChannelId === '' || req.body.afkChannelId === null) {
+            updated.afkChannelId = null;
+            updated.afkChannelName = null;
+        }
+        if (req.body.logChannelId === '' || req.body.logChannelId === null) {
+            updated.logChannelId = null;
+        }
+        if (req.body.defaultTimeout) {
+            updated.defaultTimeout = parseInt(req.body.defaultTimeout) || 300;
+        }
+
+        await setDoc(settingsRef, { afk: updated }, { merge: true });
+        res.status(200).json({ message: 'AFK settings updated successfully.', afk: updated });
+    } catch (error) {
+        console.error('Error updating AFK settings:', error);
+        res.status(500).json({ error: 'Failed to update AFK settings.' });
+    }
+});
+
 router.get('/settings/welcome-message', isAuthenticated, isGuildAdmin, async (req, res) => {
     try {
         const settingsRef = doc(db, 'guild_settings', req.session.guildId);

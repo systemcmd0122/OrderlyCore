@@ -1219,6 +1219,97 @@ document.addEventListener('DOMContentLoaded', async () => {
                 trackChanges('#vc-log-form');
             },
 
+            afk: async () => {
+                pageTitle.textContent = 'AFK設定';
+                pageContent.innerHTML = '<div class="loader-ring" style="margin: 40px auto;"></div>';
+                const afkSettings = await api.get('/api/settings/afk');
+
+                const enabled = afkSettings.enabled || false;
+                const afkChannelId = afkSettings.afkChannelId || '';
+                const logChannelId = afkSettings.logChannelId || '';
+                const defaultTimeout = afkSettings.defaultTimeout || 300;
+                const defaultAction = afkSettings.defaultAction || 'mute';
+
+                const voiceChannels = guildInfo.channels.filter(c => c.type === 2);
+                const textChannels = guildInfo.channels.filter(c => c.type === 0);
+
+                pageContent.innerHTML = `
+                <form id="afk-form">
+                    <div class="card">
+                        <div class="card-header"><h3>AFK検出設定</h3></div>
+                        <div class="form-group">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="afkEnabled" class="toggle-switch" ${enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                                AFK検出を有効にする
+                            </label>
+                            <p class="form-hint">ボイスチャンネルで長時間活動がないユーザーを自動検出します</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>チャンネル設定</h3></div>
+                        <div class="form-group">
+                            <label for="afkChannelId">AFK検出対象チャンネル</label>
+                            <select id="afkChannelId">
+                                <option value="">すべてのボイスチャンネル</option>
+                                ${voiceChannels.map(c => `<option value="${c.id}" ${c.id === afkChannelId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                            </select>
+                            <p class="form-hint">特定のチャンネルのみを監視する場合に選択</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="afkLogChannelId">ログチャンネル</label>
+                            <select id="afkLogChannelId">
+                                <option value="">ログを無効にする</option>
+                                ${textChannels.map(c => `<option value="${c.id}" ${c.id === logChannelId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>デフォルトアクション</h3></div>
+                        <div class="form-group">
+                            <label for="afkDefaultTimeout">検出までの時間（秒）</label>
+                            <input type="number" id="afkDefaultTimeout" value="${defaultTimeout}" min="60" max="3600" placeholder="300">
+                            <p class="form-hint">デフォルト: 300秒（5分）</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="afkDefaultAction">デフォルトアクション</label>
+                            <select id="afkDefaultAction">
+                                <option value="mute" ${defaultAction === 'mute' ? 'selected' : ''}>ミュート</option>
+                                <option value="deafen" ${defaultAction === 'deafen' ? 'selected' : ''}>デフ</option>
+                                <option value="kick" ${defaultAction === 'kick' ? 'selected' : ''}>キック</option>
+                                <option value="notify" ${defaultAction === 'notify' ? 'selected' : ''}>通知のみ</option>
+                            </select>
+                            <p class="form-hint">ユーザー個別の設定がない場合のデフォルト</p>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">設定を保存</button>
+                </form>`;
+
+                document.getElementById('afk-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const btn = e.target.querySelector('button[type="submit"]');
+                    const btnText = btn.textContent;
+                    btn.disabled = true;
+                    btn.textContent = '保存中...';
+                    try {
+                        await api.post('/api/settings/afk', {
+                            enabled: document.getElementById('afkEnabled').checked,
+                            afkChannelId: document.getElementById('afkChannelId').value || null,
+                            logChannelId: document.getElementById('afkLogChannelId').value || null,
+                            defaultTimeout: parseInt(document.getElementById('afkDefaultTimeout').value) || 300,
+                            defaultAction: document.getElementById('afkDefaultAction').value
+                        });
+                        showMessage('AFK設定を保存しました。');
+                        resetDirtyState();
+                    } catch (error) {
+                        showMessage(`保存エラー: ${error.message}`, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.textContent = btnText;
+                    }
+                });
+                trackChanges('#afk-form');
+            },
 
             leveling: async () => {
                 pageTitle.textContent = 'レベリング設定';

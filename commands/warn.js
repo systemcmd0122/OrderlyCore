@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits, Timestamp } = require('discord.js');
-const { collection, addDoc, getDocs, query, where } = require('firebase/firestore');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { collection, addDoc, getDocs, query, where, Timestamp } = require('firebase/firestore');
 const { v4: uuidv4 } = require('uuid');
 const { createStandardEmbed, createSuccessEmbed, COLORS } = require('../src/utils/embedBuilder');
 

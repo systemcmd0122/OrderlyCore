@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Timestamp } = require('discord.js');
-const { collection, addDoc } = require('firebase/firestore');
+const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { collection, addDoc, Timestamp } = require('firebase/firestore');
 const chalk = require('chalk');
 const { createSuccessEmbed, COLORS } = require('../src/utils/embedBuilder');
 

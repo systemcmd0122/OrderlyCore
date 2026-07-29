@@ -38,7 +38,7 @@ async function checkGuildAfk(client, guild) {
     const settingsSnap = await getDoc(doc(db, 'guild_settings', guildId));
     const guildSettings = settingsSnap.exists() ? settingsSnap.data() : {};
 
-    if (guildSettings.afk && guildSettings.afk.enabled === false) return;
+    if (!guildSettings.afk || guildSettings.afk.enabled === false) return;
 
     const defaultTimeout = guildSettings.afk?.defaultTimeout || 300;
     const defaultAction = guildSettings.afk?.defaultAction || 'mute';
@@ -83,7 +83,7 @@ async function checkUserAfk(client, guild, member, config) {
     const userSnap = await getDoc(userSettingsRef);
     const userSettings = userSnap.exists() ? userSnap.data() : {};
 
-    if (userSettings.autoDetect === false) return;
+    if (userSettings.autoDetect !== true) return;
 
     const afkTrackingRef = ref(rtdb, `afkTracking/${guildId}/${userId}`);
     const afkSnap = await get(afkTrackingRef);

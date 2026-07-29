@@ -1,4 +1,4 @@
-const { ref, set, get, update } = require('firebase/database');
+const { ref, set, get, update, increment } = require('firebase/database');
 const chalk = require('chalk');
 
 /**
@@ -41,8 +41,8 @@ async function recordSuccessRequest(rtdb, userId) {
     try {
         await initializeUserLimit(rtdb, userId);
         const updates = {
-            [`ai_rate_limits/${userId}/successRequests`]: (await get(ref(rtdb, `ai_rate_limits/${userId}/successRequests`))).val() + 1 || 1,
-            [`ai_rate_limits/${userId}/totalRequests`]: (await get(ref(rtdb, `ai_rate_limits/${userId}/totalRequests`))).val() + 1 || 1,
+            [`ai_rate_limits/${userId}/successRequests`]: increment(1),
+            [`ai_rate_limits/${userId}/totalRequests`]: increment(1),
             [`ai_rate_limits/${userId}/lastRequestTime`]: new Date().toISOString(),
             [`ai_rate_limits/${userId}/updatedAt`]: new Date().toISOString()
         };
@@ -63,14 +63,14 @@ async function recordFailedRequest(rtdb, userId, isRateLimited = false) {
         await initializeUserLimit(rtdb, userId);
 
         const baseData = {
-            [`ai_rate_limits/${userId}/failedRequests`]: (await get(ref(rtdb, `ai_rate_limits/${userId}/failedRequests`))).val() + 1 || 1,
-            [`ai_rate_limits/${userId}/totalRequests`]: (await get(ref(rtdb, `ai_rate_limits/${userId}/totalRequests`))).val() + 1 || 1,
+            [`ai_rate_limits/${userId}/failedRequests`]: increment(1),
+            [`ai_rate_limits/${userId}/totalRequests`]: increment(1),
             [`ai_rate_limits/${userId}/lastRequestTime`]: new Date().toISOString(),
             [`ai_rate_limits/${userId}/updatedAt`]: new Date().toISOString()
         };
 
         if (isRateLimited) {
-            baseData[`ai_rate_limits/${userId}/rateLimitedCount`] = (await get(ref(rtdb, `ai_rate_limits/${userId}/rateLimitedCount`))).val() + 1 || 1;
+            baseData[`ai_rate_limits/${userId}/rateLimitedCount`] = increment(1);
             baseData[`ai_rate_limits/${userId}/lastRateLimitTime`] = new Date().toISOString();
         }
 

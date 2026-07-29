@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ChannelType, PermissionFlagsBits, MessageFlags } = require('discord.js');
-const { doc, setDoc } = require('firebase/firestore');
+const { doc, getDoc, setDoc } = require('firebase/firestore');
 const chalk = require('chalk');
 
 module.exports = {
@@ -42,8 +42,11 @@ module.exports = {
         }
 
         const settingsRef = doc(db, 'guild_settings', guildId);
+        const settingsSnap = await getDoc(settingsRef);
+        const existingMappings = settingsSnap.exists() ? (settingsSnap.data().voiceChannelMappings || {}) : {};
         await setDoc(settingsRef, {
             voiceChannelMappings: {
+                ...existingMappings,
                 [voiceChannel.id]: {
                     textChannelId: textChannel.id,
                     silent: silent,
